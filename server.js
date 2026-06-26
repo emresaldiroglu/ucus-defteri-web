@@ -34,7 +34,12 @@ const FlightSchema = new mongoose.Schema({
     ucusTipi: { type: String, required: true },
     ucusSaati: { type: String, required: true }
 });
-const Flight = mongoose.model('Flight', FlightSchema);
+
+// Sanal bir 'id' alanı ekleyerek _id'yi id olarak da kullanılabilir hale getiriyoruz.
+FlightSchema.virtual('id').get(function(){
+    return this._id.toHexString();
+});
+FlightSchema.set('toJSON', { virtuals: true });
 
 // --- Auth Middleware ---
 const auth = (req, res, next) => {

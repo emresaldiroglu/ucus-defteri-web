@@ -471,7 +471,7 @@
 
                 siraliUcuslar.forEach((ucus) => {
                     const li = document.createElement('li');
-                    li.dataset.id = ucus.id; // Her bir elemana ID ata
+                    li.dataset.id = ucus._id; // Her bir elemana ID ata
                     li.innerHTML = `
                         <div class="info">
                             <strong>${ucus.havaAraciTipi} (${ucus.ucusTipi})</strong>
@@ -484,13 +484,13 @@
                     // Listeden bir elemana tıklanınca formu doldur
                     li.addEventListener('click', (e) => {
                         if (e.target.classList.contains('delete-btn')) return;
-                        formuDoldur(ucus.id);
+                        formuDoldur(ucus._id);
                     });
 
                     li.querySelector('.delete-btn').addEventListener('click', () => {
                         // Silme onayı iste
                         if (confirm(`'${ucus.havaAraciTipi}' uçuşunu silmek istediğinizden emin misiniz?`)) {
-                            ucusSil(ucus.id);
+                            ucusSil(ucus._id);
                         }
                     });
 
@@ -523,11 +523,11 @@
 
             // ID'si verilen uçuşun bilgileriyle formu doldurur
             function formuDoldur(id) {
-                const ucus = ucuslar.find(u => u.id === id);
+                const ucus = ucuslar.find(u => u._id === id);
                 if (!ucus) return;
 
-                document.getElementById('ucusId').value = ucus.id;
-                document.getElementById('ucusTarihi').value = ucus.ucusTarihi;
+                document.getElementById('ucusId').value = ucus._id;
+                document.getElementById('ucusTarihi').value = new Date(ucus.ucusTarihi).toISOString().split('T')[0];
                 document.getElementById('havaAraciTipi').value = ucus.havaAraciTipi;
                 document.getElementById('ucusTipi').value = ucus.ucusTipi;
                 document.getElementById('ucusSaati').value = ucus.ucusSaati;
@@ -545,10 +545,14 @@
             async function ucusSil(id) {
                 const token = localStorage.getItem('token');
                 try {
-                    await fetch(`/api/flights/${id}`, {
+                    const response = await fetch(`/api/flights/${id}`, {
                         method: 'DELETE',
                         headers: { 'x-auth-token': token }
                     });
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.message || 'Silme işlemi başarısız.');
+                    }
                     await verileriYukle(); // Listeyi yeniden yükle
                 } catch (error) {
                     console.error("Silme hatası:", error);
