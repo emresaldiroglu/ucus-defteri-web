@@ -268,6 +268,31 @@
 </head>
 <body>
 
+    <!-- Giriş/Kayıt Ekranı -->
+    <div id="auth-container" class="container" style="max-width: 400px; margin: 50px auto;">
+        <div class="form-container">
+            <h3 id="auth-title">Giriş Yap</h3>
+            <form id="auth-form">
+                <label for="username">Kullanıcı Adı:</label>
+                <input type="text" id="username" required>
+                <label for="password">Şifre:</label>
+                <input type="password" id="password" required>
+                <div class="button-group">
+                    <button type="submit" id="auth-submit-btn">Giriş Yap</button>
+                </div>
+                <p id="auth-switch-text" style="text-align: center; margin-top: 15px;">Hesabın yok mu? <a href="#" id="auth-switch-link">Kayıt Ol</a></p>
+            </form>
+            <p id="auth-error" style="color: red; text-align: center;"></p>
+        </div>
+    </div>
+
+    <!-- Ana Uygulama Ekranı (Başlangıçta Gizli) -->
+    <div id="app-container" style="display: none;">
+        <div class="app-header" style="padding: 10px 20px; background-color: #fff; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <span id="welcome-user"></span>
+            <button id="logout-btn" style="background-color: var(--danger-color); font-size: 14px; padding: 8px 12px;">Çıkış Yap</button>
+        </div>
+
     <div class="container">
         <div id="ozetBilgiler" title="Tüm uçuşlarınızın toplam süresi">
             <!-- Toplam uçuş saati buraya eklenecek -->
@@ -314,6 +339,7 @@
             <ul id="ucusListesi"></ul>
         </div>
     </div>
+    </div>
 
     <!-- JavaScript Uygulama Mantığı -->
     <script>
@@ -329,6 +355,16 @@
             const saatSecBtn = document.getElementById('saatSecBtn');
             const themeToggleBtn = document.getElementById('theme-toggle-btn');
             const saatSecenekleri = document.getElementById('saatSecenekleri');
+            const authContainer = document.getElementById('auth-container');
+            const appContainer = document.getElementById('app-container');
+            const authForm = document.getElementById('auth-form');
+            const authTitle = document.getElementById('auth-title');
+            const authSubmitBtn = document.getElementById('auth-submit-btn');
+            const authSwitchLink = document.getElementById('auth-switch-link');
+            const authSwitchText = document.getElementById('auth-switch-text');
+            const authError = document.getElementById('auth-error');
+            const logoutBtn = document.getElementById('logout-btn');
+            const welcomeUser = document.getElementById('welcome-user');
             const listContainerH3 = document.querySelector('.list-container > h3');
             const ucusSaatiInput = document.getElementById('ucusSaati');
 
@@ -358,15 +394,44 @@
             // 1. VERİLERİ YÖNETME FONKSİYONLARI
             //-------------------------------------
 
-            // Verileri LocalStorage'dan yükler
-            function verileriYukle() {
-                const kayitliVeri = localStorage.getItem(STORAGE_KEY);
-                ucuslar = kayitliVeri ? JSON.parse(kayitliVeri) : [];
+            // Verileri sunucudan (API'den) yükler
+            async function verileriYukle() {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+
+                try {
+                    const response = await fetch('/api/flights', {
+                        headers: { 'x-auth-token': token }
+                    });
+                    if (!response.ok) {
+                        // Token geçersizse çıkış yap
+                        cikisYap();
+                        throw new Error('Yetkilendirme hatası');
+                    }
+                    ucuslar = await response.json();
+                    renderUcuslar();
+                } catch (error) {
+                    console.error("Veri yükleme hatası:", error);
+                }
             }
 
             // Verileri LocalStorage'a kaydeder
-            function verileriKaydet() {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(ucuslar));
+            async function verileriKaydet(ucus, method = 'POST', id = '') {
+                const token = localStorage.getItem('token');
+                const url = id ? `/api/flights/${id}` : '/api/flights';
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-auth-token': token
+                        },
+                        body: JSON.stringify(ucus)
+                    });
+                    return await response.json();
+                } catch (error) {
+                    console.error("Kayıt hatası:", error);
+                }
             }
 
             // 2. ARAYÜZÜ GÜNCELLEME FONKSİYONLARI
@@ -477,20 +542,26 @@
             //------------------------------------------------
 
             // Bir uçuşu siler
-            function ucusSil(id) {
-                ucuslar = ucuslar.filter(u => u.id !== id);
-                verileriKaydet();
-                if (ucusIdInput.value == id) { // Eğer silinen, formda açık olansa formu temizle
-                    formuTemizle();
+            async function ucusSil(id) {
+                const token = localStorage.getItem('token');
+                try {
+                    await fetch(`/api/flights/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'x-auth-token': token }
+                    });
+                    await verileriYukle(); // Listeyi yeniden yükle
+                } catch (error) {
+                    console.error("Silme hatası:", error);
                 }
-                renderUcuslar();
+
+                formuTemizle();
             }
 
             // 4. EVENT LISTENERS (OLAY DİNLEYİCİLER)
             //-----------------------------------------
 
             // Form gönderildiğinde (Kaydet/Güncelle butonuna basıldığında)
-            ucusForm.addEventListener('submit', (e) => {
+            ucusForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
                 const id = ucusIdInput.value;
@@ -501,19 +572,15 @@
                     ucusSaati: document.getElementById('ucusSaati').value,
                 };
 
+                let guncellenenUcus;
                 if (id) { // ID varsa güncelleme yapılıyor
-                    const index = ucuslar.findIndex(u => u.id == id);
-                    if (index > -1) {
-                        ucuslar[index] = { ...ucuslar[index], ...ucusVerisi };
-                    }
+                    guncellenenUcus = await verileriKaydet(ucusVerisi, 'PUT', id);
                 } else { // ID yoksa yeni kayıt yapılıyor
-                    ucusVerisi.id = Date.now().toString(); // Benzersiz bir ID oluştur
-                    ucuslar.push(ucusVerisi);
+                    guncellenenUcus = await verileriKaydet(ucusVerisi, 'POST');
                 }
 
-                verileriKaydet();
-                renderUcuslar();
-                formuDoldur(id || ucusVerisi.id); // Kayıttan sonra formu dolu bırak
+                await verileriYukle();
+                formuDoldur(guncellenenUcus._id);
             });
 
             // "Yeni Kayıt" butonuna basıldığında
@@ -539,6 +606,66 @@
                 }
             });
 
+            // --- Auth Event Listeners ---
+            let isLoginMode = true;
+
+            authSwitchLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                isLoginMode = !isLoginMode;
+                authTitle.textContent = isLoginMode ? 'Giriş Yap' : 'Kayıt Ol';
+                authSubmitBtn.textContent = isLoginMode ? 'Giriş Yap' : 'Kayıt Ol';
+                authSwitchText.innerHTML = isLoginMode ? 'Hesabın yok mu? <a href="#" id="auth-switch-link">Kayıt Ol</a>' : 'Zaten hesabın var mı? <a href="#" id="auth-switch-link">Giriş Yap</a>';
+                // Linki yeniden bağla
+                document.getElementById('auth-switch-link').addEventListener('click', arguments.callee);
+            });
+
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                authError.textContent = '';
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/register';
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.message);
+                    }
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    uygulamayiGoster();
+                } catch (err) {
+                    authError.textContent = err.message;
+                }
+            });
+
+            logoutBtn.addEventListener('click', cikisYap);
+
+            function cikisYap() {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                authContainer.style.display = 'block';
+                appContainer.style.display = 'none';
+                ucuslar = [];
+                renderUcuslar();
+            }
+
+            function uygulamayiGoster() {
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (user) {
+                    welcomeUser.textContent = `Hoş geldin, ${user.username}`;
+                    authContainer.style.display = 'none';
+                    appContainer.style.display = 'block';
+                    verileriYukle();
+                }
+            }
+
+
             // Tema değiştirme butonu
             themeToggleBtn.addEventListener('click', temaDegistir);
 
@@ -556,11 +683,13 @@
             // 5. UYGULAMAYI BAŞLAT
             //----------------------
             function init() {
-                verileriYukle();
-                renderUcuslar();
-                // Kayıtlı temayı yükle
-                const kayitliTema = localStorage.getItem('ucusDefteriTemasi') || 'light';
-                temaUygula(kayitliTema);
+                const token = localStorage.getItem('token');
+                if (token) {
+                    uygulamayiGoster();
+                } else {
+                    authContainer.style.display = 'block';
+                    appContainer.style.display = 'none';
+                }
             }
 
             init();
