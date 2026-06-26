@@ -428,9 +428,13 @@
                         },
                         body: JSON.stringify(ucus)
                     });
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.message || 'Kayıt işlemi başarısız.');
+                    }
                     return await response.json();
                 } catch (error) {
-                    console.error("Kayıt hatası:", error);
+                    console.error("Kayıt/Güncelleme hatası:", error);
                 }
             }
 
@@ -584,7 +588,9 @@
                 }
 
                 await verileriYukle();
-                formuDoldur(guncellenenUcus._id);
+                if (guncellenenUcus && guncellenenUcus._id) {
+                    formuDoldur(guncellenenUcus._id);
+                }
             });
 
             // "Yeni Kayıt" butonuna basıldığında
@@ -687,6 +693,10 @@
             // 5. UYGULAMAYI BAŞLAT
             //----------------------
             function init() {
+                // Kayıtlı temayı yükle
+                const kayitliTema = localStorage.getItem('ucusDefteriTemasi') || 'light';
+                temaUygula(kayitliTema);
+
                 const token = localStorage.getItem('token');
                 if (token) {
                     uygulamayiGoster();
