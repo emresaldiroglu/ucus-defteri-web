@@ -580,16 +580,22 @@
                     ucusSaati: document.getElementById('ucusSaati').value,
                 };
 
-                let guncellenenUcus;
+                let sonuc;
                 if (id) { // ID varsa güncelleme yapılıyor
-                    guncellenenUcus = await verileriKaydet(ucusVerisi, 'PUT', id);
+                    sonuc = await verileriKaydet(ucusVerisi, 'PUT', id);
+                    // Mevcut uçuşu listede bul ve güncelle
+                    const index = ucuslar.findIndex(u => u._id === id);
+                    if (index !== -1) ucuslar[index] = sonuc;
+
                 } else { // ID yoksa yeni kayıt yapılıyor
-                    guncellenenUcus = await verileriKaydet(ucusVerisi, 'POST');
+                    sonuc = await verileriKaydet(ucusVerisi, 'POST');
+                    // Yeni uçuşu listeye ekle
+                    ucuslar.push(sonuc);
                 }
 
-                await verileriYukle();
-                if (guncellenenUcus && guncellenenUcus._id) {
-                    formuDoldur(guncellenenUcus._id);
+                renderUcuslar(); // Listeyi yeniden çiz
+                if (sonuc && sonuc._id) {
+                    formuDoldur(sonuc._id); // Formu güncel veriyle doldur ve seçili göster
                 }
             });
 
