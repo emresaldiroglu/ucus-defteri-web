@@ -619,14 +619,25 @@
             // --- Auth Event Listeners ---
             let isLoginMode = true;
 
-            authSwitchLink.addEventListener('click', (e) => {
+            function toggleAuthMode(e) {
                 e.preventDefault();
                 isLoginMode = !isLoginMode;
                 authTitle.textContent = isLoginMode ? 'Giriş Yap' : 'Kayıt Ol';
                 authSubmitBtn.textContent = isLoginMode ? 'Giriş Yap' : 'Kayıt Ol';
-                authSwitchText.innerHTML = isLoginMode ? 'Hesabın yok mu? <a href="#" id="auth-switch-link">Kayıt Ol</a>' : 'Zaten hesabın var mı? <a href="#" id="auth-switch-link">Giriş Yap</a>';
-                // Linki yeniden bağla
-                document.getElementById('auth-switch-link').addEventListener('click', arguments.callee);
+                
+                const switchLink = document.getElementById('auth-switch-link');
+                if (isLoginMode) {
+                    authSwitchText.firstChild.textContent = 'Hesabın yok mu? ';
+                    switchLink.textContent = 'Kayıt Ol';
+                } else {
+                    authSwitchText.firstChild.textContent = 'Zaten hesabın var mı? ';
+                    switchLink.textContent = 'Giriş Yap';
+                }
+            }
+            authContainer.addEventListener('click', (e) => {
+                if (e.target.id === 'auth-switch-link') {
+                    toggleAuthMode(e);
+                }
             });
 
             authForm.addEventListener('submit', async (e) => {
@@ -635,6 +646,9 @@
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
                 const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/register';
+
+                authSubmitBtn.disabled = true;
+                authSubmitBtn.textContent = 'İşlem Sürüyor...';
 
                 try {
                     const response = await fetch(endpoint, {
@@ -651,6 +665,9 @@
                     uygulamayiGoster();
                 } catch (err) {
                     authError.textContent = err.message;
+                } finally {
+                    authSubmitBtn.disabled = false;
+                    authSubmitBtn.textContent = isLoginMode ? 'Giriş Yap' : 'Kayıt Ol';
                 }
             });
 

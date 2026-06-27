@@ -7,6 +7,11 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const cors = require('cors');
 
+// JWT_SECRET kontrolü
+if (!process.env.JWT_SECRET) {
+    console.error("FATAL ERROR: JWT_SECRET is not defined.");
+    process.exit(1);
+}
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -60,63 +65,101 @@ const auth = (req, res, next) => {
 
 // Kullanıcı Kaydı
 app.post('/api/auth/register', async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ message: 'Lütfen tüm alanları doldurun.' });
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ message: 'Lütfen tüm alanları doldurun.' });
 
-    let user = await User.findOne({ username });
-    if (user) return res.status(400).json({ message: 'Bu kullanıcı adı zaten mevcut.' });
+        let user = await User.findOne({ username });
+        if (user) return res.status(400).json({ message: 'Bu kullanıcı adı zaten mevcut.' });
 
-    user = new User({ username, password });
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
-    await user.save();
+        user = new User({ username, password });
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(password, salt);
+        await user.save();
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.status(201).json({ token, user: { id: user.id, username: user.username } });
+        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+        res.status(201).json({ token, user: { id: user.id, username: user.username } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Sunucu hatası oluştu.' });
+    }
 });
 
 // Kullanıcı Girişi
 app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ message: 'Lütfen tüm alanları doldurun.' });
+    try {
+        const { username, password } = req.body;
+        if (!username || !password) return res.status(400).json({ message: 'Lütfen tüm alanları doldurun.' });
 
-    const user = await User.findOne({ username });
-    if (!user) return res.status(400).json({ message: 'Geçersiz kullanıcı bilgileri.' });
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).json({ message: 'Geçersiz kullanıcı bilgileri.' });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Geçersiz kullanıcı bilgileri.' });
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ message: 'Geçersiz kullanıcı bilgileri.' });
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user: { id: user.id, username: user.username } });
+        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+        res.json({ token, user: { id: user.id, username: user.username } });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Sunucu hatası oluştu.' });
+    }
 });
 
 // Kullanıcının uçuşlarını getir
 app.get('/api/flights', auth, async (req, res) => {
-    const flights = await Flight.find({ userId: req.user.id }).sort({ ucusTarihi: -1 });
-    res.json(flights);
+    try {
+        const flights = await Flight.find({ userId: req.user.id }).sort({ ucusTarihi: -1 });
+        res.json(flights);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Uçuşlar getirilirken bir hata oluştu.' });
+    }
 });
 
 // Yeni uçuş ekle
 app.post('/api/flights', auth, async (req, res) => {
-    const { ucusTarihi, havaAraciTipi, ucusTipi, ucusSaati } = req.body;
-    const newFlight = new Flight({
-        userId: req.user.id,
-        ucusTarihi, havaAraciTipi, ucusTipi, ucusSaati
-    });
-    const savedFlight = await newFlight.save();
-    res.status(201).json(savedFlight);
+    try {
+        const { ucusTarihi, havaAraciTipi, ucusTipi, ucusSaati } = req.body;
+        const newFlight = new Flight({
+            userId: req.user.id,
+            ucusTarihi, havaAraciTipi, ucusTipi, ucusSaati
+        });
+        const savedFlight = await newFlight.save();
+        res.status(201).json(savedFlight);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Uçuş eklenirken bir hata oluştu.' });
+    }
 });
 
 // Uçuşu güncelle
 app.put('/api/flights/:id', auth, async (req, res) => {
-    const updatedFlight = await Flight.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    res.json(updatedFlight);
+    try {
+        const flight = await Flight.findById(req.params.id);
+        if (!flight) return res.status(404).json({ message: 'Uçuş bulunamadı.' });
+        if (flight.userId.toString() !== req.user.id) return res.status(401).json({ message: 'Yetkiniz yok.' });
+
+        const updatedFlight = await Flight.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        res.json(updatedFlight);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Uçuş güncellenirken bir hata oluştu.' });
+    }
 });
 
 // Uçuşu sil
 app.delete('/api/flights/:id', auth, async (req, res) => {
-    await Flight.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Uçuş başarıyla silindi.' });
+    try {
+        const flight = await Flight.findById(req.params.id);
+        if (!flight) return res.status(404).json({ message: 'Uçuş bulunamadı.' });
+        if (flight.userId.toString() !== req.user.id) return res.status(401).json({ message: 'Yetkiniz yok.' });
+
+        await Flight.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Uçuş başarıyla silindi.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Uçuş silinirken bir hata oluştu.' });
+    }
 });
 
 // Sunucuyu başlat
