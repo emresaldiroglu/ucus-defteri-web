@@ -5,46 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ana Sayfa</title>
     <style>
-        /* Genel Sayfa Tasarımı ve Resetleme */
-        * {
-            box-sizing: border-box; /* Taşmaları önleyen en kritik kural */
-            margin: 0;
-            padding: 0;
-        }
-
+        /* Genel Sayfa Tasarımı */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            min-height: 100vh; /* Sabit height yerine min-height taşmayı önler */
+            height: 100vh;
+            margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             color: white;
-            padding: 20px; /* Küçük ekranlarda kenarlara yapışmasın */
         }
 
-        /* Ana Kart Alanı */
         .container {
             text-align: center;
             background: rgba(255, 255, 255, 0.1);
-            padding: 40px 20px;
+            padding: 50px;
             border-radius: 15px;
             backdrop-filter: blur(10px);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 500px; /* Geniş ekranlarda çok büyümesini engeller */
         }
 
         h1 {
             margin-bottom: 30px;
-            font-size: calc(1.8rem + 1vw); /* Ekrana göre otomatik büyüyen yazı */
-        }
-
-        /* Buton Grubu */
-        .btn-group {
-            display: flex;
-            flex-direction: column; /* Mobilde alt alta gelsinler */
-            gap: 15px; /* Butonlar arası boşluk */
+            font-size: 2.5rem;
         }
 
         /* Buton Tasarımları */
@@ -52,19 +36,21 @@
             background-color: #4CAF50;
             border: none;
             color: white;
-            padding: 15px 20px;
+            padding: 15px 32px;
             text-align: center;
+            text-decoration: none;
+            display: inline-block;
             font-size: 18px;
+            margin: 10px;
             cursor: pointer;
             border-radius: 8px;
             transition: background 0.3s, transform 0.2s;
             font-weight: bold;
-            width: 100%; /* İçinde bulunduğu kutuyu kaplasın */
         }
 
         .btn:hover {
             background-color: #45a049;
-            transform: scale(1.02);
+            transform: scale(1.05);
         }
 
         .btn-kdu {
@@ -75,11 +61,11 @@
             background-color: #007bb5;
         }
 
-        /* Pop-up (Modal) Dış Alanı */
+        /* Pop-up (Modal) Tasarımı */
         .modal {
-            display: none; 
+            display: none; /* Başlangıçta gizli */
             position: fixed;
-            z-index: 100;
+            z-index: 1;
             left: 0;
             top: 0;
             width: 100%;
@@ -87,17 +73,14 @@
             background-color: rgba(0,0,0,0.6);
             justify-content: center;
             align-items: center;
-            padding: 20px; /* Mobilde pop-up kenarlardan taşmasın */
         }
 
-        /* Pop-up İçerik Kartı */
         .modal-content {
             background-color: #ffffff;
             color: #333;
             padding: 30px;
             border-radius: 10px;
-            width: 100%;
-            max-width: 400px; /* Bilgisayarda maksimum genişlik */
+            width: 350px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
             position: relative;
             text-align: left;
@@ -107,7 +90,7 @@
             position: absolute;
             top: 10px;
             right: 15px;
-            font-size: 28px;
+            font-size: 24px;
             cursor: pointer;
             color: #aaa;
         }
@@ -119,8 +102,6 @@
         .modal-content h2 {
             margin-top: 0;
             color: #1e3c72;
-            font-size: 1.5rem;
-            margin-bottom: 20px;
         }
 
         /* Form Elemanları */
@@ -132,16 +113,14 @@
             display: block;
             margin-bottom: 5px;
             font-weight: 600;
-            font-size: 14px;
         }
 
         .input-group input {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: 1px solid #ccc;
             border-radius: 5px;
             box-sizing: border-box;
-            font-size: 16px; /* Mobilde inputa tıklayınca yakınlaştırma yapmasın diye ideal boyut */
         }
 
         .submit-btn {
@@ -149,12 +128,11 @@
             background-color: #1e3c72;
             color: white;
             border: none;
-            padding: 14px;
+            padding: 12px;
             font-size: 16px;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
-            margin-top: 10px;
         }
 
         .submit-btn:hover {
@@ -164,21 +142,9 @@
         #error-msg {
             color: red;
             font-size: 14px;
-            margin-top: 12px;
+            margin-top: 10px;
             text-align: center;
             display: none;
-        }
-
-        /* --- BÜYÜK EKRANLAR İÇİN AYAR (Masaüstü) --- */
-        @media (min-width: 768px) {
-            .btn-group {
-                flex-direction: row; /* Butonları yan yana getir */
-                justify-content: center;
-            }
-            .btn {
-                width: auto; /* Butonlar kendi yazısı kadar yer kaplasın */
-                min-width: 180px;
-            }
         }
     </style>
 </head>
@@ -186,10 +152,8 @@
 
     <div class="container">
         <h1>Sistem Girişi</h1>
-        <div class="btn-group">
-            <button class="btn" onclick="openLoginModal('ucussayfasi.html')">Uçuş Defterim</button>
-            <button class="btn btn-kdu" onclick="openLoginModal('kdusayfasi.html')">KDU</button>
-        </div>
+        <button class="btn" onclick="openLoginModal('ucussayfasi.html')">Uçuş Defterim</button>
+        <button class="btn btn-kdu" onclick="openLoginModal('kdusayfasi.html')">KDU</button>
     </div>
 
     <div id="loginModal" class="modal">
@@ -198,7 +162,7 @@
             <h2>Giriş Yapın</h2>
             <form id="loginForm">
                 <div class="input-group">
-                    <label for="username">Kullanıcı ID</label>
+                    <label for="username">Kullanıcı ID (E-posta/Ad)</label>
                     <input type="text" id="username" required placeholder="Kullanıcı adınız">
                 </div>
                 <div class="input-group">
@@ -212,29 +176,35 @@
     </div>
 
     <script>
-        let targetPage = ''; 
+        let targetPage = ''; // Kullanıcının gitmek istediği sayfa adresi
 
+        // Pop-up Ekranını Açar
         function openLoginModal(page) {
-            targetPage = page; 
+            targetPage = page; // Gitmek istediği sayfayı hafızaya alıyoruz
             document.getElementById('loginModal').style.display = 'flex';
         }
 
+        // Pop-up Ekranını Kapatır
         function closeModal() {
             document.getElementById('loginModal').style.display = 'none';
             document.getElementById('error-msg').style.display = 'none';
             document.getElementById('loginForm').reset();
         }
 
+        // Form Gönderildiğinde (Giriş Butonuna Basıldığında)
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); 
+            e.preventDefault(); // Sayfanın yenilenmesini engelle
 
             const usernameInput = document.getElementById('username').value;
             const passwordInput = document.getElementById('password').value;
             const errorMsg = document.getElementById('error-msg');
 
             try {
+                // RENDER BACKEND API ADRESİNİZ (Canlıya geçince burayı Render linkinizle değiştireceksiniz)
+                // Örn: https://projeniz.onrender.com/api/login
                 const backendUrl = 'http://localhost:5000/api/login'; 
 
+                // Arka yüze (Backend) verileri güvenli şekilde gönderiyoruz
                 const response = await fetch(backendUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -244,8 +214,11 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    // MongoDB'den onay geldi! Giriş başarılı.
+                    // Kullanıcıyı gitmek istediği sayfaya yönlendiriyoruz.
                     window.location.href = targetPage; 
                 } else {
+                    // Veri tabanında eşleşme bulunamadı veya şifre yanlış
                     errorMsg.style.display = 'block';
                     errorMsg.innerText = data.message || "Hatalı giriş bilgileri!";
                 }
@@ -253,7 +226,7 @@
             } catch (error) {
                 console.error("Sistem hatası:", error);
                 errorMsg.style.display = 'block';
-                errorMsg.innerText = "Sunucuya bağlanılamadı.";
+                errorMsg.innerText = "Sunucuya bağlanılamadı. Lütfen backend'in açık olduğundan emin olun.";
             }
         });
     </script>
