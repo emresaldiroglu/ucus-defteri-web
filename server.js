@@ -6,39 +6,39 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 
-// Middleware ayarları (Form verilerini okumak için)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Render Environment Variables'dan gelen URI bağlantısı
 const mongoURI = process.env.MONGO_URI;
 
-// 🎯 KRİTİK AYAR: dbName: 'test' ekleyerek yanlış veritabanına bağlanma sorununu çözüyoruz
+// 🎯 KRİTİK AYAR: dbName kısmını 'ucusDB' olarak değiştirerek doğru veritabanını hedefliyoruz
 mongoose.connect(mongoURI, {
-    dbName: 'test' 
+    dbName: 'ucusDB' 
 })
-  .then(() => console.log("✔️ [BAŞARILI] MongoDB 'test' veritabanına kesin bağlantı sağlandı!"))
+  .then(() => console.log("✔️ [BAŞARILI] MongoDB 'ucusDB' veritabanına kesin bağlantı sağlandı!"))
   .catch(err => console.error("❌ MongoDB Bağlantı Hatası: ", err));
 
-// Esnek Şema Tanımı
-const UserSchema = new mongoose.Schema({}, { strict: false });
+// Kullanıcı Şeması
+const UserSchema = new mongoose.Schema({
+    email: { type: String },
+    eposta: { type: String },
+    password: { type: String },
+    sifre: { type: String }
+});
+
 const User = mongoose.model('User', UserSchema, 'users');
 
-// Ana Sayfa Rotaları
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// LOGIN MEKANİZMASI (Bcrypt ve Çift Dil Uyumlu)
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    console.log(`--- GİRİŞ DENEMESİ ---`);
-    console.log(`Siteden Girilen E-posta: [${email}]`);
+    console.log(`--- GİRİŞ DENEMESİ --- Siteden Girilen: [${email}]`);
 
     try {
-        // E-posta veya eposta alanına göre kullanıcıyı veritabanında ara
         const user = await User.findOne({
             $or: [
                 { email: email },
@@ -47,43 +47,23 @@ app.post('/login', async (req, res) => {
         });
 
         if (!user) {
-            console.log("❌ Kullanıcı veritabanında bulunamadı!");
-            return res.send(`
-                <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
-                    <h1 style="color: #e74c3c;">❌ Giriş Başarısız!</h1>
-                    <p style="font-size:18px; color:#555;">Böyle bir kullanıcı bulunamadı.</p>
-                    <a href="/" style="display:inline-block; margin-top:15px; padding:10px 20px; background:#3498db; color:white; text-decoration:none; border-radius:5px;">Tekrar Dene</a>
-                </div>
-            `);
+            console.log("❌ Kullanıcı bulunamadı!");
+            return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Giriş Başarısız!</h1><p>Böyle bir kullanıcı bulunamadı.</p><a href="/">Tekrar Dene</a></div>`);
         }
 
-        // Veritabanındaki şifre alanını bul (password veya sifre)
         const dbPassword = user.password || user.sifre;
-
-        // 🔐 Bcrypt şifre karşılaştırması
         const isMatch = await bcrypt.compare(password, dbPassword);
 
         if (isMatch) {
-            console.log("✔️ Şifre doğru, giriş başarılı!");
-            res.send(`
-                <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
-                    <h1 style="color: #2ecc71;">✔️ Giriş Başarılı!</h1>
-                    <p style="font-size:18px; color:#555;">Sisteme başarıyla giriş yaptınız.</p>
-                </div>
-            `);
+            console.log("✔️ Giriş başarılı!");
+            res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: green;">✔️ Giriş Başarılı!</h1><p>Uçuş Log Sistemine Başarıyla Giriş Yaptınız.</p></div>`);
         } else {
             console.log("❌ Şifre yanlış!");
-            res.send(`
-                <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
-                    <h1 style="color: #e74c3c;">❌ Giriş Başarısız!</h1>
-                    <p style="font-size:18px; color:#555;">E-posta veya şifre hatalı.</p>
-                    <a href="/" style="display:inline-block; margin-top:15px; padding:10px 20px; background:#3498db; color:white; text-decoration:none; border-radius:5px;">Tekrar Dene</a>
-                </div>
-            `);
+            res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Giriş Başarısız!</h1><p>E-posta veya şifre hatalı.</p><a href="/">Tekrar Dene</a></div>`);
         }
 
     } catch (error) {
-        console.error("Sorgu hatası:", error);
+        console.error("🔴 VERİTABANI SORGULAMA HATASI:", error);
         res.status(500).send("Sunucu hatası oluştu.");
     }
 });
