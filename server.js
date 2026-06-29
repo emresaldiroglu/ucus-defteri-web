@@ -13,8 +13,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // MongoDB Bağlantısı
 const mongoURI = process.env.MONGO_URI;
-mongoose.connect(mongoURI)
-  .then(() => console.log("✔️ MongoDB bağlantısı kuruldu!"))
+// Hangi veritabanına bağlanacağını kod içinden kesin olarak dikte ediyoruz
+mongoose.connect(mongoURI, {
+    dbName: 'test' // 🎯 HATA ÖNLEYİCİ: Hangi link olursa olsun zorla 'test' veritabanına bağlanmasını sağlar!
+})
+  .then(() => console.log("✔️ [KESİN BAĞLANTI] test veritabanına başarıyla bağlanıldı!"))
   .catch(err => console.error("❌ MongoDB Bağlantı Hatası: ", err));
 
 // Şema Tanımı ( strict: false ile veritabanındaki her türlü alanı esnekçe okuyoruz )
