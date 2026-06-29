@@ -5,55 +5,70 @@ const path = require('path');
 
 const app = express();
 
-// FORM VERİLERİNİ OKUMAK İÇİN (Kritik Ayar: Not Found hatasını önler)
+// Form verilerini eksiksiz okumak için gerekli middleware tanımları
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// Klasördeki statik dosyaları (HTML/CSS) dışarıya açıyoruz
+// HTML/CSS dosyalarının olduğu public klasörünü dışarıya açıyoruz
 app.use(express.static(path.join(__dirname, 'public')));
 
-// MongoDB Bağlantısı (Render panelindeki Environment Variables'dan MONGO_URI'yi çeker)
+// Render Environment Variables'dan gelen URI bağlantısı
 const mongoURI = process.env.MONGO_URI;
 
-if (!mongoURI) {
-    console.error("HATA: Render panelinde MONGO_URI çevre değişkeni tanımlanmamış!");
-}
-
 mongoose.connect(mongoURI)
-  .then(() => console.log("MongoDB bağlantısı başarıyla kuruldu!"))
-  .catch(err => console.error("MongoDB Bağlantı Hatası: ", err));
+  .then(() => console.log("✔️ [BAŞARILI] MongoDB bağlantısı başarıyla kuruldu!"))
+  .catch(err => console.error("❌ [HATA] MongoDB Bağlantı Hatası: ", err));
 
-// Veritabanı Kullanıcı Şeması (Koleksiyon adı otomatik 'users' olur)
+// MongoDB Kullanıcı Şeması
+// Hem İngilizce (email/password) hem Türkçe (eposta/sifre) olasılığına karşı esnek yapı
 const UserSchema = new mongoose.Schema({
-    eposta: { type: String, required: true },
-    sifre: { type: String, required: true }
-});
+    eposta: String,
+    sifre: String,
+    email: String,
+    password: String
+}, { strict: false }); // strict: false sayesinde veritabanında ne isimle kayıtlıysa onu okuyabiliriz
+
 const User = mongoose.model('User', UserSchema);
 
-// 1. ROTA (GET): Kullanıcı siteye ilk girdiğinde index.html'i gösterir
+// ANA SAYFA: index.html dosyasını gösterir
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 2. ROTA (POST): Giriş Yap butonuna basıldığında çalışan ana mekanizma
+// LOGIN MEKANİZMASI
 app.post('/login', async (req, res) => {
-    // HTML'deki name="email" ve name="password" alanlarından verileri alıyoruz
     const { email, password } = req.body;
 
+    // 🔍 LOG 1: Kullanıcının ekrandan ne yazdığını Render logunda görmek için
+    console.log(`--- GİRİŞ DENEMESİ ---`);
+    console.log(`Siteden Yazılan E-posta: [${email}]`);
+    console.log(`Siteden Yazılan Şifre: [${password}]`);
+
     try {
-        // MongoDB'de bu eposta ve şifreye ait bir kayıt var mı kontrol et
-        const user = await User.findOne({ eposta: email, sifre: password });
+        // 🔍 LOG 2: Veritabanında kayıtlı olan İLK kullanıcıyı çekip yapısına bakıyoruz
+        const anyUser = await User.findOne({});
+        console.log("Veritabanındaki İlk Verinin Gerçek Hali:", anyUser);
+
+        // Hem eposta/sifre hem de email/password kombinasyonlarını aynı anda sorguluyoruz (Hata riskini sıfırlamak için)
+        const user = await User.findOne({
+            $or: [
+                { eposta: email, sifre: password },
+                { email: email, password: password },
+                { eposta: email, password: password },
+                { email: email, sifre: password }
+            ]
+        });
 
         if (user) {
-            // Kullanıcı bulunduysa
+            console.log("✔️ Eşleşme bulundu, giriş başarılı!");
             res.send(`
                 <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
                     <h1 style="color: #2ecc71;">✔️ Giriş Başarılı!</h1>
-                    <p style="font-size:18px; color:#555;">Hoş geldiniz, <b>${email}</b>.</p>
+                    <p style="font-size:18px; color:#555;">Sisteme başarıyla giriş yaptınız.</p>
                 </div>
             `);
         } else {
-            // Kullanıcı bulunamadıysa veya şifre yanlışsa
+            console.log("❌ Eşleşen kullanıcı bulunamadı, giriş başarısız!");
             res.send(`
                 <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
                     <h1 style="color: #e74c3c;">❌ Giriş Başarısız!</h1>
@@ -63,13 +78,13 @@ app.post('/login', async (req, res) => {
             `);
         }
     } catch (error) {
-        console.error("Giriş esnasında hata oluştu:", error);
-        res.status(500).send("Sunucu tarafında bir hata oluştu.");
+        console.error("Sorgu sırasında hata meydana geldi:", error);
+        res.status(500).send("Sunucu içi hata oluştu.");
     }
 });
 
-// Render'ın vereceği dinamik portu veya localde 3000 portunu dinle
+// Port Ayarı
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Sunucu ${PORT} portunda başarıyla ayağa kalktı.`);
+    console.log(`🚀 Sunucu ${PORT} portunda çalışıyor.`);
 });
