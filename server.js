@@ -24,11 +24,10 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema, 'users');
 
-// 🎯 RAPOR TARİHLERİ İÇİN AYRI VE GÜVENLİ VERİTABANI ŞEMASI
 const ReportDateSchema = new mongoose.Schema({
     userEmail: String,
-    alan: String,   // muayene1Tarih, muayene4Tarih, aletKartTarih, standTarih
-    tarih: String   // YYYY-MM-DD
+    alan: String,   
+    tarih: String   
 });
 const ReportDate = mongoose.model('ReportDate', ReportDateSchema, 'report_dates');
 
@@ -63,7 +62,7 @@ function hesaplaToplamSaat(flights) {
     });
     let toplamSaat = Math.floor(toplamDakika / 60);
     let kalanDakika = toplamDakika % 60;
-    return `${toplamSaat.toString().padStart(2, '0')}:${kalanDakika.toString().padStart(2, '0');}`;
+    return `${toplamSaat.toString().padStart(2, '0')}:${kalanDakika.toString().padStart(2, '0')}`;
 }
 
 function getGunFarki(hedefTarih) {
@@ -104,7 +103,6 @@ app.post('/login', async (req, res) => {
             const flights = await Flight.find({ userEmail: email }).sort({ tarih: -1 });
             const toplamUcusSüresi = hesaplaToplamSaat(flights);
 
-            // GGG ve Son Uçuş hesaplamaları
             const sonUcus = flights[0];
             const sonGggUcus = flights.find(f => f.egitimTipi === 'ggg');
             
@@ -120,7 +118,6 @@ app.post('/login', async (req, res) => {
             const renkGgg = kalanGgg <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
             const renkSonUcus = kalanSonUcus <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
 
-            // 🎯 AYRI VERİTABANINDAN RAPOR TARİHLERİNİ ÇEKELİM
             const kayitliTarihler = await ReportDate.find({ userEmail: email });
             const tarihBul = (alanAdi) => {
                 const bulma = kayitliTarihler.find(t => t.alan === alanAdi);
@@ -151,44 +148,33 @@ app.post('/login', async (req, res) => {
             const sAlet = hesaplaTarihliSayaç(tAlet, 1, 'Alet Kart', 'aletKartTarih');
             const sStand = hesaplaTarihliSayaç(tStand, 1, 'Standardizasyon', 'standTarih');
 
-            // TELEFONLAR İÇİN %100 UYUMLU MOBİL TASARIM (RESPONSIVE)
             res.send(`
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                 <style>
                     body { background: #f5f6fa; margin: 0; padding: 10px; font-family:'Segoe UI', sans-serif; }
                     .container { max-width:900px; margin:10px auto; padding:15px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-                    
-                    /* MOBİL GRID SİSTEMLERİ */
                     .ust-panel { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px; }
                     @media(min-width: 768px) { .ust-panel { grid-template-columns: 1fr 2fr; } }
-                    
                     .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
                     @media(min-width: 480px) { .sayac-grid { grid-template-columns: repeat(3, 1fr); } }
-
                     .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:20px; }
                     @media(min-width: 600px) { .form-grid { grid-template-columns: 1fr 1fr; } .span-mobil-2 { grid-column: span 2; } }
-
                     .filtre-box { background:#f1f2f6; padding:12px; border-radius:10px; margin-bottom:20px; display:flex; flex-direction:column; gap:10px; }
                     @media(min-width: 600px) { .filtre-box { flex-direction: row; flex-wrap: wrap; align-items: center; } }
-
                     input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
                     button { padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; }
                     button:active { opacity: 0.8; }
-                    
                     .btn-ekle { background:#2ecc71; color:white; }
                     .btn-filtre { background:#34495e; color:white; width:auto; padding:8px 15px; }
                     .btn-temizle { background:#7f8c8d; color:white; width:auto; padding:8px 15px; }
-
                     .tablo-sarmal { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; }
                     table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 14px; }
                     th { background: #2c3e50; color: white; padding: 12px; }
                     td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
-                    
                     .sil-btn { background:#e74c3c; color:white; padding:6px 12px; border-radius:4px; font-size:12px; width:auto; }
                 </style>
 
                 <div class="container">
-                    
                     <div class="ust-panel">
                         <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 20px; border-radius: 10px; text-align: center; display:flex; flex-direction:column; justify-content:center;">
                             <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">TOPLAM UÇUŞ SAATİ</span>
@@ -235,7 +221,6 @@ app.post('/login', async (req, res) => {
                             <button onclick="filtreleUcuslari()" class="btn-filtre">Uygula</button>
                             <button onclick="filtreleriTemizle()" class="btn-temizle">X</button>
                         </div>
-                        
                         <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:13px; display:none; width:100%; text-align:center; margin-top:5px;">
                             ⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span>
                         </div>
@@ -392,11 +377,9 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// 🎯 RAPOR TARİHLERİNİ ARTIK AYRI KOLEKSİYONA KAYDEDEN GÜVENLİ API RROTASI
 app.post('/api/update-user-date', async (req, res) => {
     const { userEmail, alan, tarih } = req.body;
     try {
-        // Eğer bu alan için daha önce girilmiş bir tarih varsa güncelle, yoksa yeni kayıt aç (Upsert mantığı)
         await ReportDate.findOneAndUpdate(
             { userEmail: userEmail, alan: alan },
             { tarih: tarih },
@@ -425,4 +408,4 @@ app.post('/api/add-flight', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Sunucu aktif.`));
+app.listen(PORT, () => console.log("🚀 Sunucu aktif."));
