@@ -14,28 +14,30 @@ const mongoURI = process.env.MONGO_URI;
 
 mongoose.connect(mongoURI, { dbName: 'ucusDB' })
   .then(() => console.log("✔️ [BAŞARILI] ucusDB bağlantısı aktif."))
-  .catch(err => console.error("❌ Bağlantı Hatası: ", err));
+  .catch(err => console.error("❌ Connection Error: ", err));
 
 // --- MONGODB ŞEMALARI ---
 
-// 1. Kullanıcı Şeması
 const UserSchema = new mongoose.Schema({
     email: String,
     password: String
 });
 const User = mongoose.model('User', UserSchema, 'users');
 
-// 2. Uçuş Kayıt Şeması
 const FlightSchema = new mongoose.Schema({
-    userEmail: String,      // Uçuşun hangi kullanıcıya ait olduğunu ayırmak için
+    userEmail: String,
     tarih: String,
-    egitimTipi: String,     // ggg, gş, au(sim)
-    sure: String            // HH:MM formatında saklanacak
+    havaAraciTipi: String, // s70, s70i, t70, atak, mi17, gökbey
+    egitimTipi: String,    // ggg, gş, au(sim)
+    sure: String,          // HH:MM formatı
+    gorevAciklamasi: String // Opsiyonel not alanı
 });
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 
-// --- YARDIMCI FONKSİYON (Ondalık Saati HH:MM Formatına Çevirir) ---
+// --- YARDIMCI FONKSİYONLAR ---
+
+// Ondalık saati HH:MM formatına çevirir (Örn: 2.5 -> 02:30)
 function formatUcusSaati(saatInput) {
     let num = parseFloat(saatInput);
     if (isNaN(num)) return "00:00";
@@ -43,11 +45,26 @@ function formatUcusSaati(saatInput) {
     let saat = Math.floor(num);
     let dakika = Math.round((num - saat) * 60);
     
-    // Değerleri iki haneli stringe çevir (Örn: 2 -> "02", 5 -> "05")
     let saatStr = saat.toString().padStart(2, '0');
     let dakikaStr = dakika.toString().padStart(2, '0');
     
     return `${saatStr}:${dakikaStr}`;
+}
+
+// HH:MM formatındaki süre dizisini toplayıp toplam HH:MM döndürür
+function hesaplaToplamSaat(flights) {
+    let toplamDakika = 0;
+    flights.forEach(f => {
+        if (f.sure && f.sure.includes(':')) {
+            const [saat, dakika] = f.sure.split(':').map(Number);
+            toplamDakika += (saat * 60) + dakika;
+        }
+    });
+    
+    let toplamSaat = Math.floor(toplamDakika / 60);
+    let kalanDakika = toplamDakika % 60;
+    
+    return `${toplamSaat.toString().padStart(2, '0')}:${kalanDakika.toString().padStart(2, '0')}`;
 }
 
 
@@ -57,14 +74,13 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// LOGIN VE OTOMATİK PANEL YÖNLENDİRMESİ
+// LOGIN VE LOG DEFTERİ PANELİNİN YÜKLENMESİ
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
         let user = await User.findOne({ email: email });
 
-        // Kullanıcı yoksa otomatik oluştur
         if (!user) {
             const hashedPassword = await bcrypt.hash(password, 10);
             user = new User({ email: email, password: hashedPassword });
@@ -76,36 +92,141 @@ app.post('/login', async (req, res) => {
         if (!isMatch && password === dbPassword) isMatch = true;
 
         if (isMatch) {
-            // Giriş başarılı olunca kullanıcının karşısına doğrudan Uçuş Paneli HTML'ini basıyoruz
+            // Kullanıcının mevcut uçuşlarını çekip toplam saati hesaplayalım
+            const flights = await Flight.find({ userEmail: email }).sort({ tarih: -1 });
+            const toplamUcusSüresi = hesaplaToplamSaat(flights);
+
+            // Gelişmiş Tek Sayfa (SPA) Arayüzü HTML olarak basılıyor
             res.send(`
-                <div style="font-family:Arial, sans-serif; max-width:600px; margin:50px auto; padding:20px; border:1px solid #ddd; border-radius:100px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background:#fff; border-radius:12px;">
-                    <h2 style="color: #2c3e50; text-align:center; margin-bottom:5px;">✈️ Uçuş Log Defteri</h2>
-                    <p style="text-align:center; color:#7f8c8d; font-size:14px;">Aktif Kullanıcı: <strong>${email}</strong></p>
-                    <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+                <div style="font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width:800px; margin:30px auto; padding:25px; border:1px solid #e0e0e0; border-radius:12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); background:#fff;">
                     
-                    <form action="/add-flight" method="POST" style="display:flex; flex-direction:column; gap:15px;">
-                        <input type="hidden" name="userEmail" value="${email}">
+                    <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 25px;">
+                        <span style="font-size: 14px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">TOPLAM UÇUŞ SAATİ</span>
+                        <h1 id="toplamSaatGosterge" style="margin: 5px 0 0 0; font-size: 42px; font-weight: bold;">${toplamUcusSüresi}</h1>
+                        <p style="margin:5px 0 0 0; font-size:13px; opacity:0.8;">Pilot: ${email}</p>
+                    </div>
+
+                    <h2 style="color: #2c3e50; text-align:center; margin-bottom:20px;">✈️ Yeni Uçuş Kaydı Ekle</h2>
+                    
+                    <form id="ucusFormu" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:30px;">
+                        <input type="hidden" id="userEmail" value="${email}">
                         
-                        <label style="font-weight:bold;">Tarih:</label>
-                        <input type="date" name="tarih" required style="padding:10px; border:1px solid #ccc; border-radius:5px;">
+                        <div>
+                            <label style="font-weight:bold; display:block; margin-bottom:5px;">Tarih:</label>
+                            <input type="date" id="tarih" required style="width:90%; padding:10px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
                         
-                        <label style="font-weight:bold;">Eğitim Sınıflandırması:</label>
-                        <select name="egitimTipi" style="padding:10px; border:1px solid #ccc; border-radius:5px;">
-                            <option value="ggg">ggg</option>
-                            <option value="gş">gş</option>
-                            <option value="au(sim)">au(sim)</option>
-                        </select>
+                        <div>
+                            <label style="font-weight:bold; display:block; margin-bottom:5px;">Hava Aracı Tipi:</label>
+                            <select id="havaAraciTipi" style="width:95%; padding:10px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="s70">s70</option>
+                                <option value="s70i">s70i</option>
+                                <option value="t70">t70</option>
+                                <option value="atak">atak</option>
+                                <option value="mi17">mi17</option>
+                                <option value="gökbey">gökbey</option>
+                            </select>
+                        </div>
                         
-                        <label style="font-weight:bold;">Uçuş Süresi (Örn: 2.5 veya 1.45):</label>
-                        <input type="text" name="sure" placeholder="Örn: 2.5 yazarsanız 02:30 olarak kaydedilir" required style="padding:10px; border:1px solid #ccc; border-radius:5px;">
+                        <div>
+                            <label style="font-weight:bold; display:block; margin-bottom:5px;">Eğitim Sınıflandırması:</label>
+                            <select id="egitimTipi" style="width:95%; padding:10px; border:1px solid #ccc; border-radius:5px;">
+                                <option value="ggg">ggg</option>
+                                <option value="gş">gş</option>
+                                <option value="au(sim)">au(sim)</option>
+                            </select>
+                        </div>
                         
-                        <button type="submit" style="padding:12px; background:#2ecc71; color:white; border:none; border-radius:5px; font-size:16px; font-weight:bold; cursor:pointer;">Uçuşu Veritabanına Kaydet</button>
+                        <div>
+                            <label style="font-weight:bold; display:block; margin-bottom:5px;">Uçuş Süresi (Örn: 2.5):</label>
+                            <input type="text" id="sure" placeholder="Ondalık veya HH:MM" required style="width:90%; padding:10px; border:1px solid #ccc; border-radius:5px;">
+                        </div>
+
+                        <div style="grid-column: span 2;">
+                            <label style="font-weight:bold; display:block; margin-bottom:5px;">Görev Açıklaması (İsteğe Bağlı Not):</label>
+                            <textarea id="gorevAciklamasi" placeholder="Görev detayları, hava durumu veya eklemek istediğiniz notlar..." style="width:97%; padding:10px; border:1px solid #ccc; border-radius:5px; height:60px; resize:none;"></textarea>
+                        </div>
+                        
+                        <button type="submit" style="grid-column: span 2; padding:12px; background:#2ecc71; color:white; border:none; border-radius:5px; font-size:16px; font-weight:bold; cursor:pointer; transition:background 0.2s;">Uçuşu Listeye ve Veritabanına Ekle</button>
                     </form>
                     
-                    <div style="text-align:center; margin-top:20px;">
-                        <a href="/my-flights?email=${email}" style="color:#3498db; text-decoration:none; font-weight:bold;">📋 Önceki Uçuşlarımı Göster</a>
+                    <h3 style="color:#2c3e50; border-bottom:2px solid #eee; padding-bottom:8px;">📋 Uçuş Kayıt Geçmişi</h3>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+                            <thead>
+                                <tr style="background:#f2f2f2; text-align:center;">
+                                    <th style="padding:10px; border-bottom:2px solid #ddd;">Tarih</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd;">Hava Aracı</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd;">Eğitim Tipi</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd;">Süre</th>
+                                    <th style="padding:10px; border-bottom:2px solid #ddd;">Görev Açıklaması</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ucusTabloGövde">
+                                ${flights.map(f => `
+                                    <tr style="border-bottom: 1px solid #eee; text-align:center;">
+                                        <td style="padding:10px;">${f.tarih}</td>
+                                        <td style="padding:10px; font-weight:bold; color:#34495e;">${f.havaAraciTipi || '-'}</td>
+                                        <td style="padding:10px; font-weight:bold; color:#7f8c8d;">${f.egitimTipi}</td>
+                                        <td style="padding:10px; color:#e67e22; font-weight:bold;">${f.sure}</td>
+                                        <td style="padding:10px; font-size:13px; color:#555; text-align:left;">${f.gorevAciklamasi || ''}</td>
+                                    </tr>
+                                `).join('') || '<tr><td colspan="5" id="bosUyarisi" style="text-align:center; padding:20px; color:#999;">Henüz uçuş kaydı bulunamadı.</td></tr>'}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+
+                <script>
+                    document.getElementById('ucusFormu').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+                        
+                        const veri = {
+                            userEmail: document.getElementById('userEmail').value,
+                            tarih: document.getElementById('tarih').value,
+                            havaAraciTipi: document.getElementById('havaAraciTipi').value,
+                            egitimTipi: document.getElementById('egitimTipi').value,
+                            sure: document.getElementById('sure').value,
+                            gorevAciklamasi: document.getElementById('gorevAciklamasi').value
+                        };
+
+                        // Verileri sayfayı terk etmeden arka plana (API) postalıyoruz
+                        const response = await fetch('/api/add-flight', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(veri)
+                        });
+
+                        const sonuc = await response.json();
+
+                        if(sonuc.success) {
+                            // 1. Üstteki Toplam Saat Bilgisini Yenile
+                            document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
+
+                            // 2. Tablo Boş Uyarısını Kaldır (Eğer Varsa)
+                            const bosUyarisi = document.getElementById('bosUyarisi');
+                            if(bosUyarisi) bosUyarisi.parentElement.remove();
+
+                            // 3. Tablonun En Başına Yeni Satırı Şak Diye Ekle
+                            const yeniSatir = \`
+                                <tr style="border-bottom: 1px solid #eee; text-align:center; background:#e8f8f5;">
+                                    <td style="padding:10px;">\${veri.tarih}</td>
+                                    <td style="padding:10px; font-weight:bold; color:#34495e;">\${veri.havaAraciTipi}</td>
+                                    <td style="padding:10px; font-weight:bold; color:#7f8c8d;">\${veri.egitimTipi}</td>
+                                    <td style="padding:10px; color:#e67e22; font-weight:bold;">\${sonuc.eklenenSure}</td>
+                                    <td style="padding:10px; font-size:13px; color:#555; text-align:left;">\${veri.gorevAciklamasi}</td>
+                                </tr>
+                            \`;
+                            document.getElementById('ucusTabloGövde').insertAdjacentHTML('afterbegin', yeniSatir);
+
+                            // 4. Formu temizle (Tarih ve Hava Aracı kalsın, süre ve not sıfırlansın)
+                            document.getElementById('sure').value = '';
+                            document.getElementById('gorevAciklamasi').value = '';
+                        } else {
+                            alert('Uçuş kaydedilirken teknik bir hata oluştu!');
+                        }
+                    });
+                </script>
             `);
         } else {
             res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Şifre Hatalı!</h1><a href="/">Tekrar Dene</a></div>`);
@@ -117,82 +238,40 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// VERİTABANINA UÇUŞ KAYDETME ROTASI
-app.post('/add-flight', async (req, res) => {
-    const { userEmail, tarih, egitimTipi, sure } = req.body;
-
-    // Sizin istediğiniz otomatik saat formatı düzeltmesi (2.5 -> 02:30)
+// ⚡ SAYFAYI DEĞİŞTİRMEDEN ARKA PLANDA ÇALIŞAN UÇUŞ EKLEME API'Sİ
+app.post('/api/add-flight', async (req, res) => {
+    const { userEmail, tarih, havaAraciTipi, egitimTipi, sure, gorevAciklamasi } = req.body;
+    
+    // Otomatik saat formatı çevrimi devreye giriyor (2.5 -> 02:30)
     const duzeltilmisSure = formatUcusSaati(sure);
 
     try {
         const newFlight = new Flight({
-            userEmail: userEmail,
-            tarih: tarih,
-            egitimTipi: egitimTipi,
-            sure: duzeltilmisSure
+            userEmail,
+            tarih,
+            havaAraciTipi,
+            egitimTipi,
+            sure: duzeltilmisSure,
+            gorevAciklamasi
         });
-
         await newFlight.save();
 
-        res.send(`
-            <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
-                <h1 style="color: #2ecc71;">✔️ Uçuş Başarıyla Kaydedildi!</h1>
-                <p style="font-size:18px; color:#555;">Girdiğiniz süre otomatik olarak düzenlendi: <strong>${duzeltilmisSure}</strong></p>
-                <br>
-                <form action="/login" method="POST" style="display:inline;">
-                    <input type="hidden" name="email" value="${userEmail}">
-                    <input type="hidden" name="password" value="gecici"> <button type="submit" style="padding:10px 20px; background:#3498db; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">Panel geri dön</button>
-                </form>
-            </div>
-        `);
+        // Kullanıcının güncel tüm uçuşlarını çekip yeni toplam saati hesaplayalım
+        const tümUcuslar = await Flight.find({ userEmail });
+        const yeniToplam = hesaplaToplamSaat(tümUcuslar);
+
+        // Ön yüze sayfa değişmeden güncellenecek verileri json olarak paslıyoruz
+        res.json({
+            success: true,
+            yeniToplamSaat: yeniToplam,
+            eklenenSure: duzeltilmisSure
+        });
+
     } catch (error) {
-        console.error("Uçuş kaydedilemedi:", error);
-        res.status(500).send("Uçuş kaydedilirken bir hata oluştu.");
-    }
-});
-
-// KULLANICININ KENDİ UÇUŞLARINI LİSTELEME ROTASI
-app.get('/my-flights', async (req, res) => {
-    const email = req.query.email;
-
-    try {
-        const flights = await Flight.find({ userEmail: email });
-
-        let listeHtml = flights.map(f => `
-            <tr style="border-bottom: 1px solid #ddd; text-align:center;">
-                <td style="padding:10px;">${f.tarih}</td>
-                <td style="padding:10px; font-weight:bold; color:#2c3e50;">${f.egitimTipi}</td>
-                <td style="padding:10px; color:#e67e22; font-weight:bold;">${f.sure}</td>
-            </tr>
-        `).join('');
-
-        res.send(`
-            <div style="font-family:Arial, sans-serif; max-width:600px; margin:50px auto; padding:20px; border:1px solid #ddd; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1);">
-                <h2 style="text-align:center; color:#2c3e50;">📋 Uçuş Kayıtlarınız</h2>
-                <p style="text-align:center; color:#7f8c8d;">${email}</p>
-                
-                <table style="width:100%; border-collapse:collapse; margin-top:20px;">
-                    <thead>
-                        <tr style="background:#f2f2f2;">
-                            <th style="padding:10px; border-bottom:2px solid #ddd;">Tarih</th>
-                            <th style="padding:10px; border-bottom:2px solid #ddd;">Eğitim Tipi</th>
-                            <th style="padding:10px; border-bottom:2px solid #ddd;">Süre (HH:MM)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${listeHtml || '<tr><td colspan="3" style="text-align:center; padding:20px; color:#999;">Henüz uçuş kaydı bulunamadı.</td></tr>'}
-                    </tbody>
-                </table>
-                <br>
-                <div style="text-align:center;">
-                    <a href="/" style="display:inline-block; padding:10px 20px; background:#3498db; color:white; text-decoration:none; border-radius:5px; font-weight:bold;">Ana Sayfaya Dön</a>
-                </div>
-            </div>
-        `);
-    } catch (error) {
-        res.status(500).send("Uçuşlar listelenirken hata oluştu.");
+        console.error(error);
+        res.json({ success: false });
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Sunucu aktif.`));
+app.listen(PORT, () => console.log(`🚀 Logbook sunucusu aktif.`));
