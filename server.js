@@ -20,13 +20,17 @@ mongoose.connect(mongoURI, { dbName: 'ucusDB' })
 
 const UserSchema = new mongoose.Schema({
     email: String,
-    password: String,
-    muayene1Tarih: String, 
-    muayene4Tarih: String, 
-    aletKartTarih: String, 
-    standTarih: String     
+    password: String
 });
 const User = mongoose.model('User', UserSchema, 'users');
+
+// 🎯 RAPOR TARİHLERİ İÇİN AYRI VE GÜVENLİ VERİTABANI ŞEMASI
+const ReportDateSchema = new mongoose.Schema({
+    userEmail: String,
+    alan: String,   // muayene1Tarih, muayene4Tarih, aletKartTarih, standTarih
+    tarih: String   // YYYY-MM-DD
+});
+const ReportDate = mongoose.model('ReportDate', ReportDateSchema, 'report_dates');
 
 const FlightSchema = new mongoose.Schema({
     userEmail: String,
@@ -59,7 +63,7 @@ function hesaplaToplamSaat(flights) {
     });
     let toplamSaat = Math.floor(toplamDakika / 60);
     let kalanDakika = toplamDakika % 60;
-    return `${toplamSaat.toString().padStart(2, '0')}:${kalanDakika.toString().padStart(2, '0')}`;
+    return `${toplamSaat.toString().padStart(2, '0')}:${kalanDakika.toString().padStart(2, '0');}`;
 }
 
 function getGunFarki(hedefTarih) {
@@ -116,12 +120,23 @@ app.post('/login', async (req, res) => {
             const renkGgg = kalanGgg <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
             const renkSonUcus = kalanSonUcus <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
 
-            // Dinamik etiketli sayaç hesaplama fonksiyonu
-            const hesaplaTarihliSayaç = (baslangicTarihi, periyotYil, etiket) => {
+            // 🎯 AYRI VERİTABANINDAN RAPOR TARİHLERİNİ ÇEKELİM
+            const kayitliTarihler = await ReportDate.find({ userEmail: email });
+            const tarihBul = (alanAdi) => {
+                const bulma = kayitliTarihler.find(t => t.alan === alanAdi);
+                return bulma ? bulma.tarih : null;
+            };
+
+            const tMuayene1 = tarihBul('muayene1Tarih');
+            const tMuayene4 = tarihBul('muayene4Tarih');
+            const tAlet = tarihBul('aletKartTarih');
+            const tStand = tarihBul('standTarih');
+
+            const hesaplaTarihliSayaç = (baslangicTarihi, periyotYil, etiket, teknikAlan) => {
                 if (!baslangicTarihi) {
                     return { 
                         gun: null, 
-                        html: `<div onclick="tarihSecimiAc('${etiket}', '${etiket.toLowerCase().replace(/ /g, '')}')" style="background:#bdc3c7; color:#2c3e50; padding:10px; border-radius:8px; text-align:center; font-size:11px; cursor:pointer; border:1px dashed #7f8c8d;"><strong>${etiket}</strong><br><span style="font-size:12px; font-weight:bold; color:#c0392b;">⚠️ TARİH GİRİLMEDİ</span></div>` 
+                        html: `<div onclick="tarihSecimiAc('${etiket}', '${teknikAlan}')" style="background:#f1f2f6; color:#2c3e50; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer; border:2px dashed #bdc3c7; transition:all 0.2s;"><strong>${etiket}</strong><br><span style="font-size:11px; font-weight:bold; color:#c0392b; display:inline-block; margin-top:4px;">⚠️ TARİH GİRİLMEDİ</span></div>` 
                     };
                 }
                 const hedef = new Date(baslangicTarihi);
@@ -131,94 +146,135 @@ app.post('/login', async (req, res) => {
                 return { gun: kalanGün, renk: renk };
             };
 
-            const sMuayene1 = hesaplaTarihliSayaç(user.muayene1Tarih, 1, '1 Yıllık Muayene');
-            const sMuayene4 = hesaplaTarihliSayaç(user.muayene4Tarih, 4, '4 Yıllık Muayene');
-            const sAlet = hesaplaTarihliSayaç(user.aletKartTarih, 1, 'Alet Kart');
-            const sStand = hesaplaTarihliSayaç(user.standTarih, 1, 'Standardizasyon');
+            const sMuayene1 = hesaplaTarihliSayaç(tMuayene1, 1, '1 Yıllık Muayene', 'muayene1Tarih');
+            const sMuayene4 = hesaplaTarihliSayaç(tMuayene4, 4, '4 Yıllık Muayene', 'muayene4Tarih');
+            const sAlet = hesaplaTarihliSayaç(tAlet, 1, 'Alet Kart', 'aletKartTarih');
+            const sStand = hesaplaTarihliSayaç(tStand, 1, 'Standardizasyon', 'standTarih');
 
+            // TELEFONLAR İÇİN %100 UYUMLU MOBİL TASARIM (RESPONSIVE)
             res.send(`
-                <div style="font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width:900px; margin:20px auto; padding:25px; border:1px solid #e0e0e0; border-radius:12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); background:#fff;">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                <style>
+                    body { background: #f5f6fa; margin: 0; padding: 10px; font-family:'Segoe UI', sans-serif; }
+                    .container { max-width:900px; margin:10px auto; padding:15px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
                     
-                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 25px;">
+                    /* MOBİL GRID SİSTEMLERİ */
+                    .ust-panel { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px; }
+                    @media(min-width: 768px) { .ust-panel { grid-template-columns: 1fr 2fr; } }
+                    
+                    .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+                    @media(min-width: 480px) { .sayac-grid { grid-template-columns: repeat(3, 1fr); } }
+
+                    .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:20px; }
+                    @media(min-width: 600px) { .form-grid { grid-template-columns: 1fr 1fr; } .span-mobil-2 { grid-column: span 2; } }
+
+                    .filtre-box { background:#f1f2f6; padding:12px; border-radius:10px; margin-bottom:20px; display:flex; flex-direction:column; gap:10px; }
+                    @media(min-width: 600px) { .filtre-box { flex-direction: row; flex-wrap: wrap; align-items: center; } }
+
+                    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+                    button { padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; }
+                    button:active { opacity: 0.8; }
+                    
+                    .btn-ekle { background:#2ecc71; color:white; }
+                    .btn-filtre { background:#34495e; color:white; width:auto; padding:8px 15px; }
+                    .btn-temizle { background:#7f8c8d; color:white; width:auto; padding:8px 15px; }
+
+                    .tablo-sarmal { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; }
+                    table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 14px; }
+                    th { background: #2c3e50; color: white; padding: 12px; }
+                    td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
+                    
+                    .sil-btn { background:#e74c3c; color:white; padding:6px 12px; border-radius:4px; font-size:12px; width:auto; }
+                </style>
+
+                <div class="container">
+                    
+                    <div class="ust-panel">
                         <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 20px; border-radius: 10px; text-align: center; display:flex; flex-direction:column; justify-content:center;">
-                            <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">TOPLAM UÇUŞ SAATİ</span>
-                            <h1 id="toplamSaatGosterge" style="margin: 5px 0 0 0; font-size: 38px; font-weight: bold;">${toplamUcusSüresi}</h1>
-                            <p style="margin:5px 0 0 0; font-size:12px; opacity:0.8;">${email}</p>
+                            <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9;">TOPLAM UÇUŞ SAATİ</span>
+                            <h1 id="toplamSaatGosterge" style="margin: 5px 0; font-size: 36px; font-weight: bold;">${toplamUcusSüresi}</h1>
+                            <p style="margin:0; font-size:12px; opacity:0.8; word-break:break-all;">${email}</p>
                         </div>
 
-                        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
-                            <div style="${renkGgg} color:white; padding:10px; border-radius:8px; text-align:center; font-size:12px;">
-                                <strong>GGG Sayaç (60 Gün)</strong><br><span style="font-size:20px; font-weight:bold;">${kalanGgg} Gün</span>
+                        <div class="sayac-grid">
+                            <div style="${renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
+                                <strong>GGG Sayaç (60G)</strong><br><span style="font-size:18px; font-weight:bold;">${kalanGgg} Gün</span>
                             </div>
-                            <div style="${renkSonUcus} color:white; padding:10px; border-radius:8px; text-align:center; font-size:12px;">
-                                <strong>Son Uçuş (60 Gün)</strong><br><span style="font-size:20px; font-weight:bold;">${kalanSonUcus} Gün</span>
+                            <div style="${renkSonUcus} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
+                                <strong>Son Uçuş (60G)</strong><br><span style="font-size:18px; font-weight:bold;">${kalanSonUcus} Gün</span>
                             </div>
                             
-                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih')" style="${sMuayene1.renk} color:white; padding:10px; border-radius:8px; text-align:center; font-size:11px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span>${sMuayene1.gun <= 90 ? '<br><span style="font-size:10px; background:yellow; color:black; padding:1px 4px; border-radius:3px; font-weight:bold;">⚠️ RANDEVU AL!</span>' : ''}</div>` : sMuayene1.html}
-                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih')" style="${sMuayene4.renk} color:white; padding:10px; border-radius:8px; text-align:center; font-size:11px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span>${sMuayene4.gun <= 90 ? '<br><span style="font-size:10px; background:yellow; color:black; padding:1px 4px; border-radius:3px; font-weight:bold;">⚠️ RANDEVU AL!</span>' : ''}</div>` : sMuayene4.html}
-                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih')" style="${sAlet.renk} color:white; padding:10px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span></div>` : sAlet.html}
-                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih')" style="${sStand.renk || 'background:#f1c40f; color:#000;'} color:white; padding:10px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span></div>` : sStand.html}
+                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih')" style="${sMuayene1.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span>${sMuayene1.gun <= 90 ? '<br><span style="font-size:10px; background:yellow; color:black; padding:1px 4px; border-radius:3px; font-weight:bold;">⚠️ RANDEVU AL!</span>' : ''}</div>` : sMuayene1.html}
+                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih')" style="${sMuayene4.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span>${sMuayene4.gun <= 90 ? '<br><span style="font-size:10px; background:yellow; color:black; padding:1px 4px; border-radius:3px; font-weight:bold;">⚠️ RANDEVU AL!</span>' : ''}</div>` : sMuayene4.html}
+                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih')" style="${sAlet.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span></div>` : sAlet.html}
+                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih')" style="${sStand.renk || 'background:#f1c40f; color:#000;'} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span></div>` : sStand.html}
                         </div>
                     </div>
 
-                    <div style="background:#f1f2f6; padding:15px; border-radius:10px; margin-bottom:20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <strong style="color:#2c3e50;">📋 Gelişmiş Filtrele:</strong>
-                        <input type="number" id="filtreYil" placeholder="Yıl" style="padding:6px; border:1px solid #ccc; border-radius:4px; width:100px;">
-                        <select id="filtreAy" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
+                    <div class="filtre-box">
+                        <strong style="color:#2c3e50; font-size:14px;">📋 Filtre:</strong>
+                        <input type="number" id="filtreYil" placeholder="Yıl" style="max-width:120px;">
+                        <select id="filtreAy" style="max-width:130px;">
                             <option value="">Ay Seçin</option>
                             <option value="01">Ocak</option><option value="02">Şubat</option><option value="03">Mart</option>
                             <option value="04">Nisan</option><option value="05">Mayıs</option><option value="06">Haziran</option>
                             <option value="07">Temmuz</option><option value="08">Ağustos</option><option value="09">Eylül</option>
                             <option value="10">Ekim</option><option value="11">Kasım</option><option value="12">Aralık</option>
                         </select>
-                        <select id="filtreHavaAraci" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="">Hava Aracı Seçin</option>
+                        <select id="filtreHavaAraci" style="max-width:180px;">
+                            <option value="">Hava Aracı</option>
                             <option value="sikorsky">Sikorsky (s70, s70i, t70)</option>
                             <option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option>
                             <option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option>
                         </select>
-                        <select id="filtreUcusTipi" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
-                            <option value="">Uçuş Tipi Seçin</option>
+                        <select id="filtreUcusTipi" style="max-width:130px;">
+                            <option value="">Uçuş Tipi</option>
                             <option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option>
                         </select>
-                        <button onclick="filtreleUcuslari()" style="padding:6px 12px; background:#34495e; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Uygula</button>
-                        <button onclick="filtreleriTemizle()" style="padding:6px 12px; background:#7f8c8d; color:white; border:none; border-radius:4px; cursor:pointer;">Temizle</button>
+                        <div style="display:flex; gap:5px;">
+                            <button onclick="filtreleUcuslari()" class="btn-filtre">Uygula</button>
+                            <button onclick="filtreleriTemizle()" class="btn-temizle">X</button>
+                        </div>
                         
-                        <div id="filtreSaatKutusu" style="margin-left:auto; background:#2c3e50; color:#fff; padding:6px 12px; border-radius:4px; font-weight:bold; font-size:13px; display:none;">
-                            ⏱️ Filtrelenen Toplam Süre: <span id="filtreliSaatGosterge">00:00</span>
+                        <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:8px 12px; border-radius:6px; font-weight:bold; font-size:13px; display:none; width:100%; text-align:center; margin-top:5px;">
+                            ⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span>
                         </div>
                     </div>
 
-                    <form id="ucusFormu" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; background:#f9f9f9; padding:20px; border-radius:10px; margin-bottom:25px;">
+                    <form id="ucusFormu" class="form-grid">
                         <input type="hidden" id="userEmail" value="${email}">
-                        <div><label style="font-weight:bold;">Tarih:</label><input type="date" id="tarih" required style="width:90%; padding:10px; border:1px solid #ccc; border-radius:5px;"></div>
-                        <div><label style="font-weight:bold;">Hava Aracı Tipi:</label><select id="havaAraciTipi" style="width:95%; padding:10px; border:1px solid #ccc; border-radius:5px;"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
-                        <div><label style="font-weight:bold;">Eğitim Sınıflandırması:</label><select id="egitimTipi" style="width:95%; padding:10px; border:1px solid #ccc; border-radius:5px;"><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
-                        <div><label style="font-weight:bold;">Uçuş Süresi (Örn: 2.5):</label><input type="text" id="sure" required style="width:90%; padding:10px; border:1px solid #ccc; border-radius:5px;"></div>
-                        <div style="grid-column: span 2;"><label style="font-weight:bold;">Görev Açıklaması:</label><textarea id="gorevAciklamasi" style="width:97%; padding:10px; border:1px solid #ccc; border-radius:5px; height:40px; resize:none;"></textarea></div>
-                        <button type="submit" style="grid-column: span 2; padding:12px; background:#2ecc71; color:white; border:none; border-radius:5px; font-size:16px; font-weight:bold; cursor:pointer;">Uçuşu Ekle</button>
+                        <div><label style="font-weight:bold; font-size:13px;">Tarih:</label><input type="date" id="tarih" required></div>
+                        <div><label style="font-weight:bold; font-size:13px;">Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
+                        <div><label style="font-weight:bold; font-size:13px;">Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
+                        <div><label style="font-weight:bold; font-size:13px;">Uçuş Süresi (Örn: 2.5):</label><input type="text" id="sure" placeholder="2.5 veya 02:30" required></div>
+                        <div class="span-mobil-2"><label style="font-weight:bold; font-size:13px;">Görev Açıklaması:</label><textarea id="gorevAciklamasi" style="height:50px; resize:none;"></textarea></div>
+                        <button type="submit" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
                     </form>
 
-                    <table style="width:100%; border-collapse:collapse;">
-                        <thead><tr style="background:#2c3e50; color:white;"><th style="padding:10px;">Tarih</th><th>Hava Aracı</th><th>Eğitim Tipi</th><th>Süre</th><th>Görev Açıklaması</th><th>İşlem</th></tr></thead>
-                        <tbody id="ucusTabloGövde">
-                            ${flights.map(f => `
-                                <tr id="row-${f._id}" class="ucus-satiri" data-tarih="${f.tarih}" data-hava="${f.havaAraciTipi}" data-egitim="${f.egitimTipi}" data-sure="${f.sure}" style="border-bottom: 1px solid #eee; text-align:center;">
-                                    <td style="padding:10px;">${f.tarih}</td><td style="padding:10px; font-weight:bold;">${f.havaAraciTipi}</td><td>${f.egitimTipi}</td><td style="color:#e67e22; font-weight:bold;">${f.sure}</td><td style="padding:10px; text-align:left; font-size:13px;">${f.gorevAciklamasi || ''}</td><td><button onclick="silUcus('${f._id}')" style="background:#e74c3c; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">Sil</button></td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                    <div class="tablo-sarmal">
+                        <table>
+                            <thead><tr><th>Tarih</th><th>Hava Aracı</th><th>Eğitim</th><th>Süre</th><th>Görev Açıklaması</th><th>İşlem</th></tr></thead>
+                            <tbody id="ucusTabloGövde">
+                                ${flights.map(f => `
+                                    <tr id="row-${f._id}" class="ucus-satiri" data-tarih="${f.tarih}" data-hava="${f.havaAraciTipi}" data-egitim="${f.egitimTipi}" data-sure="${f.sure}">
+                                        <td>${f.tarih}</td><td style="font-weight:bold;">${f.havaAraciTipi}</td><td>${f.egitimTipi}</td><td style="color:#e67e22; font-weight:bold;">${f.sure}</td><td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.gorevAciklamasi || ''}</td><td><button onclick="silUcus('${f._id}')" class="sil-btn">Sil</button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:9999;">
-                    <div style="background:white; padding:25px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
-                        <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0;">Tarih Girin</h3>
+                <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
+                    <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
+                        <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px;">Tarih Girin</h3>
                         <input type="hidden" id="hedefAlan">
-                        <input type="date" id="yeniKategoriTarih" style="padding:10px; width:80%; margin-bottom:15px; border:1px solid #ccc; border-radius:5px;">
+                        <input type="date" id="yeniKategoriTarih" style="margin-bottom:15px;">
                         <br>
-                        <button onclick="kaydetKategoriTarihi()" style="padding:8px 15px; background:#2ecc71; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; margin-right:10px;">Tarihi Kaydet</button>
-                        <button onclick="document.getElementById('tarihModal').style.display='none'" style="padding:8px 15px; background:#95a5a6; color:white; border:none; border-radius:4px; cursor:pointer;">İptal</button>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <button onclick="kaydetKategoriTarihi()" style="background:#2ecc71; color:white;">Kaydet</button>
+                            <button onclick="document.getElementById('tarihModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
+                        </div>
                     </div>
                 </div>
 
@@ -229,11 +285,10 @@ app.post('/login', async (req, res) => {
                         document.getElementById('tarihModal').style.display = 'flex';
                     }
 
-                    // 🎯 KAYDET BUTONU DÜZELTİLDİ
                     async function kaydetKategoriTarihi() {
                         const alan = document.getElementById('hedefAlan').value;
                         const tarihDegeri = document.getElementById('yeniKategoriTarih').value;
-                        if(!tarihDegeri) { alert('Lütfen geçerli bir tarih seçin.'); return; }
+                        if(!tarihDegeri) { alert('Lütfen tarih seçin.'); return; }
 
                         const response = await fetch('/api/update-user-date', {
                             method: 'POST',
@@ -246,7 +301,7 @@ app.post('/login', async (req, res) => {
                         });
                         const sonuc = await response.json();
                         if(sonuc.success) {
-                            alert('Tarih başarıyla güncellendi!');
+                            alert('Tarih veritabanına işlendi!');
                             window.location.reload();
                         }
                     }
@@ -266,7 +321,6 @@ app.post('/login', async (req, res) => {
                         if((await response.json()).success) window.location.reload();
                     });
 
-                    // 🎯 SİLME ESNASINDA SAAT GÜNCELLEMESİ AKTİF EDİLDİ
                     async function silUcus(id) {
                         if(!confirm("Bu uçuş kaydını silmek istediğinize emin misiniz?")) return;
                         const response = await fetch('/api/delete-flight', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, userEmail: document.getElementById('userEmail').value }) });
@@ -274,12 +328,10 @@ app.post('/login', async (req, res) => {
                         if(sonuc.success) { 
                             document.getElementById('row-'+id).remove(); 
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
-                            // Eğer filtreleme aktifse filtreli saati de anlık düşür
                             filtreleUcuslari();
                         }
                     }
 
-                    // 🎯 DİNAMİK FİLTRELİ SAAT HESAPLAYAN YENİ ÖN YÜZ MANTIĞI
                     function filtreleUcuslari() {
                         const yil = document.getElementById('filtreYil').value;
                         const ay = document.getElementById('filtreAy').value;
@@ -306,7 +358,6 @@ app.post('/login', async (req, res) => {
                             
                             satir.style.display = u ? '' : 'none';
 
-                            // Sadece filtreye uyan ve ekranda kalan satırların saatlerini topluyoruz
                             if (u && s && s.includes(':')) {
                                 const [saat, dakika] = s.split(':').map(Number);
                                 toplamFiltreDakika += (saat * 60) + dakika;
@@ -341,12 +392,16 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// 🎯 RAPOR TARİHLERİNİ ARTIK AYRI KOLEKSİYONA KAYDEDEN GÜVENLİ API RROTASI
 app.post('/api/update-user-date', async (req, res) => {
     const { userEmail, alan, tarih } = req.body;
     try {
-        const updateData = {};
-        updateData[alan] = tarih;
-        await User.findOneAndUpdate({ email: userEmail }, updateData);
+        // Eğer bu alan için daha önce girilmiş bir tarih varsa güncelle, yoksa yeni kayıt aç (Upsert mantığı)
+        await ReportDate.findOneAndUpdate(
+            { userEmail: userEmail, alan: alan },
+            { tarih: tarih },
+            { upsert: true, new: true }
+        );
         res.json({ success: true });
     } catch (error) {
         res.json({ success: false });
@@ -359,9 +414,7 @@ app.delete('/api/delete-flight', async (req, res) => {
         await Flight.findByIdAndDelete(id); 
         const kalanlar = await Flight.find({ userEmail });
         res.json({ success: true, yeniToplamSaat: hesaplaToplamSaat(kalanlar) }); 
-    } catch (e) { 
-        res.json({ success: false }); 
-    }
+    } catch (e) { res.json({ success: false }); }
 });
 
 app.post('/api/add-flight', async (req, res) => {
