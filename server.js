@@ -12,9 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const mongoURI = process.env.MONGO_URI;
 
-mongoose.connect(mongoURI, {
-    dbName: 'ucusDB' 
-})
+mongoose.connect(mongoURI, { dbName: 'ucusDB' })
   .then(() => console.log("✔️ [BAŞARILI] ucusDB bağlantısı aktif."))
   .catch(err => console.error("❌ Bağlantı Hatası: ", err));
 
@@ -37,33 +35,43 @@ app.post('/login', async (req, res) => {
     console.log(`--- GİRİŞ DENEMESİ --- Siteden Girilen: [${email}]`);
 
     try {
-        const user = await User.findOne({
+        // Veritabanında kullanıcıyı ara
+        let user = await User.findOne({
             $or: [{ email: email }, { eposta: email }]
         });
 
+        // 🎯 SİHİRLİ DOKUNUŞ: Eğer kullanıcı ucusDB içinde yoksa, otomatik oluşturuyoruz!
         if (!user) {
-            console.log("❌ Kullanıcı bulunamadı!");
-            return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Giriş Başarısız!</h1><p>Kullanıcı bulunamadı.</p><a href="/">Tekrar Dene</a></div>`);
+            console.log(`💡 [OTOMATİK KAYIT] ${email} bulunamadı. ucusDB içine otomatik ekleniyor...`);
+            
+            // Siteden girilen şifreyi güvenli bir şekilde Bcrypt ile şifrele
+            const hashedPassword = await bcrypt.hash(password, 10);
+            
+            user = new User({
+                email: email,
+                password: hashedPassword
+            });
+            
+            await user.save();
+            console.log(`✔️ [OTOMATİK KAYIT] Kullanıcı başarıyla oluşturuldu!`);
         }
 
         const dbPassword = user.password || user.sifre;
 
-        // 🔐 1. KONTROL: Bcrypt şifreleme uyumu (Kriptolu şifre için)
+        // Şifre kontrolü
         let isMatch = false;
         try {
             isMatch = await bcrypt.compare(password, dbPassword);
-        } catch (bcryptErr) {
-            // Eğer veritabanındaki şifre kriptolu değilse bcrypt hata verebilir, düz metin kontrolüne geçeceğiz
+        } catch (e) {
             isMatch = false;
         }
 
-        // 📝 2. KONTROL: Düz metin uyumu (Veritabanında direkt "sifre123" veya "123456" yazıyorsa)
-        if (!isMatch && (password === dbPassword)) {
+        if (!isMatch && password === dbPassword) {
             isMatch = true;
         }
 
         if (isMatch) {
-            console.log("✔️ Giriş başarılı! Eşleşme sağlandı.");
+            console.log("✔️ Giriş başarılı!");
             res.send(`
                 <div style="font-family:Arial, sans-serif; text-align:center; margin-top:100px;">
                     <h1 style="color: #2ecc71;">✔️ Giriş Başarılı!</h1>
@@ -71,7 +79,7 @@ app.post('/login', async (req, res) => {
                 </div>
             `);
         } else {
-            console.log("❌ Şifre yanlış! Girilen şifre veritabanındaki veriyle uyuşmuyor.");
+            console.log("❌ Şifre yanlış!");
             res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Giriş Başarısız!</h1><p>Şifre hatalı.</p><a href="/">Tekrar Dene</a></div>`);
         }
 
@@ -82,4 +90,4 @@ app.post('/login', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Sunucu ${PORT} portunda aktif.`));
+app.listen(PORT, () => console.log("🚀 Sunucu aktif."));
