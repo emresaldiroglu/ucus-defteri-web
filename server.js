@@ -78,8 +78,8 @@ function hesaplaToplamSaat(flights) {
 function getGunFarki(hedefTarih) {
     if (!hedefTarih) return null;
     const bugun = new Date();
-    const hedef = new Date(hedefTarih);
-    const zamanFarki = hedef.getTime() - bugun.getTime();
+    const healer = new Date(hedefTarih);
+    const zamanFarki = healer.getTime() - bugun.getTime();
     return Math.ceil(zamanFarki / (1000 * 3600 * 24));
 }
 
@@ -87,6 +87,12 @@ function formatTRTarih(dateObj) {
     const d = new Date(dateObj);
     if (isNaN(d.getTime())) return "";
     return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+// Input içine basılacak YYYY-MM-DD formatı için yardımcı fonksiyon
+function formatInputTarih(dateStr) {
+    if (!dateStr) return "";
+    return dateStr; 
 }
 
 
@@ -149,15 +155,16 @@ app.post('/login', async (req, res) => {
                 if (!baslangicTarihi) {
                     return { 
                         gun: null, 
+                        hamTarih: "",
                         sonTarihStr: "",
-                        html: `<div onclick="tarihSecimiAc('${etiket}', '${teknikAlan}')" style="background:#f1f2f6; color:#2c3e50; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer; border:2px dashed #bdc3c7;"><strong>${etiket}</strong><br><span style="font-size:11px; font-weight:bold; color:#c0392b; display:inline-block; margin-top:4px;">⚠️ TARİH GİRİLMEDİ</span></div>` 
+                        html: `<div onclick="tarihSecimiAc('${etiket}', '${teknikAlan}', '')" style="background:#f1f2f6; color:#2c3e50; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer; border:2px dashed #bdc3c7;"><strong>${etiket}</strong><br><span style="font-size:11px; font-weight:bold; color:#c0392b; display:inline-block; margin-top:4px;">⚠️ TARİH GİRİLMEDİ</span></div>` 
                     };
                 }
                 const hedef = new Date(baslangicTarihi);
                 hedef.setFullYear(hedef.getFullYear() + periyotYil);
                 const kalanGün = getGunFarki(hedef);
                 let renk = kalanGün <= 90 ? 'background:#e74c3c;' : 'background:#3498db;';
-                return { gun: kalanGün, renk: renk, sonTarihStr: formatTRTarih(hedef) };
+                return { gun: kalanGün, renk: renk, hamTarih: baslangicTarihi, sonTarihStr: formatTRTarih(hedef) };
             };
 
             const sMuayene1 = hesaplaTarihliSayaç(tMuayene1, 1, '1 Yıllık Muayene', 'muayene1Tarih');
@@ -229,10 +236,10 @@ app.post('/login', async (req, res) => {
                                 <span class="tarih-etiket">Son Tarih: ${formatTRTarih(hedefSonUcus)}</span>
                             </div>
                             
-                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih')" style="${sMuayene1.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene1.sonTarihStr}</span></div>` : sMuayene1.html}
-                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih')" style="${sMuayene4.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene4.sonTarihStr}</span></div>` : sMuayene4.html}
-                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih')" style="${sAlet.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sAlet.sonTarihStr}</span></div>` : sAlet.html}
-                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih')" style="${sStand.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sStand.sonTarihStr}</span></div>` : sStand.html}
+                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih', '${sMuayene1.hamTarih}')" style="${sMuayene1.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene1.sonTarihStr}</span></div>` : sMuayene1.html}
+                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih', '${sMuayene4.hamTarih}')" style="${sMuayene4.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene4.sonTarihStr}</span></div>` : sMuayene4.html}
+                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih', '${sAlet.hamTarih}')" style="${sAlet.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sAlet.sonTarihStr}</span></div>` : sAlet.html}
+                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih', '${sStand.hamTarih}')" style="${sStand.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sStand.sonTarihStr}</span></div>` : sStand.html}
                         </div>
                     </div>
 
@@ -294,7 +301,6 @@ app.post('/login', async (req, res) => {
                         </div>
                         <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
                         <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi" style="height:50px; resize:none;"></textarea></div>
-                        
                         <button type="button" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
                     </div>
 
@@ -317,7 +323,12 @@ app.post('/login', async (req, res) => {
 
                 <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
-                        <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px;">Tarih Girin</h3>
+                        <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:5px;">Tarih Girin</h3>
+                        
+                        <div id="modalMevcutTarihKutusu" style="font-size:12px; color:#7f8c8d; font-weight:bold; margin-bottom:15px; background:#f8f9fa; padding:6px; border-radius:4px;">
+                            Mevcut Kayıtlı Tarih: <span id="modalMevcutTarihText">-</span>
+                        </div>
+
                         <input type="hidden" id="hedefAlan">
                         <input type="date" id="yeniKategoriTarih" style="margin-bottom:15px;">
                         <br>
@@ -332,9 +343,25 @@ app.post('/login', async (req, res) => {
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
 
-                    function tarihSecimiAc(etiketIsmi, alanAdi) {
+                    // 🎯 TARİH SEÇİMİ AÇILDIĞINDA MEVCUT TARİHİ FORMATLAYIP YAZAN MANTIK
+                    function tarihSecimiAc(etiketIsmi, alanAdi, hamTarih) {
                         document.getElementById('modalBaslik').innerText = etiketIsmi + " Başlangıç Tarihi";
                         document.getElementById('hedefAlan').value = alanAdi;
+                        
+                        const tTextAlan = document.getElementById('modalMevcutTarihText');
+                        const inputTarih = document.getElementById('yeniKategoriTarih');
+
+                        if(hamTarih && hamTarih !== 'null' && hamTarih !== '') {
+                            // Ham tarihi TR formatına çek (DD.MM.YYYY)
+                            const d = new Date(hamTarih);
+                            const trFormati = \`\${d.getDate().toString().padStart(2, '0')}.\${(d.getMonth() + 1).toString().padStart(2, '0')}.\${d.getFullYear()}\`;
+                            tTextAlan.innerText = trFormati;
+                            inputTarih.value = hamTarih; // Takvimin içi de seçili gelsin
+                        } else {
+                            tTextAlan.innerText = "Girilmedi";
+                            inputTarih.value = "";
+                        }
+
                         document.getElementById('tarihModal').style.display = 'flex';
                     }
 
@@ -359,7 +386,6 @@ app.post('/login', async (req, res) => {
                         }
                     }
 
-                    // 🎯 SAYFAYI ASLA YENİLEMEYEN (DURAKSIZ) DİNAMİK EKLEME METODU
                     async function kaydetYeniUcus() {
                         const tarih = document.getElementById('tarih').value;
                         const havaAraciTipi = document.getElementById('havaAraciTipi').value;
@@ -391,7 +417,6 @@ app.post('/login', async (req, res) => {
                         
                         const sonuc = await response.json();
                         if(sonuc.success) {
-                            // Sayfayı yenilemiyoruz! Dinamik olarak DOM'a satır ekliyoruz.
                             const tbody = document.getElementById('ucusTabloGövde');
                             
                             const tr = document.createElement('tr');
@@ -411,19 +436,14 @@ app.post('/login', async (req, res) => {
                                 <td><button type="button" onclick="silUcus('\${sonuc.data._id}')" class="sil-btn">Sil</button></td>
                             \`;
 
-                            // Yeni uçuşu en başa yerleştir
                             tbody.insertBefore(tr, tbody.firstChild);
-
-                            // Toplam saati güncelle
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
 
-                            // Form alanlarını sıfırla
                             document.getElementById('tarih').value = '';
                             document.getElementById('egitimTipi').value = '';
                             document.getElementById('sure').value = '';
                             document.getElementById('gorevAciklamasi').value = '';
 
-                            // Listeyi ve sayfalama düzenini bozmadan güncelle
                             mevcutSayfa = 1;
                             filtreleUcuslari();
                             alert("Uçuş kaydı başarıyla eklendi!");
@@ -585,7 +605,6 @@ app.delete('/api/delete-flight', async (req, res) => {
     } catch (e) { res.json({ success: false }); }
 });
 
-// API GELİŞTİRİLDİ: Yeni eklenen uçuş objesini ve güncel toplam saati ön yüze paslar
 app.post('/api/add-flight', async (req, res) => {
     try {
         const formatliSure = formatUcusSaati(req.body.sure);
