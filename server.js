@@ -83,7 +83,6 @@ function getGunFarki(hedefTarih) {
     return Math.ceil(zamanFarki / (1000 * 3600 * 24));
 }
 
-// Tarihi TR formatına çeviren yardımcı fonksiyon (DD.MM.YYYY)
 function formatTRTarih(dateObj) {
     const d = new Date(dateObj);
     if (isNaN(d.getTime())) return "";
@@ -206,7 +205,6 @@ app.post('/login', async (req, res) => {
                     td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
                     .sil-btn { background:#e74c3c; color:white; padding:6px 12px; border-radius:4px; font-size:12px; width:auto; }
 
-                    /* SAYFALAMA TASARIMI */
                     .sayfalama-alani { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 15px; padding: 10px 0; }
                     .sayfa-btn { width: auto; padding: 8px 14px; background: #fff; border: 1px solid #ddd; color: #333; font-size: 14px; border-radius: 4px; }
                     .sayfa-btn.aktif { background: #2c3e50; color: white; border-color: #2c3e50; }
@@ -273,8 +271,8 @@ app.post('/login', async (req, res) => {
                             </select>
                         </div>
                         <div style="display:flex; gap:8px; width:100%; margin-top:5px;">
-                            <button onclick="filtreleUcuslari()" class="btn-filtre">Uygula</button>
-                            <button onclick="filtreleriTemizle()" class="btn-temizle">Temizle</button>
+                            <button type="button" onclick="filtreleUcuslari()" class="btn-filtre">Uygula</button>
+                            <button type="button" onclick="filtreleriTemizle()" class="btn-temizle">Temizle</button>
                         </div>
                         <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:10px; border-radius:6px; font-weight:bold; font-size:14px; display:none; width:100%; text-align:center;">
                             ⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span>
@@ -296,7 +294,8 @@ app.post('/login', async (req, res) => {
                         </div>
                         <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
                         <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi" style="height:50px; resize:none;"></textarea></div>
-                        <button onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
+                        
+                        <button type="button" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
                     </div>
 
                     <div class="tablo-sarmal">
@@ -305,7 +304,7 @@ app.post('/login', async (req, res) => {
                             <tbody id="ucusTabloGövde">
                                 ${flights.map(f => `
                                     <tr id="row-${f._id}" class="ucus-satiri" data-tarih="${f.tarih}" data-hava="${f.havaAraciTipi}" data-egitim="${f.egitimTipi}" data-sure="${f.sure}">
-                                        <td>${f.tarih}</td><td style="font-weight:bold;">${f.havaAraciTipi}</td><td>${f.egitimTipi}</td><td style="color:#e67e22; font-weight:bold;">${f.sure}</td><td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.gorevAciklamasi || ''}</td><td><button onclick="silUcus('${f._id}')" class="sil-btn">Sil</button></td>
+                                        <td>${f.tarih}</td><td style="font-weight:bold;">${f.havaAraciTipi}</td><td>${f.egitimTipi}</td><td style="color:#e67e22; font-weight:bold;">${f.sure}</td><td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.gorevAciklamasi || ''}</td><td><button type="button" onclick="silUcus('${f._id}')" class="sil-btn">Sil</button></td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -323,14 +322,13 @@ app.post('/login', async (req, res) => {
                         <input type="date" id="yeniKategoriTarih" style="margin-bottom:15px;">
                         <br>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <button onclick="kaydetKategoriTarihi()" style="background:#2ecc71; color:white;">Kaydet</button>
-                            <button onclick="document.getElementById('tarihModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
+                            <button type="button" onclick="kaydetKategoriTarihi()" style="background:#2ecc71; color:white;">Kaydet</button>
+                            <button type="button" onclick="document.getElementById('tarihModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
                         </div>
                     </div>
                 </div>
 
                 <script>
-                    // Sayfalama için global değişken
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
 
@@ -361,10 +359,13 @@ app.post('/login', async (req, res) => {
                         }
                     }
 
+                    // 🎯 SAYFAYI ASLA YENİLEMEYEN (DURAKSIZ) DİNAMİK EKLEME METODU
                     async function kaydetYeniUcus() {
                         const tarih = document.getElementById('tarih').value;
+                        const havaAraciTipi = document.getElementById('havaAraciTipi').value;
                         const egitimTipi = document.getElementById('egitimTipi').value;
                         const sure = document.getElementById('sure').value;
+                        const gorevAciklamasi = document.getElementById('gorevAciklamasi').value;
 
                         if(!tarih || !egitimTipi || !sure) {
                             alert("Lütfen Tarih, Eğitim Sınıflandırması ve Süre alanlarını eksiksiz doldurun.");
@@ -376,10 +377,10 @@ app.post('/login', async (req, res) => {
                         const veri = {
                             userEmail: document.getElementById('userEmail').value,
                             tarih: tarih,
-                            havaAraciTipi: document.getElementById('havaAraciTipi').value,
+                            havaAraciTipi: havaAraciTipi,
                             egitimTipi: egitimTipi,
                             sure: sure,
-                            gorevAciklamasi: document.getElementById('gorevAciklamasi').value
+                            gorevAciklamasi: gorevAciklamasi
                         };
 
                         const response = await fetch('/api/add-flight', { 
@@ -390,7 +391,42 @@ app.post('/login', async (req, res) => {
                         
                         const sonuc = await response.json();
                         if(sonuc.success) {
-                            window.location.reload(); 
+                            // Sayfayı yenilemiyoruz! Dinamik olarak DOM'a satır ekliyoruz.
+                            const tbody = document.getElementById('ucusTabloGövde');
+                            
+                            const tr = document.createElement('tr');
+                            tr.id = 'row-' + sonuc.data._id;
+                            tr.className = 'ucus-satiri';
+                            tr.setAttribute('data-tarih', sonuc.data.tarih);
+                            tr.setAttribute('data-hava', sonuc.data.havaAraciTipi);
+                            tr.setAttribute('data-egitim', sonuc.data.egitimTipi);
+                            tr.setAttribute('data-sure', sonuc.data.sure);
+
+                            tr.innerHTML = \`
+                                <td>\${sonuc.data.tarih}</td>
+                                <td style="font-weight:bold;">\${sonuc.data.havaAraciTipi}</td>
+                                <td>\${sonuc.data.egitimTipi}</td>
+                                <td style="color:#e67e22; font-weight:bold;">\${sonuc.data.sure}</td>
+                                <td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${sonuc.data.gorevAciklamasi || ''}</td>
+                                <td><button type="button" onclick="silUcus('\${sonuc.data._id}')" class="sil-btn">Sil</button></td>
+                            \`;
+
+                            // Yeni uçuşu en başa yerleştir
+                            tbody.insertBefore(tr, tbody.firstChild);
+
+                            // Toplam saati güncelle
+                            document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
+
+                            // Form alanlarını sıfırla
+                            document.getElementById('tarih').value = '';
+                            document.getElementById('egitimTipi').value = '';
+                            document.getElementById('sure').value = '';
+                            document.getElementById('gorevAciklamasi').value = '';
+
+                            // Listeyi ve sayfalama düzenini bozmadan güncelle
+                            mevcutSayfa = 1;
+                            filtreleUcuslari();
+                            alert("Uçuş kaydı başarıyla eklendi!");
                         } else {
                             alert("Uçuş kaydedilirken bir hata oluştu.");
                         }
@@ -407,7 +443,6 @@ app.post('/login', async (req, res) => {
                         }
                     }
 
-                    // 🎯 DİNAMİK SAYFALAMA DESTEKLİ GELİŞMİŞ FİLTRELEME MANTIĞI
                     function filtreleUcuslari() {
                         const secilenYil = document.getElementById('filtreYil').value;
                         const ay = document.getElementById('filtreAy').value;
@@ -425,7 +460,6 @@ app.post('/login', async (req, res) => {
                             bitisTarihi = new Date(y + '-09-01');           
                         }
 
-                        // Filtreye uyan satırları toplamak için dizi
                         let gorunurSatirlar = [];
 
                         document.querySelectorAll('.ucus-satiri').forEach(satir => {
@@ -455,11 +489,10 @@ app.post('/login', async (req, res) => {
                                     toplamFiltreDakika += (saat * 60) + dakika;
                                 }
                             } else {
-                                satir.style.display = 'none'; // Filtreye uymayanı peşinen gizle
+                                satir.style.display = 'none';
                             }
                         });
 
-                        // Üst toplam filtre süresi kutusu ayarı
                         if(filtreAktifMi) {
                             let fSaat = Math.floor(toplamFiltreDakika / 60).toString().padStart(2, '0');
                             let fDakika = (toplamFiltreDakika % 60).toString().padStart(2, '0');
@@ -469,7 +502,6 @@ app.post('/login', async (req, res) => {
                             document.getElementById('filtreSaatKutusu').style.display = 'none';
                         }
 
-                        // SAYFALAMA MOTORUNU TETİKLE
                         sayfalamayiCiz(gorunurSatirlar);
                     }
 
@@ -477,10 +509,8 @@ app.post('/login', async (req, res) => {
                         const toplamSatirSayisi = aktifSatirlar.length;
                         const toplamSayfaSayisi = Math.ceil(toplamSatirSayisi / satirBasinaVeri) || 1;
 
-                        // Eğer mevcut sayfa filtrelemeden ötürü üst sınırda kaldıysa eşitle
                         if (mevcutSayfa > toplamSayfaSayisi) mevcutSayfa = toplamSayfaSayisi;
 
-                        // Tüm aktif satırları önce gizle, sadece mevcut sayfaya ait olanları göster
                         aktifSatirlar.forEach((satir, index) => {
                             const baslangicSınırı = (mevcutSayfa - 1) * satirBasinaVeri;
                             const bitisSınırı = mevcutSayfa * satirBasinaVeri;
@@ -492,18 +522,18 @@ app.post('/login', async (req, res) => {
                             }
                         });
 
-                        // Butonları HTML alanına yerleştirme
                         const sayfalamaKutusu = document.getElementById('sayfalamaAlani');
                         sayfalamaKutusu.innerHTML = '';
 
                         if (toplamSayfaSayisi > 1) {
                             for (let i = 1; i <= toplamSayfaSayisi; i++) {
                                 const btn = document.createElement('button');
+                                btn.type = 'button';
                                 btn.innerText = i;
                                 btn.className = 'sayfa-btn' + (i === mevcutSayfa ? ' aktif' : '');
                                 btn.onclick = function() {
                                     mevcutSayfa = i;
-                                    filtreleUcuslari(); // Sayfa değiştiğinde filtre fonksiyonunu tekrar çalıştırır
+                                    filtreleUcuslari();
                                 };
                                 sayfalamaKutusu.appendChild(btn);
                             }
@@ -519,7 +549,6 @@ app.post('/login', async (req, res) => {
                         filtreleUcuslari();
                     }
 
-                    // Sayfa ilk yüklendiğinde listeyi 10'arlı göstermek için başlangıç tetiklemesi
                     window.onload = function() {
                         filtreleUcuslari();
                     };
@@ -556,10 +585,17 @@ app.delete('/api/delete-flight', async (req, res) => {
     } catch (e) { res.json({ success: false }); }
 });
 
+// API GELİŞTİRİLDİ: Yeni eklenen uçuş objesini ve güncel toplam saati ön yüze paslar
 app.post('/api/add-flight', async (req, res) => {
     try {
-        const nf = new Flight({ ...req.body, sure: formatUcusSaati(req.body.sure) });
-        await nf.save(); res.json({ success: true });
+        const formatliSure = formatUcusSaati(req.body.sure);
+        const nf = new Flight({ ...req.body, sure: formatliSure });
+        const savedFlight = await nf.save();
+        
+        const tumUcuslar = await Flight.find({ userEmail: req.body.userEmail });
+        const yeniToplam = hesaplaToplamSaat(tumUcuslar);
+
+        res.json({ success: true, data: savedFlight, yeniToplamSaat: yeniToplam });
     } catch (e) { res.json({ success: false }); }
 });
 
