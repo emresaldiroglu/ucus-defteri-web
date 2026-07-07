@@ -42,12 +42,12 @@ const FlightSchema = new mongoose.Schema({
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 
-// --- 🎯 AKILLI SÜRE ALGILAYICI FONKSİYON ---
+// --- YARDIMCI FONKSİYONLAR ---
+
 function formatUcusSaati(saatInput) {
     if (!saatInput) return "00:00";
     let inputStr = saatInput.toString().trim();
 
-    // Eğer "2:10" gibi iki nokta üst üste içeriyorsa
     if (inputStr.includes(':')) {
         let [saatPart, dakikaPart] = inputStr.split(':').map(Number);
         if (isNaN(saatPart)) saatPart = 0;
@@ -55,7 +55,6 @@ function formatUcusSaati(saatInput) {
         return `${saatPart.toString().padStart(2, '0')}:${dakikaPart.toString().padStart(2, '0')}`;
     } 
     
-    // Eğer "2.5" gibi ondalıklı veya düz sayıysa
     let num = parseFloat(inputStr);
     if (isNaN(num)) return "00:00";
     let saat = Math.floor(num);
@@ -84,6 +83,13 @@ function getGunFarki(hedefTarih) {
     return Math.ceil(zamanFarki / (1000 * 3600 * 24));
 }
 
+// Tarihi TR formatına çeviren yardımcı fonksiyon (DD.MM.YYYY)
+function formatTRTarih(dateObj) {
+    const d = new Date(dateObj);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
+}
+
 
 // --- ROTALAR ---
 
@@ -95,14 +101,11 @@ app.get('/login', (req, res) => {
     res.redirect('/');
 });
 
-// 🎯 LOGIN COKERTILDI - OTOMATIK KAYIT KALDIRILDI
 app.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
         let user = await User.findOne({ email: email });
-        
-        // Eğer kullanıcı veritabanında yoksa, artık kaydetmiyor direkt engelliyor!
         if (!user) {
             return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Kullanıcı Bulunamadı!</h1><p>Bu e-posta adresi sistemde kayıtlı değil.</p><a href="/">Geri Dön</a></div>`);
         }
@@ -131,7 +134,7 @@ app.post('/login', async (req, res) => {
             const renkSonUcus = kalanSonUcus <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
 
             const kayitliTarihler = await ReportDate.find({ userEmail: email });
-            const staticYears = Array.from({length: 10}, (_, i) => 2024 + i); // 2024-2033 arası filtre yılları
+            const staticYears = Array.from({length: 10}, (_, i) => 2024 + i);
 
             const tarihBul = (alanAdi) => {
                 const bulma = kayitliTarihler.find(t => t.alan === alanAdi);
@@ -147,6 +150,7 @@ app.post('/login', async (req, res) => {
                 if (!baslangicTarihi) {
                     return { 
                         gun: null, 
+                        sonTarihStr: "",
                         html: `<div onclick="tarihSecimiAc('${etiket}', '${teknikAlan}')" style="background:#f1f2f6; color:#2c3e50; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer; border:2px dashed #bdc3c7;"><strong>${etiket}</strong><br><span style="font-size:11px; font-weight:bold; color:#c0392b; display:inline-block; margin-top:4px;">⚠️ TARİH GİRİLMEDİ</span></div>` 
                     };
                 }
@@ -154,7 +158,7 @@ app.post('/login', async (req, res) => {
                 hedef.setFullYear(hedef.getFullYear() + periyotYil);
                 const kalanGün = getGunFarki(hedef);
                 let renk = kalanGün <= 90 ? 'background:#e74c3c;' : 'background:#3498db;';
-                return { gun: kalanGün, renk: renk };
+                return { gun: kalanGün, renk: renk, sonTarihStr: formatTRTarih(hedef) };
             };
 
             const sMuayene1 = hesaplaTarihliSayaç(tMuayene1, 1, '1 Yıllık Muayene', 'muayene1Tarih');
@@ -168,13 +172,13 @@ app.post('/login', async (req, res) => {
                     body { background: #f5f6fa; margin: 0; padding: 8px; font-family:'Segoe UI', sans-serif; }
                     .container { max-width:900px; margin:5px auto; padding:12px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; }
                     
-                    /* MOBİL DE %100 ALT ALTA (VERTICAL) DÜZEN */
                     .ust-panel { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
                     .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
                     
-                    /* Form ve Filtrelerin Mobil Tam Uyum Dikey Hali */
                     .form-grid, .filtre-box { display: flex; flex-direction: column; gap: 10px; background:#f9f9f9; padding:12px; border-radius:10px; margin-bottom:15px; box-sizing: border-box; }
                     .filtre-box { background: #eef1f4; }
+
+                    .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
 
                     @media(min-width: 768px) { 
                         .ust-panel { display: grid; grid-template-columns: 1fr 2fr; } 
@@ -201,6 +205,11 @@ app.post('/login', async (req, res) => {
                     th { background: #2c3e50; color: white; padding: 12px; }
                     td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
                     .sil-btn { background:#e74c3c; color:white; padding:6px 12px; border-radius:4px; font-size:12px; width:auto; }
+
+                    /* SAYFALAMA TASARIMI */
+                    .sayfalama-alani { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 15px; padding: 10px 0; }
+                    .sayfa-btn { width: auto; padding: 8px 14px; background: #fff; border: 1px solid #ddd; color: #333; font-size: 14px; border-radius: 4px; }
+                    .sayfa-btn.aktif { background: #2c3e50; color: white; border-color: #2c3e50; }
                 </style>
 
                 <div class="container">
@@ -215,15 +224,17 @@ app.post('/login', async (req, res) => {
                         <div class="sayac-grid">
                             <div style="${renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
                                 <strong>GGG Sayaç (60G)</strong><br><span style="font-size:18px; font-weight:bold;">${kalanGgg} Gün</span>
+                                <span class="tarih-etiket">Son Tarih: ${formatTRTarih(hedefGgg)}</span>
                             </div>
                             <div style="${renkSonUcus} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
                                 <strong>Son Uçuş (60G)</strong><br><span style="font-size:18px; font-weight:bold;">${kalanSonUcus} Gün</span>
+                                <span class="tarih-etiket">Son Tarih: ${formatTRTarih(hedefSonUcus)}</span>
                             </div>
                             
-                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih')" style="${sMuayene1.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span></div>` : sMuayene1.html}
-                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih')" style="${sMuayene4.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span></div>` : sMuayene4.html}
-                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih')" style="${sAlet.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span></div>` : sAlet.html}
-                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih')" style="${sStand.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span></div>` : sStand.html}
+                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih')" style="${sMuayene1.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene1.sonTarihStr}</span></div>` : sMuayene1.html}
+                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih')" style="${sMuayene4.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene4.sonTarihStr}</span></div>` : sMuayene4.html}
+                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih')" style="${sAlet.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sAlet.sonTarihStr}</span></div>` : sAlet.html}
+                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih')" style="${sStand.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sStand.sonTarihStr}</span></div>` : sStand.html}
                         </div>
                     </div>
 
@@ -274,7 +285,6 @@ app.post('/login', async (req, res) => {
                         <input type="hidden" id="userEmail" value="${email}">
                         <div><label>Tarih:</label><input type="date" id="tarih"></div>
                         <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
-                        
                         <div>
                             <label>Eğitim Sınıflandırması:</label>
                             <select id="egitimTipi">
@@ -301,6 +311,9 @@ app.post('/login', async (req, res) => {
                             </tbody>
                         </table>
                     </div>
+
+                    <div id="sayfalamaAlani" class="sayfalama-alani"></div>
+
                 </div>
 
                 <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
@@ -317,6 +330,10 @@ app.post('/login', async (req, res) => {
                 </div>
 
                 <script>
+                    // Sayfalama için global değişken
+                    let mevcutSayfa = 1;
+                    const satirBasinaVeri = 10;
+
                     function tarihSecimiAc(etiketIsmi, alanAdi) {
                         document.getElementById('modalBaslik').innerText = etiketIsmi + " Başlangıç Tarihi";
                         document.getElementById('hedefAlan').value = alanAdi;
@@ -344,7 +361,6 @@ app.post('/login', async (req, res) => {
                         }
                     }
 
-                    // 🎯 MOBIL AJANLAR ICIN YENI AJAX UÇUŞ KAYDETME MANTIĞI (SAYFA YENILENMEZ, OTURUM DÜŞMEZ)
                     async function kaydetYeniUcus() {
                         const tarih = document.getElementById('tarih').value;
                         const egitimTipi = document.getElementById('egitimTipi').value;
@@ -374,7 +390,7 @@ app.post('/login', async (req, res) => {
                         
                         const sonuc = await response.json();
                         if(sonuc.success) {
-                            window.location.reload(); // Güvenli tetikleme
+                            window.location.reload(); 
                         } else {
                             alert("Uçuş kaydedilirken bir hata oluştu.");
                         }
@@ -387,13 +403,13 @@ app.post('/login', async (req, res) => {
                         if(sonuc.success) { 
                             document.getElementById('row-'+id).remove(); 
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
-                            filtreleUcuslari();
+                            filtreleUcuslari(); 
                         }
                     }
 
-                    // 🎯 1 EYLÜL MANTIĞINA GÖRE GELİŞTİRİLMİŞ YIL FİLTRESİ
+                    // 🎯 DİNAMİK SAYFALAMA DESTEKLİ GELİŞMİŞ FİLTRELEME MANTIĞI
                     function filtreleUcuslari() {
-                        const secilenYil = document.getElementById('filtreYil').value; // Örn: 2026
+                        const secilenYil = document.getElementById('filtreYil').value;
                         const ay = document.getElementById('filtreAy').value;
                         const hava = document.getElementById('filtreHavaAraci').value;
                         const egitim = document.getElementById('filtreUcusTipi').value;
@@ -401,29 +417,28 @@ app.post('/login', async (req, res) => {
                         let toplamFiltreDakika = 0;
                         let filtreAktifMi = (secilenYil || ay || hava || egitim);
 
-                        // 1 Eylül Dönem Sınırları Hesaplama
                         let baslangicTarihi = null;
                         let bitisTarihi = null;
                         if(secilenYil) {
                             let y = parseInt(secilenYil);
-                            baslangicTarihi = new Date((y - 1) + '-09-01'); // 1 Eylül 2025
-                            bitisTarihi = new Date(y + '-09-01');           // 1 Eylül 2026
+                            baslangicTarihi = new Date((y - 1) + '-09-01'); 
+                            bitisTarihi = new Date(y + '-09-01');           
                         }
 
+                        // Filtreye uyan satırları toplamak için dizi
+                        let gorunurSatirlar = [];
+
                         document.querySelectorAll('.ucus-satiri').forEach(satir => {
-                            const tStr = satir.getAttribute('data-tarih'); // YYYY-MM-DD
+                            const tStr = satir.getAttribute('data-tarih'); 
                             const h = satir.getAttribute('data-hava');
                             const e = satir.getAttribute('data-egitim');
                             const s = satir.getAttribute('data-sure');
 
                             let u = true;
 
-                            // 1 Eylül dönemsel karşılaştırma kontrolü
                             if(secilenYil) {
                                 const mevcutUcusTarihi = new Date(tStr);
-                                if(mevcutUcusTarihi < baslangicTarihi || mevcutUcusTarihi > bitisTarihi) {
-                                    u = false;
-                                }
+                                if(mevcutUcusTarihi < baslangicTarihi || mevcutUcusTarihi > bitisTarihi) u = false;
                             }
 
                             if(ay && tStr.split('-')[1] !== ay) u = false;
@@ -433,14 +448,18 @@ app.post('/login', async (req, res) => {
                                 else if(h !== hava) u = false;
                             }
                             
-                            satir.style.display = u ? '' : 'none';
-
-                            if (u && s && s.includes(':')) {
-                                const [saat, dakika] = s.split(':').map(Number);
-                                toplamFiltreDakika += (saat * 60) + dakika;
+                            if(u) {
+                                gorunurSatirlar.push(satir);
+                                if (s && s.includes(':')) {
+                                    const [saat, dakika] = s.split(':').map(Number);
+                                    toplamFiltreDakika += (saat * 60) + dakika;
+                                }
+                            } else {
+                                satir.style.display = 'none'; // Filtreye uymayanı peşinen gizle
                             }
                         });
 
+                        // Üst toplam filtre süresi kutusu ayarı
                         if(filtreAktifMi) {
                             let fSaat = Math.floor(toplamFiltreDakika / 60).toString().padStart(2, '0');
                             let fDakika = (toplamFiltreDakika % 60).toString().padStart(2, '0');
@@ -449,6 +468,46 @@ app.post('/login', async (req, res) => {
                         } else {
                             document.getElementById('filtreSaatKutusu').style.display = 'none';
                         }
+
+                        // SAYFALAMA MOTORUNU TETİKLE
+                        sayfalamayiCiz(gorunurSatirlar);
+                    }
+
+                    function sayfalamayiCiz(aktifSatirlar) {
+                        const toplamSatirSayisi = aktifSatirlar.length;
+                        const toplamSayfaSayisi = Math.ceil(toplamSatirSayisi / satirBasinaVeri) || 1;
+
+                        // Eğer mevcut sayfa filtrelemeden ötürü üst sınırda kaldıysa eşitle
+                        if (mevcutSayfa > toplamSayfaSayisi) mevcutSayfa = toplamSayfaSayisi;
+
+                        // Tüm aktif satırları önce gizle, sadece mevcut sayfaya ait olanları göster
+                        aktifSatirlar.forEach((satir, index) => {
+                            const baslangicSınırı = (mevcutSayfa - 1) * satirBasinaVeri;
+                            const bitisSınırı = mevcutSayfa * satirBasinaVeri;
+
+                            if (index >= baslangicSınırı && index < bitisSınırı) {
+                                satir.style.display = '';
+                            } else {
+                                satir.style.display = 'none';
+                            }
+                        });
+
+                        // Butonları HTML alanına yerleştirme
+                        const sayfalamaKutusu = document.getElementById('sayfalamaAlani');
+                        sayfalamaKutusu.innerHTML = '';
+
+                        if (toplamSayfaSayisi > 1) {
+                            for (let i = 1; i <= toplamSayfaSayisi; i++) {
+                                const btn = document.createElement('button');
+                                btn.innerText = i;
+                                btn.className = 'sayfa-btn' + (i === mevcutSayfa ? ' aktif' : '');
+                                btn.onclick = function() {
+                                    mevcutSayfa = i;
+                                    filtreleUcuslari(); // Sayfa değiştiğinde filtre fonksiyonunu tekrar çalıştırır
+                                };
+                                sayfalamaKutusu.appendChild(btn);
+                            }
+                        }
                     }
 
                     function filtreleriTemizle() {
@@ -456,9 +515,14 @@ app.post('/login', async (req, res) => {
                         document.getElementById('filtreAy').value = '';
                         document.getElementById('filtreHavaAraci').value = '';
                         document.getElementById('filtreUcusTipi').value = '';
-                        document.querySelectorAll('.ucus-satiri').forEach(s => s.style.display = '');
-                        document.getElementById('filtreSaatKutusu').style.display = 'none';
+                        mevcutSayfa = 1;
+                        filtreleUcuslari();
                     }
+
+                    // Sayfa ilk yüklendiğinde listeyi 10'arlı göstermek için başlangıç tetiklemesi
+                    window.onload = function() {
+                        filtreleUcuslari();
+                    };
                 </script>
             `);
         } else {
