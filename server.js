@@ -125,7 +125,6 @@ function formatTRTarih(dateObj) {
     return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
 }
 
-// 🎯 KÜÇÜK YARDIMCI: NEGATİF GÜNLERİ "60 günden fazla" YAPMA
 function formatKalanGunMetni(kalanGun) {
     if (kalanGun < 0) {
         return "60 günden fazla";
@@ -134,7 +133,6 @@ function formatKalanGunMetni(kalanGun) {
 }
 
 function hesaplaGggVeSonUcusDurumu(flights) {
-    // au(sim) HAREÇ GERÇEK UÇUŞLAR
     const gercekUcuslar = flights.filter(f => f.egitimTipi !== 'au(sim)');
     
     const sonUcus = gercekUcuslar[0];
@@ -162,15 +160,14 @@ function hesaplaGggVeSonUcusDurumu(flights) {
     };
 }
 
-// 🎯 DÜZELTİLMİŞ VE au(sim) HARİÇ ARAÇ BAZLI DETAYLI SAYAÇ ANALİZİ
+// 🎯 KUSURSUZ ARAÇ BAZLI ANALİZ
 function hesaplaAracaGoreDetayliDurum(flights) {
     let sonuc = { ggg: {}, sonUcus: {} };
     
-    // Simülatör (au(sim)) uçuşlarını filtrele
     const gercekUcuslar = flights.filter(f => f.egitimTipi !== 'au(sim)');
 
     HAVA_ARACLARI_LISTESI.forEach(arac => {
-        // 1. GGG SADECE 'ggg' TİPİ GERÇEK UÇUŞLARA BAKAR
+        // 1. GGG İÇİN SADECE 'ggg' TİPİ UÇUŞLAR
         const aracGggUcuslari = gercekUcuslar.filter(f => f.havaAraciTipi === arac && f.egitimTipi === 'ggg');
         const sonGgg = aracGggUcuslari[0]; 
 
@@ -187,7 +184,7 @@ function hesaplaAracaGoreDetayliDurum(flights) {
             sonuc.ggg[arac] = { yok: true };
         }
 
-        // 2. SON UÇUŞ İSE O ARAÇLA YAPILAN EN SON GERÇEK UÇUŞA BAKAR (gş, ggg vb.)
+        // 2. SON UÇUŞ İÇİN O ARAÇLA YAPILAN EN SON GERÇEK UÇUŞ (gş, ggg vb. fark etmez)
         const aracTumGercekUcuslari = gercekUcuslar.filter(f => f.havaAraciTipi === arac);
         const sonGenel = aracTumGercekUcuslari[0];
 
@@ -197,7 +194,7 @@ function hesaplaAracaGoreDetayliDurum(flights) {
             const kalan = getGunFarki(hedef);
             sonuc.sonUcus[arac] = {
                 tarih: formatTRTarih(sonGenel.tarih),
-                tip: sonGenel.egitimTipi.toUpperCase(),
+                tip: sonGenel.egitimTipi.toUpperCase(), // Doğru uçuş tipini yazdırıyoruz (GŞ, GGG vb.)
                 kalanGunStr: formatKalanGunMetni(kalan),
                 renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
             };
