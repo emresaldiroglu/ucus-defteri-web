@@ -225,13 +225,16 @@ app.post('/login', async (req, res) => {
                     .ust-panel { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
                     .saatler-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
                     .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-                    .form-grid { display: flex; flex-direction: column; gap: 10px; background:#f9f9f9; padding:12px; border-radius:10px; margin-bottom:15px; box-sizing: border-box; }
                     
-                    /* 🎯 AÇILIR KAPANIR FİLTRE KUTUSU STİLLERİ */
-                    .filtre-container { background: #eef1f4; border-radius: 10px; margin-bottom: 15px; overflow: hidden; border: 1px solid #dcdde1; }
-                    .filtre-toggle-btn { width: 100%; padding: 14px; background: #dfe4ea; border: none; font-weight: bold; font-size: 14px; color: #2f3640; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-                    .filtre-icerik { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; padding: 0 12px; background: #eef1f4; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
-                    .filtre-icerik.acik { max-height: 450px; padding: 12px; transition: max-height 0.35s ease-in; }
+                    /* 🎯 AKORDEON KUTULARI (Filtre ve Uçuş Ekleme) */
+                    .akordeon-container { background: #eef1f4; border-radius: 10px; margin-bottom: 15px; overflow: hidden; border: 1px solid #dcdde1; }
+                    .akordeon-toggle-btn { width: 100%; padding: 14px; background: #dfe4ea; border: none; font-weight: bold; font-size: 14px; color: #2f3640; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+                    .akordeon-icerik { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; padding: 0 12px; background: #eef1f4; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
+                    .akordeon-icerik.acik { max-height: 550px; padding: 12px; transition: max-height 0.35s ease-in; }
+
+                    /* Uçuş ekleme butonu özel rengi */
+                    .ekle-toggle-stil { background: #e8f8f5; border-color: #a3e4d7; }
+                    .ekle-toggle-btn { background: #d1f2eb; color: #0e6655; }
 
                     .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
                     
@@ -240,8 +243,10 @@ app.post('/login', async (req, res) => {
                         .sayac-grid { grid-template-columns: repeat(3, 1fr); }
                         .form-grid { display: grid; grid-template-columns: 1fr 1fr; }
                         .span-mobil-2 { grid-column: span 2; }
-                        .filtre-icerik { flex-direction: row; flex-wrap: wrap; align-items: center; }
+                        .akordeon-icerik { flex-direction: row; flex-wrap: wrap; align-items: center; }
                     }
+
+                    .form-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 
                     label { font-weight: bold; font-size: 13px; color: #34495e; display: block; margin-bottom: 4px; }
                     
@@ -260,7 +265,7 @@ app.post('/login', async (req, res) => {
                     input[type="date"] { appearance: none; -webkit-appearance: none; }
 
                     button { padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; box-sizing: border-box; }
-                    .btn-ekle { background:#2ecc71; color:white; }
+                    .btn-ekle { background:#2ecc71; color:white; height: 46px; }
                     .btn-filtre { background:#34495e; color:white; }
                     .btn-temizle { background:#7f8c8d; color:white; }
                     @media(min-width: 768px) { .btn-filtre, .btn-temizle { width: auto; padding: 10px 20px; height: 46px; } }
@@ -309,13 +314,13 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <!-- 🎯 AÇILIR KAPANIR FİLTRE KUTUSU -->
-                    <div class="filtre-container">
-                        <button type="button" class="filtre-toggle-btn" onclick="filtreyiAcKapat()">
+                    <!-- 🎯 1. AKORDEON: GEÇMİŞ UÇUŞ ARAMA (FİLTRE) -->
+                    <div class="akordeon-container">
+                        <button type="button" class="akordeon-toggle-btn" onclick="akordeonAcKapat('filtreIcerikKutusu', 'filtreOkIkon')">
                             <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
                             <span id="filtreOkIkon">▼</span>
                         </button>
-                        <div id="filtreIcerikKutusu" class="filtre-icerik">
+                        <div id="filtreIcerikKutusu" class="akordeon-icerik">
                             <div style="flex:1; width:100%;"><label>📋 Yıl Seçimi (1 Eylül Dönemi):</label><select id="filtreYil"><option value="">Yıl Seçin</option>${staticYears.map(y => `<option value="${y}">${y}</option>`).join('')}</select></div>
                             <div style="flex:1; width:100%;"><label>Ay:</label><select id="filtreAy"><option value="">Ay Seçin</option><option value="01">Ocak</option><option value="02">Şubat</option><option value="03">Mart</option><option value="04">Nisan</option><option value="05">Mayıs</option><option value="06">Haziran</option><option value="07">Temmuz</option><option value="08">Ağustos</option><option value="09">Eylül</option><option value="10">Ekim</option><option value="11">Kasım</option><option value="12">Aralık</option></select></div>
                             <div style="flex:1; width:100%;"><label>Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option><option value="sikorsky">Sikorsky (s70, s70i, t70)</option><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
@@ -325,14 +330,23 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <div class="form-grid">
-                        <input type="hidden" id="userEmail" value="${email}">
-                        <div><label>Tarih:</label><input type="date" id="tarih" value="${bugunTarihStr}"></div>
-                        <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
-                        <div><label>Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
-                        <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
-                        <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi"></textarea></div>
-                        <button type="button" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
+                    <!-- 🎯 2. AKORDEON: YENİ UÇUŞ SAATİ EKLEME -->
+                    <div class="akordeon-container ekle-toggle-stil">
+                        <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" onclick="akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon')">
+                            <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
+                            <span id="ekleOkIkon">▼</span>
+                        </button>
+                        <div id="ekleIcerikKutusu" class="akordeon-icerik">
+                            <div class="form-grid">
+                                <input type="hidden" id="userEmail" value="${email}">
+                                <div><label>Tarih:</label><input type="date" id="tarih" value="${bugunTarihStr}"></div>
+                                <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
+                                <div><label>Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
+                                <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
+                                <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi"></textarea></div>
+                                <button type="button" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="tablo-sarmal">
@@ -370,10 +384,10 @@ app.post('/login', async (req, res) => {
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
 
-                    // 🎯 FİLTRE KUTUSUNU AÇIP KAPATAN FONKSİYON
-                    function filtreyiAcKapat() {
-                        const icerik = document.getElementById('filtreIcerikKutusu');
-                        const ok = document.getElementById('filtreOkIkon');
+                    // 🎯 ORTAK AKORDEON AÇMA / KAPATMA FONKSİYONU
+                    function akordeonAcKapat(icerikId, okId) {
+                        const icerik = document.getElementById(icerikId);
+                        const ok = document.getElementById(okId);
                         if (icerik.classList.contains('acik')) {
                             icerik.classList.remove('acik');
                             ok.innerText = '▼';
@@ -492,6 +506,10 @@ app.post('/login', async (req, res) => {
                             document.getElementById('egitimTipi').value = '';
                             document.getElementById('sure').value = '';
                             document.getElementById('gorevAciklamasi').value = '';
+
+                            // 🎯 Uçuş eklendikten sonra formu otomatik kapat
+                            document.getElementById('ekleIcerikKutusu').classList.remove('acik');
+                            document.getElementById('ekleOkIkon').innerText = '▼';
 
                             mevcutSayfa = 1;
                             filtreleUcuslari();
