@@ -80,6 +80,9 @@ const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 // --- YARDIMCI FONKSİYONLAR ---
 
+const DONEM_HEDEF_SAAT = 140;
+const IZINLI_TARIH_ALANLARI = ['muayene1Tarih', 'muayene4Tarih', 'aletKartTarih', 'standTarih'];
+
 const HAVA_ARACLARI_LISTESI = ['s70', 's70i', 't70', 'atak', 'mi17', 'gökbey', 'cayrokopter', 'ab-205'];
 
 function formatUcusSaati(saatInput) {
@@ -144,9 +147,16 @@ function hesaplaAktifDonemSaati(flights) {
 
     let saat = Math.floor(toplamDakika / 60);
     let dakika = toplamDakika % 60;
+
+    // Dönem hedefi: 140 saat. Güncel dönem saati düşülerek kalan süre bulunur.
+    const kalanDakika = Math.max(0, (DONEM_HEDEF_SAAT * 60) - toplamDakika);
+    const kalanSaat = Math.floor(kalanDakika / 60);
+    const kalanDk = kalanDakika % 60;
+
     return {
         yil: aktifDonemYili,
         sure: `${saat.toString().padStart(2, '0')}:${dakika.toString().padStart(2, '0')}`,
+        kalan: `${kalanSaat.toString().padStart(2, '0')}:${kalanDk.toString().padStart(2, '0')}`,
         donemUcuslari: donemUcuslari
     };
 }
@@ -436,7 +446,7 @@ const loginHandler = async (req, res) => {
                                 </div>
                                 <div onclick="donemUcuslariModalAc()" style="cursor:pointer;" title="Dönem Uçuşlarını Görmek İçin Tıkla">
                                     <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">${aktifDonem.yil} DÖNEMİ 🔍</span>
-                                    <h2 id="donemSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold; color: #f1c40f;">${aktifDonem.sure}</h2>
+                                    <h2 id="donemSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold; color: #f1c40f;">${aktifDonem.sure}<span title="${DONEM_HEDEF_SAAT} saatten kalan" style="font-size: 12px; font-weight: normal; color: #fff; opacity: 0.85; margin-left: 4px;">(${aktifDonem.kalan})</span></h2>
                                 </div>
                             </div>
                             <div>
@@ -802,7 +812,7 @@ const loginHandler = async (req, res) => {
                                 // MOBİLDE OTURUM KAYBINI ENGELLEMEK İÇİN SAYFA YENİLEME DÜZELTMESİ
                                 window.location.href = window.location.href;
                             } else {
-                                alert("Uçuş kaydedilirken bir hata oluştu.");
+                                alert(sonuc.message || "Uçuş kaydedilirken bir hata oluştu.");
                             }
                         } catch(e) {
                             alert("Ağ hatası oluştu.");
@@ -975,10 +985,21 @@ app.post('/register', async (req, res) => {
     }
 });
 
-app.post('/api/update-password', async (req, res) => {
-    const { userEmail, eskiSifre, yeniSifre } = req.body;
+// --- API İÇİN OTURUM DOĞRULAMA ---
+// E-posta artık istemciden gelen veriye değil, imzalı çerezden alınır.
+function oturumGerekli(req, res, next) {
+    const email = oturumEmailOku(req);
+    if (!email) {
+        return res.status(401).json({ success: false, message: "Oturum süresi doldu, lütfen tekrar giriş yapın." });
+    }
+    req.oturumEmail = email;
+    next();
+}
+
+app.post('/api/update-password', oturumGerekli, async (req, res) => {
+    const { eskiSifre, yeniSifre } = req.body;
     try {
-        const user = await User.findOne({ email: userEmail });
+        const user = await User.findOne({ email: req.oturumEmail });
         if(!user) {
             return res.json({ success: false, message: "Kullanıcı bulunamadı." });
         }
@@ -1002,11 +1023,14 @@ app.post('/api/update-password', async (req, res) => {
     }
 });
 
-app.post('/api/update-user-date', async (req, res) => {
-    const { userEmail, alan, tarih } = req.body;
+app.post('/api/update-user-date', oturumGerekli, async (req, res) => {
+    const { alan, tarih } = req.body;
+    if (!IZINLI_TARIH_ALANLARI.includes(alan) || !tarih) {
+        return res.json({ success: false });
+    }
     try {
         await ReportDate.findOneAndUpdate(
-            { userEmail: userEmail, alan: alan },
+            { userEmail: req.oturumEmail, alan: alan },
             { tarih: tarih },
             { upsert: true, new: true }
         );
@@ -1016,18 +1040,27 @@ app.post('/api/update-user-date', async (req, res) => {
     }
 });
 
-app.delete('/api/delete-flight', async (req, res) => {
-    const { id, userEmail } = req.body;
-    try { 
-        await Flight.findByIdAndDelete(id); 
-        res.json({ success: true }); 
+app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
+    const { id } = req.body;
+    try {
+        // Sadece oturumdaki kullanıcının kendi kaydı silinebilir
+        await Flight.findOneAndDelete({ _id: id, userEmail: req.oturumEmail });
+        res.json({ success: true });
     } catch (e) { res.json({ success: false }); }
 });
 
-app.post('/api/add-flight', async (req, res) => {
+app.post('/api/add-flight', oturumGerekli, async (req, res) => {
     try {
-        const formatliSure = formatUcusSaati(req.body.sure);
-        const nf = new Flight({ ...req.body, sure: formatliSure });
+        const { tarih, havaAraciTipi, egitimTipi, sure, gorevAciklamasi } = req.body;
+        const formatliSure = formatUcusSaati(sure);
+        const nf = new Flight({
+            userEmail: req.oturumEmail,
+            tarih,
+            havaAraciTipi,
+            egitimTipi,
+            sure: formatliSure,
+            gorevAciklamasi
+        });
         await nf.save();
         res.json({ success: true });
     } catch (e) { res.json({ success: false }); }
