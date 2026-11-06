@@ -123,9 +123,7 @@ function formatTRTarih(dateObj) {
     return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
 }
 
-// 🎯 GGG ve Son Uçuş verilerini hesaplayan ortak fonksiyon
 function hesaplaGggVeSonUcusDurumu(flights) {
-    // flights zaten tarih sıralı (en yeni üste) gelmeli
     const sonUcus = flights[0];
     const sonGggUcus = flights.find(f => f.egitimTipi === 'ggg');
     
@@ -187,6 +185,9 @@ app.post('/login', async (req, res) => {
             const kayitliTarihler = await ReportDate.find({ userEmail: email.trim().toLowerCase() });
             const staticYears = Array.from({length: 10}, (_, i) => 2024 + i);
 
+            // Bugünün tarihini YYYY-MM-DD formatında al
+            const bugunTarihStr = new Date().toISOString().split('T')[0];
+
             const tarihBul = (alanAdi) => {
                 const bulma = kayitliTarihler.find(t => t.alan === alanAdi);
                 return bulma ? bulma.tarih : null;
@@ -229,6 +230,7 @@ app.post('/login', async (req, res) => {
                     .form-grid, .filtre-box { display: flex; flex-direction: column; gap: 10px; background:#f9f9f9; padding:12px; border-radius:10px; margin-bottom:15px; box-sizing: border-box; }
                     .filtre-box { background: #eef1f4; }
                     .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
+                    
                     @media(min-width: 768px) { 
                         .ust-panel { display: grid; grid-template-columns: 2fr 3fr; } 
                         .sayac-grid { grid-template-columns: repeat(3, 1fr); }
@@ -236,13 +238,37 @@ app.post('/login', async (req, res) => {
                         .span-mobil-2 { grid-column: span 2; }
                         .filtre-box { flex-direction: row; flex-wrap: wrap; align-items: center; }
                     }
+
                     label { font-weight: bold; font-size: 13px; color: #34495e; display: block; margin-bottom: 4px; }
-                    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; background: #fff; }
+                    
+                    /* 🎯 TÜM GİRİŞ ELEMANLARI (KUTULAR) ORTAK BOY VE HİZAYA GETİRİLDİ */
+                    input, select, textarea { 
+                        width: 100%; 
+                        height: 46px; 
+                        padding: 0 12px; 
+                        border: 1px solid #ccc; 
+                        border-radius: 6px; 
+                        box-sizing: border-box; 
+                        font-size: 15px; 
+                        background: #fff; 
+                        line-height: normal;
+                    }
+                    textarea { 
+                        height: 60px; 
+                        padding: 10px 12px; 
+                        resize: none; 
+                    }
+                    input[type="date"] {
+                        appearance: none;
+                        -webkit-appearance: none;
+                    }
+
                     button { padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; box-sizing: border-box; }
                     .btn-ekle { background:#2ecc71; color:white; }
                     .btn-filtre { background:#34495e; color:white; }
                     .btn-temizle { background:#7f8c8d; color:white; }
-                    @media(min-width: 768px) { .btn-filtre, .btn-temizle { width: auto; padding: 10px 20px; } }
+                    @media(min-width: 768px) { .btn-filtre, .btn-temizle { width: auto; padding: 10px 20px; height: 46px; } }
+                    
                     .tablo-sarmal { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; }
                     table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 14px; }
                     th { background: #2c3e50; color: white; padding: 12px; }
@@ -270,7 +296,6 @@ app.post('/login', async (req, res) => {
                             <p style="margin:5px 0 0 0; font-size:11px; opacity:0.8; word-break:break-all;">${email}</p>
                         </div>
 
-                        <!-- GGG ve Son Uçuş kutularına ID eklendi (Anlık güncellenebilmesi için) -->
                         <div class="sayac-grid">
                             <div id="boxGgg" style="${gggDurum.renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
                                 <strong>GGG Sayaç (60G)</strong><br><span id="valGgg" style="font-size:18px; font-weight:bold;">${gggDurum.kalanGgg} Gün</span>
@@ -297,13 +322,14 @@ app.post('/login', async (req, res) => {
                         <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:10px; border-radius:6px; font-weight:bold; font-size:14px; display:none; width:100%; text-align:center;">⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
                     </div>
 
+                    <!-- 🎯 BUGÜNÜN TARİHİ OTOMATİK SEÇİLİ GELEN GİRİŞ FORMU -->
                     <div class="form-grid">
                         <input type="hidden" id="userEmail" value="${email}">
-                        <div><label>Tarih:</label><input type="date" id="tarih"></div>
+                        <div><label>Tarih:</label><input type="date" id="tarih" value="${bugunTarihStr}"></div>
                         <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
                         <div><label>Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
                         <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
-                        <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi" style="height:50px; resize:none;"></textarea></div>
+                        <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi"></textarea></div>
                         <button type="button" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
                     </div>
 
@@ -435,7 +461,6 @@ app.post('/login', async (req, res) => {
 
                             tbody.insertBefore(tr, tbody.firstChild);
                             
-                            // 🎯 Anlık Güncellemeler (Toplam, Dönem ve GGG / Son Uçuş Sayaçları)
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
                             document.getElementById('donemSaatGosterge').innerText = sonuc.yeniDonemSaat;
                             
@@ -447,7 +472,9 @@ app.post('/login', async (req, res) => {
                             document.getElementById('tarihSonUcus').innerText = "Son Tarih: " + sonuc.gggDurum.hedefSonUcusStr;
                             document.getElementById('boxSonUcus').style = sonuc.gggDurum.renkSonUcus + " color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;";
 
-                            document.getElementById('tarih').value = '';
+                            // Tarih alanı sıfırlanırken yeniden bugünün tarihi atanır
+                            const bugunStr = new Date().toISOString().split('T')[0];
+                            document.getElementById('tarih').value = bugunStr;
                             document.getElementById('egitimTipi').value = '';
                             document.getElementById('sure').value = '';
                             document.getElementById('gorevAciklamasi').value = '';
@@ -467,7 +494,6 @@ app.post('/login', async (req, res) => {
                         if(sonuc.success) { 
                             document.getElementById('row-'+id).remove(); 
                             
-                            // Silme işleminden sonra da sayaçları anlık güncelle
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
                             document.getElementById('donemSaatGosterge').innerText = sonuc.yeniDonemSaat;
 
@@ -668,7 +694,6 @@ app.post('/api/add-flight', async (req, res) => {
         const nf = new Flight({ ...req.body, sure: formatliSure });
         const savedFlight = await nf.save();
         
-        // Tüm uçuşları tarih sırasına göre çekelim ki GGG ve Son Uçuş doğru hesaplansın
         const tumUcuslar = await Flight.find({ userEmail: req.body.userEmail }).sort({ tarih: -1 });
         const yeniToplam = hesaplaToplamSaat(tumUcuslar);
         const yeniDonem = hesaplaAktifDonemSaati(tumUcuslar);
