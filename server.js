@@ -234,7 +234,6 @@ app.post('/login', async (req, res) => {
                     .ekle-toggle-stil { background: #e8f8f5; border-color: #a3e4d7; }
                     .ekle-toggle-btn { background: #d1f2eb; color: #0e6655; }
 
-                    /* 🎯 KDU BUTONU STİLİ (ARADA) */
                     .kdu-link-btn {
                         display: block;
                         width: 100%;
@@ -254,6 +253,19 @@ app.post('/login', async (req, res) => {
                         transition: background 0.2s;
                     }
                     .kdu-link-btn:hover { background: #732d91; }
+
+                    /* 🎯 KULLANICI E-POSTA TIKLANABİLİR STİLİ */
+                    .user-email-link {
+                        margin: 5px 0 0 0;
+                        font-size: 11px;
+                        opacity: 0.9;
+                        word-break: break-all;
+                        cursor: pointer;
+                        text-decoration: underline;
+                        display: inline-block;
+                        transition: color 0.2s;
+                    }
+                    .user-email-link:hover { color: #f1c40f; }
 
                     .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
                     
@@ -321,7 +333,10 @@ app.post('/login', async (req, res) => {
                                     <h2 id="donemSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold; color: #f1c40f;">${aktifDonem.sure}</h2>
                                 </div>
                             </div>
-                            <p style="margin:5px 0 0 0; font-size:11px; opacity:0.8; word-break:break-all;">${email}</p>
+                            <!-- 🎯 TIKLANABİLİR E-POSTA (ŞİFRE DEĞİŞTİRME TETİKLEYİCİSİ) -->
+                            <div>
+                                <span class="user-email-link" onclick="sifreModalAc()" title="Şifreyi Değiştirmek İçin Tıkla">${email}</span>
+                            </div>
                         </div>
 
                         <div class="sayac-grid">
@@ -341,7 +356,6 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <!-- 1. GEÇMİŞ UÇUŞ ARAMA (FİLTRE) -->
                     <div class="akordeon-container">
                         <button type="button" class="akordeon-toggle-btn" onclick="akordeonAcKapat('filtreIcerikKutusu', 'filtreOkIkon')">
                             <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
@@ -357,12 +371,10 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <!-- 🎯 2. KDU BUTONU (ARADA) -->
                     <a href="/kdu.html" target="_blank" class="kdu-link-btn">
                         📟 KDU (Keyboard Display Unit) Aç
                     </a>
 
-                    <!-- 3. YENİ UÇUŞ SAATİ EKLEME -->
                     <div class="akordeon-container ekle-toggle-stil">
                         <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" onclick="akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon')">
                             <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
@@ -413,6 +425,27 @@ app.post('/login', async (req, res) => {
 
                 </div>
 
+                <!-- 🎯 ŞİFRE GÜNCELLEME MODALI -->
+                <div id="sifreModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
+                    <div style="background:white; padding:20px; border-radius:10px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:350px; width:100%;">
+                        <h3 style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">🔐 Şifre Güncelleme</h3>
+                        
+                        <label style="font-size:12px;">Mevcut Şifre:</label>
+                        <input type="password" id="eskiSifre" placeholder="Mevcut şifreniz" style="margin-bottom:10px;">
+                        
+                        <label style="font-size:12px;">Yeni Şifre:</label>
+                        <input type="password" id="yeniSifre1" placeholder="En az 8 karakter, 1 büyük, 1 rakam" style="margin-bottom:10px;">
+                        
+                        <label style="font-size:12px;">Yeni Şifre (Tekrar):</label>
+                        <input type="password" id="yeniSifre2" placeholder="Yeni şifreyi tekrar girin" style="margin-bottom:15px;">
+                        
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <button type="button" onclick="sifreyiGuncelle()" style="background:#2ecc71; color:white;">Güncelle</button>
+                            <button type="button" onclick="document.getElementById('sifreModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
                         <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:5px;">Tarih Girin</h3>
@@ -430,6 +463,63 @@ app.post('/login', async (req, res) => {
                 <script>
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
+
+                    // 🎯 ŞİFRE DEĞİŞTİRME MODALINI AÇ / KAPA
+                    function sifreModalAc() {
+                        document.getElementById('eskiSifre').value = '';
+                        document.getElementById('yeniSifre1').value = '';
+                        document.getElementById('yeniSifre2').value = '';
+                        document.getElementById('sifreModal').style.display = 'flex';
+                    }
+
+                    // 🎯 ŞİFRE GÜNCELLEME KONTROLLERİ VE API İSTEĞİ
+                    async function sifreyiGuncelle() {
+                        const eskiSifre = document.getElementById('eskiSifre').value;
+                        const yeniSifre1 = document.getElementById('yeniSifre1').value;
+                        const yeniSifre2 = document.getElementById('yeniSifre2').value;
+
+                        if(!eskiSifre || !yeniSifre1 || !yeniSifre2) {
+                            alert("Lütfen tüm alanları doldurun.");
+                            return;
+                        }
+
+                        if(yeniSifre1 !== yeniSifre2) {
+                            alert("Yeni şifreler birbiriyle uyuşmuyor!");
+                            return;
+                        }
+
+                        // Kurallar: En az 8 karakter, 1 büyük harf, 1 rakam
+                        if(yeniSifre1.length < 8) {
+                            alert("Yeni şifre en az 8 karakter olmalıdır.");
+                            return;
+                        }
+                        if(!/[A-Z]/.test(yeniSifre1)) {
+                            alert("Yeni şifre en az 1 büyük harf içermelidir.");
+                            return;
+                        }
+                        if(!/[0-9]/.test(yeniSifre1)) {
+                            alert("Yeni şifre en az 1 rakam içermelidir.");
+                            return;
+                        }
+
+                        const response = await fetch('/api/update-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userEmail: document.getElementById('userEmail').value,
+                                eskiSifre: eskiSifre,
+                                yeniSifre: yeniSifre1
+                            })
+                        });
+
+                        const sonuc = await response.json();
+                        if(sonuc.success) {
+                            alert("Şifreniz başarıyla güncellendi!");
+                            document.getElementById('sifreModal').style.display = 'none';
+                        } else {
+                            alert("Hata: " + (sonuc.message || "Mevcut şifre hatalı."));
+                        }
+                    }
 
                     function akordeonAcKapat(icerikId, okId) {
                         const icerik = document.getElementById(icerikId);
@@ -763,6 +853,34 @@ app.post('/register', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).send("Kayıt esnasında sunucu hatası oluştu.");
+    }
+});
+
+// 🎯 ŞİFRE GÜNCELLEME BACKEND API
+app.post('/api/update-password', async (req, res) => {
+    const { userEmail, eskiSifre, yeniSifre } = req.body;
+    try {
+        const user = await User.findOne({ email: userEmail });
+        if(!user) {
+            return res.json({ success: false, message: "Kullanıcı bulunamadı." });
+        }
+
+        let isMatch = await bcrypt.compare(eskiSifre, user.password);
+        if (!isMatch && eskiSifre === user.password) isMatch = true;
+
+        if(!isMatch) {
+            return res.json({ success: false, message: "Mevcut şifreniz yanlış." });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(yeniSifre, salt);
+
+        user.password = hashedPassword;
+        await user.save();
+
+        res.json({ success: true });
+    } catch (error) {
+        res.json({ success: false, message: "Sunucu hatası." });
     }
 });
 
