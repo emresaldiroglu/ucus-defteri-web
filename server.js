@@ -125,9 +125,20 @@ function formatTRTarih(dateObj) {
     return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
 }
 
+// 🎯 KÜÇÜK YARDIMCI: NEGATİF GÜNLERİ "60 günden fazla" YAPMA
+function formatKalanGunMetni(kalanGun) {
+    if (kalanGun < 0) {
+        return "60 günden fazla";
+    }
+    return `${kalanGun} Gün`;
+}
+
 function hesaplaGggVeSonUcusDurumu(flights) {
-    const sonUcus = flights[0];
-    const sonGggUcus = flights.find(f => f.egitimTipi === 'ggg');
+    // au(sim) HAREÇ GERÇEK UÇUŞLAR
+    const gercekUcuslar = flights.filter(f => f.egitimTipi !== 'au(sim)');
+    
+    const sonUcus = gercekUcuslar[0];
+    const sonGggUcus = gercekUcuslar.find(f => f.egitimTipi === 'ggg');
     
     const sonUcusTarihStr = sonUcus ? sonUcus.tarih : new Date().toISOString().split('T')[0];
     const sonGggTarihStr = sonGggUcus ? sonGggUcus.tarih : new Date().toISOString().split('T')[0];
@@ -142,23 +153,26 @@ function hesaplaGggVeSonUcusDurumu(flights) {
     const renkSonUcus = kalanSonUcus <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
 
     return {
-        kalanGgg,
+        kalanGgg: formatKalanGunMetni(kalanGgg),
         hedefGggStr: formatTRTarih(hedefGgg),
         renkGgg,
-        kalanSonUcus,
+        kalanSonUcus: formatKalanGunMetni(kalanSonUcus),
         hedefSonUcusStr: formatTRTarih(hedefSonUcus),
         renkSonUcus
     };
 }
 
-// 🎯 TÜM HAVA ARAÇLARINA GÖRE GGG VE SON UÇUŞ ANALİZİ
+// 🎯 DÜZELTİLMİŞ VE au(sim) HARİÇ ARAÇ BAZLI DETAYLI SAYAÇ ANALİZİ
 function hesaplaAracaGoreDetayliDurum(flights) {
     let sonuc = { ggg: {}, sonUcus: {} };
+    
+    // Simülatör (au(sim)) uçuşlarını filtrele
+    const gercekUcuslar = flights.filter(f => f.egitimTipi !== 'au(sim)');
 
     HAVA_ARACLARI_LISTESI.forEach(arac => {
-        // GGG için sadece egitimTipi === 'ggg' olanlar
-        const aracGggUcuslari = flights.filter(f => f.havaAraciTipi === arac && f.egitimTipi === 'ggg');
-        const sonGgg = aracGggUcuslari[0]; // zaten tariha göre sıralı geldiği için ilk eleman en son uçuştur
+        // 1. GGG SADECE 'ggg' TİPİ GERÇEK UÇUŞLARA BAKAR
+        const aracGggUcuslari = gercekUcuslar.filter(f => f.havaAraciTipi === arac && f.egitimTipi === 'ggg');
+        const sonGgg = aracGggUcuslari[0]; 
 
         if (sonGgg) {
             const hedef = new Date(sonGgg.tarih);
@@ -166,16 +180,16 @@ function hesaplaAracaGoreDetayliDurum(flights) {
             const kalan = getGunFarki(hedef);
             sonuc.ggg[arac] = {
                 tarih: formatTRTarih(sonGgg.tarih),
-                kalanGun: kalan,
+                kalanGunStr: formatKalanGunMetni(kalan),
                 renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
             };
         } else {
             sonuc.ggg[arac] = { yok: true };
         }
 
-        // Son Uçuş için tüm eğitim tipleri (örneğin gş veya herhangi biri)
-        const aracTumUcuslari = flights.filter(f => f.havaAraciTipi === arac);
-        const sonGenel = aracTumUcuslari[0];
+        // 2. SON UÇUŞ İSE O ARAÇLA YAPILAN EN SON GERÇEK UÇUŞA BAKAR (gş, ggg vb.)
+        const aracTumGercekUcuslari = gercekUcuslar.filter(f => f.havaAraciTipi === arac);
+        const sonGenel = aracTumGercekUcuslari[0];
 
         if (sonGenel) {
             const hedef = new Date(sonGenel.tarih);
@@ -184,7 +198,7 @@ function hesaplaAracaGoreDetayliDurum(flights) {
             sonuc.sonUcus[arac] = {
                 tarih: formatTRTarih(sonGenel.tarih),
                 tip: sonGenel.egitimTipi.toUpperCase(),
-                kalanGun: kalan,
+                kalanGunStr: formatKalanGunMetni(kalan),
                 renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
             };
         } else {
@@ -385,14 +399,12 @@ app.post('/login', async (req, res) => {
                         </div>
 
                         <div class="sayac-grid">
-                            <!-- 🎯 GGG KUTUSU (TIKLANABİLİR) -->
                             <div id="boxGgg" onclick="detayliSayacModalAc('ggg')" style="${gggDurum.renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;" title="Tüm Araçların GGG Durumunu Gör">
-                                <strong>GGG Sayaç (60G)</strong><br><span id="valGgg" style="font-size:18px; font-weight:bold;">${gggDurum.kalanGgg} Gün</span>
+                                <strong>GGG Sayaç (60G)</strong><br><span id="valGgg" style="font-size:16px; font-weight:bold;">${gggDurum.kalanGgg}</span>
                                 <span id="tarihGgg" class="tarih-etiket">Son Tarih: ${gggDurum.hedefGggStr}</span>
                             </div>
-                            <!-- 🎯 SON UÇUŞ KUTUSU (TIKLANABİLİR) -->
                             <div id="boxSonUcus" onclick="detayliSayacModalAc('sonUcus')" style="${gggDurum.renkSonUcus} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;" title="Tüm Araçların Son Uçuş Durumunu Gör">
-                                <strong>Son Uçuş (60G)</strong><br><span id="valSonUcus" style="font-size:18px; font-weight:bold;">${gggDurum.kalanSonUcus} Gün</span>
+                                <strong>Son Uçuş (60G)</strong><br><span id="valSonUcus" style="font-size:16px; font-weight:bold;">${gggDurum.kalanSonUcus}</span>
                                 <span id="tarihSonUcus" class="tarih-etiket">Son Tarih: ${gggDurum.hedefSonUcusStr}</span>
                             </div>
                             
@@ -472,7 +484,7 @@ app.post('/login', async (req, res) => {
 
                 </div>
 
-                <!-- 🎯 ARAÇ BAZLI DETAYLI SAYAÇ MODALI -->
+                <!-- ARAÇ BAZLI DETAYLI SAYAÇ MODALI -->
                 <div id="detayliSayacModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:12px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:400px; width:100%; max-height:85vh; display:flex; flex-direction:column;">
                         <h3 id="sayacModalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">✈️ Hava Araçları Durumu</h3>
@@ -518,7 +530,6 @@ app.post('/login', async (req, res) => {
                     const satirBasinaVeri = 10;
                     const aracBazliVeri = ${JSON.stringify(aracBazliDurum)};
 
-                    // 🎯 DETAYLI SAYAÇ MODALINI AÇAN FONKSİYON
                     function detayliSayacModalAc(tip) {
                         const baslik = document.getElementById('sayacModalBaslik');
                         const icerikDiv = document.getElementById('sayacModalIcerik');
@@ -542,7 +553,7 @@ app.post('/login', async (req, res) => {
                                         <span style="font-size:11px; color:#7f8c8d;">Son Tarih: \${bilgi.tarih}</span>
                                     </div>
                                     <div style="background:\${bilgi.renk}; color:white; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; text-align:center;">
-                                        \${bilgi.kalanGun} Gün
+                                        \${bilgi.kalanGunStr}
                                     </div>
                                 \`;
                             }
