@@ -44,6 +44,8 @@ const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 // --- YARDIMCI FONKSİYONLAR ---
 
+const HAVA_ARACLARI_LISTESI = ['s70', 's70i', 't70', 'atak', 'mi17', 'gökbey', 'cayrokopter', 'ab-205'];
+
 function formatUcusSaati(saatInput) {
     if (!saatInput) return "00:00";
     let inputStr = saatInput.toString().trim();
@@ -149,6 +151,50 @@ function hesaplaGggVeSonUcusDurumu(flights) {
     };
 }
 
+// 🎯 TÜM HAVA ARAÇLARINA GÖRE GGG VE SON UÇUŞ ANALİZİ
+function hesaplaAracaGoreDetayliDurum(flights) {
+    let sonuc = { ggg: {}, sonUcus: {} };
+
+    HAVA_ARACLARI_LISTESI.forEach(arac => {
+        // GGG için sadece egitimTipi === 'ggg' olanlar
+        const aracGggUcuslari = flights.filter(f => f.havaAraciTipi === arac && f.egitimTipi === 'ggg');
+        const sonGgg = aracGggUcuslari[0]; // zaten tariha göre sıralı geldiği için ilk eleman en son uçuştur
+
+        if (sonGgg) {
+            const hedef = new Date(sonGgg.tarih);
+            hedef.setDate(hedef.getDate() + 60);
+            const kalan = getGunFarki(hedef);
+            sonuc.ggg[arac] = {
+                tarih: formatTRTarih(sonGgg.tarih),
+                kalanGun: kalan,
+                renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
+            };
+        } else {
+            sonuc.ggg[arac] = { yok: true };
+        }
+
+        // Son Uçuş için tüm eğitim tipleri (örneğin gş veya herhangi biri)
+        const aracTumUcuslari = flights.filter(f => f.havaAraciTipi === arac);
+        const sonGenel = aracTumUcuslari[0];
+
+        if (sonGenel) {
+            const hedef = new Date(sonGenel.tarih);
+            hedef.setDate(hedef.getDate() + 60);
+            const kalan = getGunFarki(hedef);
+            sonuc.sonUcus[arac] = {
+                tarih: formatTRTarih(sonGenel.tarih),
+                tip: sonGenel.egitimTipi.toUpperCase(),
+                kalanGun: kalan,
+                renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
+            };
+        } else {
+            sonuc.sonUcus[arac] = { yok: true };
+        }
+    });
+
+    return sonuc;
+}
+
 
 // --- ROTALAR ---
 
@@ -181,6 +227,7 @@ app.post('/login', async (req, res) => {
             const toplamUcusSüresi = hesaplaToplamSaat(flights);
             const aktifDonem = hesaplaAktifDonemSaati(flights);
             const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
+            const aracBazliDurum = hesaplaAracaGoreDetayliDurum(flights);
 
             const kayitliTarihler = await ReportDate.find({ userEmail: email.trim().toLowerCase() });
             const staticYears = Array.from({length: 10}, (_, i) => 2024 + i);
@@ -254,7 +301,6 @@ app.post('/login', async (req, res) => {
                     }
                     .kdu-link-btn:hover { background: #732d91; }
 
-                    /* 🎯 KULLANICI E-POSTA TIKLANABİLİR STİLİ */
                     .user-email-link {
                         margin: 5px 0 0 0;
                         font-size: 11px;
@@ -333,18 +379,19 @@ app.post('/login', async (req, res) => {
                                     <h2 id="donemSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold; color: #f1c40f;">${aktifDonem.sure}</h2>
                                 </div>
                             </div>
-                            <!-- 🎯 TIKLANABİLİR E-POSTA (ŞİFRE DEĞİŞTİRME TETİKLEYİCİSİ) -->
                             <div>
                                 <span class="user-email-link" onclick="sifreModalAc()" title="Şifreyi Değiştirmek İçin Tıkla">${email}</span>
                             </div>
                         </div>
 
                         <div class="sayac-grid">
-                            <div id="boxGgg" style="${gggDurum.renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
+                            <!-- 🎯 GGG KUTUSU (TIKLANABİLİR) -->
+                            <div id="boxGgg" onclick="detayliSayacModalAc('ggg')" style="${gggDurum.renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;" title="Tüm Araçların GGG Durumunu Gör">
                                 <strong>GGG Sayaç (60G)</strong><br><span id="valGgg" style="font-size:18px; font-weight:bold;">${gggDurum.kalanGgg} Gün</span>
                                 <span id="tarihGgg" class="tarih-etiket">Son Tarih: ${gggDurum.hedefGggStr}</span>
                             </div>
-                            <div id="boxSonUcus" style="${gggDurum.renkSonUcus} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;">
+                            <!-- 🎯 SON UÇUŞ KUTUSU (TIKLANABİLİR) -->
+                            <div id="boxSonUcus" onclick="detayliSayacModalAc('sonUcus')" style="${gggDurum.renkSonUcus} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;" title="Tüm Araçların Son Uçuş Durumunu Gör">
                                 <strong>Son Uçuş (60G)</strong><br><span id="valSonUcus" style="font-size:18px; font-weight:bold;">${gggDurum.kalanSonUcus} Gün</span>
                                 <span id="tarihSonUcus" class="tarih-etiket">Son Tarih: ${gggDurum.hedefSonUcusStr}</span>
                             </div>
@@ -364,7 +411,7 @@ app.post('/login', async (req, res) => {
                         <div id="filtreIcerikKutusu" class="akordeon-icerik">
                             <div style="flex:1; width:100%;"><label>📋 Yıl Seçimi (1 Eylül Dönemi):</label><select id="filtreYil"><option value="">Yıl Seçin</option>${staticYears.map(y => `<option value="${y}">${y}</option>`).join('')}</select></div>
                             <div style="flex:1; width:100%;"><label>Ay:</label><select id="filtreAy"><option value="">Ay Seçin</option><option value="01">Ocak</option><option value="02">Şubat</option><option value="03">Mart</option><option value="04">Nisan</option><option value="05">Mayıs</option><option value="06">Haziran</option><option value="07">Temmuz</option><option value="08">Ağustos</option><option value="09">Eylül</option><option value="10">Ekim</option><option value="11">Kasım</option><option value="12">Aralık</option></select></div>
-                            <div style="flex:1; width:100%;"><label>Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option><option value="sikorsky">Sikorsky (s70, s70i, t70)</option><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
+                            <div style="flex:1; width:100%;"><label>Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option><option value="cayrokopter">cayrokopter</option><option value="ab-205">ab-205</option></select></div>
                             <div style="flex:1; width:100%;"><label>Uçuş Tipi:</label><select id="filtreUcusTipi"><option value="">Uçuş Tipi</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
                             <div style="display:flex; gap:8px; width:100%; margin-top:5px;"><button type="button" onclick="filtreleUcuslari()" class="btn-filtre">Uygula</button><button type="button" onclick="filtreleriTemizle()" class="btn-temizle">Temizle</button></div>
                             <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:10px; border-radius:6px; font-weight:bold; font-size:14px; display:none; width:100%; text-align:center;">⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
@@ -384,7 +431,7 @@ app.post('/login', async (req, res) => {
                             <div class="form-grid">
                                 <input type="hidden" id="userEmail" value="${email}">
                                 <div><label>Tarih:</label><input type="date" id="tarih" value="${bugunTarihStr}"></div>
-                                <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option></select></div>
+                                <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option><option value="cayrokopter">cayrokopter</option><option value="ab-205">ab-205</option></select></div>
                                 <div><label>Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
                                 <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
                                 <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi"></textarea></div>
@@ -425,20 +472,25 @@ app.post('/login', async (req, res) => {
 
                 </div>
 
-                <!-- 🎯 ŞİFRE GÜNCELLEME MODALI -->
+                <!-- 🎯 ARAÇ BAZLI DETAYLI SAYAÇ MODALI -->
+                <div id="detayliSayacModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
+                    <div style="background:white; padding:20px; border-radius:12px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:400px; width:100%; max-height:85vh; display:flex; flex-direction:column;">
+                        <h3 id="sayacModalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">✈️ Hava Araçları Durumu</h3>
+                        <div id="sayacModalIcerik" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
+                        <button type="button" onclick="document.getElementById('detayliSayacModal').style.display='none'" style="background:#95a5a6; color:white; margin-top:15px;">Kapat</button>
+                    </div>
+                </div>
+
+                <!-- ŞİFRE GÜNCELLEME MODALI -->
                 <div id="sifreModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:10px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:350px; width:100%;">
                         <h3 style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">🔐 Şifre Güncelleme</h3>
-                        
                         <label style="font-size:12px;">Mevcut Şifre:</label>
                         <input type="password" id="eskiSifre" placeholder="Mevcut şifreniz" style="margin-bottom:10px;">
-                        
                         <label style="font-size:12px;">Yeni Şifre:</label>
                         <input type="password" id="yeniSifre1" placeholder="En az 8 karakter, 1 büyük, 1 rakam" style="margin-bottom:10px;">
-                        
                         <label style="font-size:12px;">Yeni Şifre (Tekrar):</label>
                         <input type="password" id="yeniSifre2" placeholder="Yeni şifreyi tekrar girin" style="margin-bottom:15px;">
-                        
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                             <button type="button" onclick="sifreyiGuncelle()" style="background:#2ecc71; color:white;">Güncelle</button>
                             <button type="button" onclick="document.getElementById('sifreModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
@@ -446,6 +498,7 @@ app.post('/login', async (req, res) => {
                     </div>
                 </div>
 
+                <!-- TARİH MODALI -->
                 <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
                         <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:5px;">Tarih Girin</h3>
@@ -463,8 +516,42 @@ app.post('/login', async (req, res) => {
                 <script>
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
+                    const aracBazliVeri = ${JSON.stringify(aracBazliDurum)};
 
-                    // 🎯 ŞİFRE DEĞİŞTİRME MODALINI AÇ / KAPA
+                    // 🎯 DETAYLI SAYAÇ MODALINI AÇAN FONKSİYON
+                    function detayliSayacModalAc(tip) {
+                        const baslik = document.getElementById('sayacModalBaslik');
+                        const icerikDiv = document.getElementById('sayacModalIcerik');
+                        icerikDiv.innerHTML = '';
+
+                        const veriSeti = tip === 'ggg' ? aracBazliVeri.ggg : aracBazliVeri.sonUcus;
+                        baslik.innerText = tip === 'ggg' ? '🚁 Hava Araçları GGG Durumları' : '🚁 Hava Araçları Son Uçuş Durumları';
+
+                        for (const [arac, bilgi] of Object.entries(veriSeti)) {
+                            const aracAdiStr = arac.toUpperCase();
+                            const itemDiv = document.createElement('div');
+                            itemDiv.style.cssText = "padding:10px; border-radius:6px; background:#f8f9fa; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;";
+
+                            if (bilgi.yok) {
+                                itemDiv.innerHTML = \`<strong style="color:#2c3e50;">\${aracAdiStr}</strong><span style="color:#c0392b; font-size:12px; font-weight:bold;">Uçuş yapılmamış</span>\`;
+                            } else {
+                                const tipYazisi = bilgi.tip ? \` (\${bilgi.tip})\` : '';
+                                itemDiv.innerHTML = \`
+                                    <div>
+                                        <strong style="color:#2c3e50;">\${aracAdiStr}</strong>\${tipYazisi}<br>
+                                        <span style="font-size:11px; color:#7f8c8d;">Son Tarih: \${bilgi.tarih}</span>
+                                    </div>
+                                    <div style="background:\${bilgi.renk}; color:white; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; text-align:center;">
+                                        \${bilgi.kalanGun} Gün
+                                    </div>
+                                \`;
+                            }
+                            icerikDiv.appendChild(itemDiv);
+                        }
+
+                        document.getElementById('detayliSayacModal').style.display = 'flex';
+                    }
+
                     function sifreModalAc() {
                         document.getElementById('eskiSifre').value = '';
                         document.getElementById('yeniSifre1').value = '';
@@ -472,7 +559,6 @@ app.post('/login', async (req, res) => {
                         document.getElementById('sifreModal').style.display = 'flex';
                     }
 
-                    // 🎯 ŞİFRE GÜNCELLEME KONTROLLERİ VE API İSTEĞİ
                     async function sifreyiGuncelle() {
                         const eskiSifre = document.getElementById('eskiSifre').value;
                         const yeniSifre1 = document.getElementById('yeniSifre1').value;
@@ -488,7 +574,6 @@ app.post('/login', async (req, res) => {
                             return;
                         }
 
-                        // Kurallar: En az 8 karakter, 1 büyük harf, 1 rakam
                         if(yeniSifre1.length < 8) {
                             alert("Yeni şifre en az 8 karakter olmalıdır.");
                             return;
@@ -614,65 +699,7 @@ app.post('/login', async (req, res) => {
                         
                         const sonuc = await response.json();
                         if(sonuc.success) {
-                            const tbody = document.getElementById('ucusTabloGövde');
-                            
-                            const aciklama = sonuc.data.gorevAciklamasi || '';
-                            const kisaltilmisAciklama = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
-
-                            const tr = document.createElement('tr');
-                            tr.id = 'row-' + sonuc.data._id;
-                            tr.className = 'ucus-satiri';
-                            tr.setAttribute('data-tarih', sonuc.data.tarih);
-                            tr.setAttribute('data-hava', sonuc.data.havaAraciTipi);
-                            tr.setAttribute('data-egitim', sonuc.data.egitimTipi);
-                            tr.setAttribute('data-sure', sonuc.data.sure);
-                            tr.onclick = function() { detayAcKapat(sonuc.data._id); };
-
-                            tr.innerHTML = \`
-                                <td>\${sonuc.data.tarih}</td>
-                                <td style="font-weight:bold;">\${sonuc.data.havaAraciTipi}</td>
-                                <td>\${sonuc.data.egitimTipi}</td>
-                                <td style="color:#e67e22; font-weight:bold;">\${sonuc.data.sure}</td>
-                                <td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="\${aciklama}">\${kisaltilmisAciklama}</td>
-                                <td onclick="event.stopPropagation()"><button type="button" onclick="silUcus('\${sonuc.data._id}')" class="sil-btn">Sil</button></td>
-                            \`;
-
-                            const detayTr = document.createElement('tr');
-                            detayTr.id = 'detay-' + sonuc.data._id;
-                            detayTr.className = 'detay-satiri';
-                            detayTr.innerHTML = \`
-                                <td colspan="6">
-                                    <div style="font-size:11px; font-weight:bold; color:#64748b; margin-bottom:4px;">📋 Tam Görev Açıklaması:</div>
-                                    <div class="detay-kutu">\${aciklama || 'Görev açıklaması girilmemiş.'}</div>
-                                </td>
-                            \`;
-
-                            tbody.insertBefore(detayTr, tbody.firstChild);
-                            tbody.insertBefore(tr, tbody.firstChild);
-                            
-                            document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
-                            document.getElementById('donemSaatGosterge').innerText = sonuc.yeniDonemSaat;
-                            
-                            document.getElementById('valGgg').innerText = sonuc.gggDurum.kalanGgg + " Gün";
-                            document.getElementById('tarihGgg').innerText = "Son Tarih: " + sonuc.gggDurum.hedefGggStr;
-                            document.getElementById('boxGgg').style = sonuc.gggDurum.renkGgg + " color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;";
-
-                            document.getElementById('valSonUcus').innerText = sonuc.gggDurum.kalanSonUcus + " Gün";
-                            document.getElementById('tarihSonUcus').innerText = "Son Tarih: " + sonuc.gggDurum.hedefSonUcusStr;
-                            document.getElementById('boxSonUcus').style = sonuc.gggDurum.renkSonUcus + " color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;";
-
-                            const bugunStr = new Date().toISOString().split('T')[0];
-                            document.getElementById('tarih').value = bugunStr;
-                            document.getElementById('egitimTipi').value = '';
-                            document.getElementById('sure').value = '';
-                            document.getElementById('gorevAciklamasi').value = '';
-
-                            document.getElementById('ekleIcerikKutusu').classList.remove('acik');
-                            document.getElementById('ekleOkIkon').innerText = '▼';
-
-                            mevcutSayfa = 1;
-                            filtreleUcuslari();
-                            alert("Uçuş kaydı başarıyla eklendi!");
+                            window.location.reload();
                         } else {
                             alert("Uçuş kaydedilirken bir hata oluştu.");
                         }
@@ -683,21 +710,7 @@ app.post('/login', async (req, res) => {
                         const response = await fetch('/api/delete-flight', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, userEmail: document.getElementById('userEmail').value }) });
                         const sonuc = await response.json();
                         if(sonuc.success) { 
-                            document.getElementById('row-'+id).remove(); 
-                            document.getElementById('detay-'+id).remove();
-                            
-                            document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
-                            document.getElementById('donemSaatGosterge').innerText = sonuc.yeniDonemSaat;
-
-                            document.getElementById('valGgg').innerText = sonuc.gggDurum.kalanGgg + " Gün";
-                            document.getElementById('tarihGgg').innerText = "Son Tarih: " + sonuc.gggDurum.hedefGggStr;
-                            document.getElementById('boxGgg').style = sonuc.gggDurum.renkGgg + " color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;";
-
-                            document.getElementById('valSonUcus').innerText = sonuc.gggDurum.kalanSonUcus + " Gün";
-                            document.getElementById('tarihSonUcus').innerText = "Son Tarih: " + sonuc.gggDurum.hedefSonUcusStr;
-                            document.getElementById('boxSonUcus').style = sonuc.gggDurum.renkSonUcus + " color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px;";
-
-                            filtreleUcuslari(); 
+                            window.location.reload();
                         }
                     }
 
@@ -856,7 +869,6 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// 🎯 ŞİFRE GÜNCELLEME BACKEND API
 app.post('/api/update-password', async (req, res) => {
     const { userEmail, eskiSifre, yeniSifre } = req.body;
     try {
@@ -902,15 +914,7 @@ app.delete('/api/delete-flight', async (req, res) => {
     const { id, userEmail } = req.body;
     try { 
         await Flight.findByIdAndDelete(id); 
-        const kalanlar = await Flight.find({ userEmail }).sort({ tarih: -1 });
-        const gggDurum = hesaplaGggVeSonUcusDurumu(kalanlar);
-
-        res.json({ 
-            success: true, 
-            yeniToplamSaat: hesaplaToplamSaat(kalanlar),
-            yeniDonemSaat: hesaplaAktifDonemSaati(kalanlar).sure,
-            gggDurum: gggDurum
-        }); 
+        res.json({ success: true }); 
     } catch (e) { res.json({ success: false }); }
 });
 
@@ -918,20 +922,8 @@ app.post('/api/add-flight', async (req, res) => {
     try {
         const formatliSure = formatUcusSaati(req.body.sure);
         const nf = new Flight({ ...req.body, sure: formatliSure });
-        const savedFlight = await nf.save();
-        
-        const tumUcuslar = await Flight.find({ userEmail: req.body.userEmail }).sort({ tarih: -1 });
-        const yeniToplam = hesaplaToplamSaat(tumUcuslar);
-        const yeniDonem = hesaplaAktifDonemSaati(tumUcuslar);
-        const gggDurum = hesaplaGggVeSonUcusDurumu(tumUcuslar);
-
-        res.json({ 
-            success: true, 
-            data: savedFlight, 
-            yeniToplamSaat: yeniToplam,
-            yeniDonemSaat: yeniDonem.sure,
-            gggDurum: gggDurum
-        });
+        await nf.save();
+        res.json({ success: true });
     } catch (e) { res.json({ success: false }); }
 });
 
