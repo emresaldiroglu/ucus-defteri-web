@@ -386,7 +386,6 @@ app.post('/login', async (req, res) => {
                                     <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">TOPLAM SAAT</span>
                                     <h2 id="toplamSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold;">${toplamUcusSüresi}</h2>
                                 </div>
-                                <!-- 🎯 DÖNEM SAATİNE TIKLAYINCA GEÇMİŞ UÇUŞ POP-UP'I AÇILIR -->
                                 <div onclick="donemUcuslariModalAc()" style="cursor:pointer;" title="Dönem Uçuşlarını Görmek İçin Tıkla">
                                     <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">${aktifDonem.yil} DÖNEMİ 🔍</span>
                                     <h2 id="donemSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold; color: #f1c40f;">${aktifDonem.sure}</h2>
@@ -483,7 +482,7 @@ app.post('/login', async (req, res) => {
 
                 </div>
 
-                <!-- 🎯 DÖNEM UÇUŞLARI PRATİK POP-UP MODALI -->
+                <!-- DÖNEM UÇUŞLARI PRATİK MODAL -->
                 <div id="donemUcuslariModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:12px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:450px; width:100%; max-height:85vh; display:flex; flex-direction:column;">
                         <h3 style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">📋 ${aktifDonem.yil} Dönemi Uçuş Listesi</h3>
@@ -539,7 +538,6 @@ app.post('/login', async (req, res) => {
                     const aracBazliVeri = ${JSON.stringify(aracBazliDurum)};
                     const donemUcuslariVerisi = ${JSON.stringify(aktifDonem.donemUcuslari)};
 
-                    // 🎯 DÖNEM UÇUŞLARI PRATİK MODALINI AÇAN FONKSİYON
                     function donemUcuslariModalAc() {
                         const icerikDiv = document.getElementById('donemUcuslariIcerik');
                         icerikDiv.innerHTML = '';
@@ -909,7 +907,7 @@ app.post('/register', async (req, res) => {
 
         const newUser = new User({
             email: email.trim().toLowerCase(),
-            password: hashedPassword;
+            password: hashedPassword
         });
         await newUser.save();
 
