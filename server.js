@@ -438,15 +438,16 @@ app.post('/login', async (req, res) => {
                             <span id="ekleOkIkon">▼</span>
                         </button>
                         <div id="ekleIcerikKutusu" class="akordeon-icerik">
-                            <div class="form-grid">
+                            <!-- MOBİLDE ANA SAYFAYA YÖNLENDİRMEYİ ENGELLEMEK İÇİN TYPE="BUTTON" KULLANILDI -->
+                            <form onsubmit="return false;" class="form-grid">
                                 <input type="hidden" id="userEmail" value="${email}">
                                 <div><label>Tarih:</label><input type="date" id="tarih" value="${bugunTarihStr}"></div>
                                 <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option><option value="cayrokopter">cayrokopter</option><option value="ab-205">ab-205</option></select></div>
                                 <div><label>Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
                                 <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
                                 <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi"></textarea></div>
-                                <button type="button" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
-                            </div>
+                                <button type="button" id="btnUcusEkle" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
+                            </form>
                         </div>
                     </div>
 
@@ -741,17 +742,22 @@ app.post('/login', async (req, res) => {
                             gorevAciklamasi: gorevAciklamasi
                         };
 
-                        const response = await fetch('/api/add-flight', { 
-                            method: 'POST', 
-                            headers: { 'Content-Type': 'application/json' }, 
-                            body: JSON.stringify(veri) 
-                        });
-                        
-                        const sonuc = await response.json();
-                        if(sonuc.success) {
-                            window.location.reload();
-                        } else {
-                            alert("Uçuş kaydedilirken bir hata oluştu.");
+                        try {
+                            const response = await fetch('/api/add-flight', { 
+                                method: 'POST', 
+                                headers: { 'Content-Type': 'application/json' }, 
+                                body: JSON.stringify(veri) 
+                            });
+                            
+                            const sonuc = await response.json();
+                            if(sonuc.success) {
+                                // MOBİLDE OTURUM KAYBINI ENGELLEMEK İÇİN SAYFA YENİLEME DÜZELTMESİ
+                                window.location.href = window.location.href;
+                            } else {
+                                alert("Uçuş kaydedilirken bir hata oluştu.");
+                            }
+                        } catch(e) {
+                            alert("Ağ hatası oluştu.");
                         }
                     }
 
@@ -760,7 +766,7 @@ app.post('/login', async (req, res) => {
                         const response = await fetch('/api/delete-flight', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, userEmail: document.getElementById('userEmail').value }) });
                         const sonuc = await response.json();
                         if(sonuc.success) { 
-                            window.location.reload();
+                            window.location.href = window.location.href;
                         }
                     }
 
