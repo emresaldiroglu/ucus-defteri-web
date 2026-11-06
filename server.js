@@ -221,7 +221,7 @@ app.post('/login', async (req, res) => {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                 <style>
                     body { background: #f5f6fa; margin: 0; padding: 8px; font-family:'Segoe UI', sans-serif; }
-                    .container { max-width:900px; margin:5px auto; padding:12px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; }
+                    .container { max-width:900px; margin:5px auto; padding:12px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; position: relative; }
                     .ust-panel { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
                     .saatler-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
                     .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -236,6 +236,27 @@ app.post('/login', async (req, res) => {
 
                     .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
                     
+                    /* 🎯 KDU SİMGE BUTONU STİLİ */
+                    .kdu-btn {
+                        position: absolute;
+                        top: 15px;
+                        right: 15px;
+                        background: #8e44ad;
+                        color: white;
+                        border: none;
+                        padding: 6px 12px;
+                        border-radius: 20px;
+                        font-size: 12px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        box-shadow: 0 2px 8px rgba(142, 68, 173, 0.4);
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
+                        z-index: 10;
+                    }
+                    .kdu-btn:hover { background: #732d91; }
+
                     @media(min-width: 768px) { 
                         .ust-panel { display: grid; grid-template-columns: 2fr 3fr; } 
                         .sayac-grid { grid-template-columns: repeat(3, 1fr); }
@@ -273,11 +294,9 @@ app.post('/login', async (req, res) => {
                     th { background: #2c3e50; color: white; padding: 12px; }
                     td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
                     
-                    /* 🎯 UÇUŞ SATIRI TIKLANABİLİR STİLİ */
                     .ucus-satiri { cursor: pointer; transition: background 0.2s; }
                     .ucus-satiri:hover { background: #f8f9fa; }
                     
-                    /* 🎯 DETAY (AÇILIR KAPANIR GÖREV) SATIRI */
                     .detay-satiri { background: #fdfefe; display: none; }
                     .detay-satiri td { padding: 15px; text-align: left; border-bottom: 2px solid #e2e8f0; }
                     .detay-kutu { background: #f1f5f9; padding: 12px; border-radius: 6px; border-left: 4px solid #3498db; font-size: 13px; color: #334155; line-height: 1.5; word-break: break-word; }
@@ -289,7 +308,11 @@ app.post('/login', async (req, res) => {
                 </style>
 
                 <div class="container">
-                    
+                    <!-- 🎯 SAĞ ÜST KÖŞEDEKİ KDU SİMGESİ / BUTONU -->
+                    <button type="button" class="kdu-btn" onclick="kduModalAc()">
+                        📟 <span>KDU</span>
+                    </button>
+
                     <div class="ust-panel">
                         <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 15px; border-radius: 10px; text-align: center; display:flex; flex-direction:column; justify-content:center;">
                             <div class="saatler-wrapper">
@@ -387,6 +410,17 @@ app.post('/login', async (req, res) => {
 
                 </div>
 
+                <!-- 🎯 KDU EKRANI İÇİN POPUP / MODAL -->
+                <div id="kduModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:99999; padding:10px; box-sizing:border-box;">
+                    <div style="background:#1e293b; border-radius:12px; width:100%; max-width:650px; height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+                        <div style="background:#0f172a; color:white; padding:10px 15px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155;">
+                            <span style="font-weight:bold; font-size:14px;">📟 KDU Simülasyonu</span>
+                            <button type="button" onclick="kduModalKapat()" style="background:#e74c3c; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; width:auto; font-size:12px;">X Kapat</button>
+                        </div>
+                        <iframe src="/kdu.html" style="width:100%; height:100%; border:none; background:#000;"></iframe>
+                    </div>
+                </div>
+
                 <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
                         <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:5px;">Tarih Girin</h3>
@@ -405,6 +439,14 @@ app.post('/login', async (req, res) => {
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
 
+                    // 🎯 KDU EKRANINI AÇIP KAPATAN FONKSİYONLAR
+                    function kduModalAc() {
+                        document.getElementById('kduModal').style.display = 'flex';
+                    }
+                    function kduModalKapat() {
+                        document.getElementById('kduModal').style.display = 'none';
+                    }
+
                     function akordeonAcKapat(icerikId, okId) {
                         const icerik = document.getElementById(icerikId);
                         const ok = document.getElementById(okId);
@@ -417,7 +459,6 @@ app.post('/login', async (req, res) => {
                         }
                     }
 
-                    // 🎯 UÇUŞ SATIRINA BASILINCA TAM AÇIKLAMAYI AÇIP KAPATAN FONKSİYON
                     function detayAcKapat(id) {
                         const detaySatir = document.getElementById('detay-' + id);
                         if (detaySatir.style.display === 'table-row') {
@@ -635,7 +676,7 @@ app.post('/login', async (req, res) => {
                                 }
                             } else {
                                 satir.style.display = 'none';
-                                detaySatir.style.display = 'none'; // Filtreye uymayanın detayı da gizlenir
+                                detaySatir.style.display = 'none';
                             }
                         });
 
@@ -665,7 +706,6 @@ app.post('/login', async (req, res) => {
 
                             if (index >= baslangicSınırı && index < bitisSınırı) {
                                 satir.style.display = '';
-                                // Not: Sayfalandığında detay satırı kapalı başlar, kullanıcı tıklarsa açılır
                             } else {
                                 satir.style.display = 'none';
                                 detaySatir.style.display = 'none';
