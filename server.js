@@ -226,13 +226,11 @@ app.post('/login', async (req, res) => {
                     .saatler-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
                     .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
                     
-                    /* 🎯 AKORDEON KUTULARI (Filtre ve Uçuş Ekleme) */
                     .akordeon-container { background: #eef1f4; border-radius: 10px; margin-bottom: 15px; overflow: hidden; border: 1px solid #dcdde1; }
                     .akordeon-toggle-btn { width: 100%; padding: 14px; background: #dfe4ea; border: none; font-weight: bold; font-size: 14px; color: #2f3640; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
                     .akordeon-icerik { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; padding: 0 12px; background: #eef1f4; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
                     .akordeon-icerik.acik { max-height: 550px; padding: 12px; transition: max-height 0.35s ease-in; }
 
-                    /* Uçuş ekleme butonu özel rengi */
                     .ekle-toggle-stil { background: #e8f8f5; border-color: #a3e4d7; }
                     .ekle-toggle-btn { background: #d1f2eb; color: #0e6655; }
 
@@ -274,6 +272,16 @@ app.post('/login', async (req, res) => {
                     table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 14px; }
                     th { background: #2c3e50; color: white; padding: 12px; }
                     td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
+                    
+                    /* 🎯 UÇUŞ SATIRI TIKLANABİLİR STİLİ */
+                    .ucus-satiri { cursor: pointer; transition: background 0.2s; }
+                    .ucus-satiri:hover { background: #f8f9fa; }
+                    
+                    /* 🎯 DETAY (AÇILIR KAPANIR GÖREV) SATIRI */
+                    .detay-satiri { background: #fdfefe; display: none; }
+                    .detay-satiri td { padding: 15px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+                    .detay-kutu { background: #f1f5f9; padding: 12px; border-radius: 6px; border-left: 4px solid #3498db; font-size: 13px; color: #334155; line-height: 1.5; word-break: break-word; }
+
                     .sil-btn { background:#e74c3c; color:white; padding:6px 12px; border-radius:4px; font-size:12px; width:auto; }
                     .sayfalama-alani { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 15px; padding: 10px 0; }
                     .sayfa-btn { width: auto; padding: 8px 14px; background: #fff; border: 1px solid #ddd; color: #333; font-size: 14px; border-radius: 4px; }
@@ -314,7 +322,6 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <!-- 🎯 1. AKORDEON: GEÇMİŞ UÇUŞ ARAMA (FİLTRE) -->
                     <div class="akordeon-container">
                         <button type="button" class="akordeon-toggle-btn" onclick="akordeonAcKapat('filtreIcerikKutusu', 'filtreOkIkon')">
                             <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
@@ -330,7 +337,6 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <!-- 🎯 2. AKORDEON: YENİ UÇUŞ SAATİ EKLEME -->
                     <div class="akordeon-container ekle-toggle-stil">
                         <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" onclick="akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon')">
                             <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
@@ -353,11 +359,26 @@ app.post('/login', async (req, res) => {
                         <table>
                             <thead><tr><th>Tarih</th><th>Hava Aracı</th><th>Eğitim</th><th>Süre</th><th>Görev Açıklaması</th><th>İşlem</th></tr></thead>
                             <tbody id="ucusTabloGövde">
-                                ${flights.map(f => `
-                                    <tr id="row-${f._id}" class="ucus-satiri" data-tarih="${f.tarih}" data-hava="${f.havaAraciTipi}" data-egitim="${f.egitimTipi}" data-sure="${f.sure}">
-                                        <td>${f.tarih}</td><td style="font-weight:bold;">${f.havaAraciTipi}</td><td>${f.egitimTipi}</td><td style="color:#e67e22; font-weight:bold;">${f.sure}</td><td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.gorevAciklamasi || ''}</td><td><button type="button" onclick="silUcus('${f._id}')" class="sil-btn">Sil</button></td>
-                                    </tr>
-                                `).join('')}
+                                ${flights.map(f => {
+                                    const aciklama = f.gorevAciklamasi || '';
+                                    const kisaltilmisAciklama = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
+                                    return `
+                                        <tr id="row-${f._id}" class="ucus-satiri" data-tarih="${f.tarih}" data-hava="${f.havaAraciTipi}" data-egitim="${f.egitimTipi}" data-sure="${f.sure}" onclick="detayAcKapat('${f._id}')">
+                                            <td>${f.tarih}</td>
+                                            <td style="font-weight:bold;">${f.havaAraciTipi}</td>
+                                            <td>${f.egitimTipi}</td>
+                                            <td style="color:#e67e22; font-weight:bold;">${f.sure}</td>
+                                            <td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${aciklama}">${kisaltilmisAciklama}</td>
+                                            <td onclick="event.stopPropagation()"><button type="button" onclick="silUcus('${f._id}')" class="sil-btn">Sil</button></td>
+                                        </tr>
+                                        <tr id="detay-${f._id}" class="detay-satiri">
+                                            <td colspan="6">
+                                                <div style="font-size:11px; font-weight:bold; color:#64748b; margin-bottom:4px;">📋 Tam Görev Açıklaması:</div>
+                                                <div class="detay-kutu">${aciklama || 'Görev açıklaması girilmemiş.'}</div>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
                             </tbody>
                         </table>
                     </div>
@@ -384,7 +405,6 @@ app.post('/login', async (req, res) => {
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
 
-                    // 🎯 ORTAK AKORDEON AÇMA / KAPATMA FONKSİYONU
                     function akordeonAcKapat(icerikId, okId) {
                         const icerik = document.getElementById(icerikId);
                         const ok = document.getElementById(okId);
@@ -394,6 +414,16 @@ app.post('/login', async (req, res) => {
                         } else {
                             icerik.classList.add('acik');
                             ok.innerText = '▲';
+                        }
+                    }
+
+                    // 🎯 UÇUŞ SATIRINA BASILINCA TAM AÇIKLAMAYI AÇIP KAPATAN FONKSİYON
+                    function detayAcKapat(id) {
+                        const detaySatir = document.getElementById('detay-' + id);
+                        if (detaySatir.style.display === 'table-row') {
+                            detaySatir.style.display = 'none';
+                        } else {
+                            detaySatir.style.display = 'table-row';
                         }
                     }
 
@@ -471,6 +501,9 @@ app.post('/login', async (req, res) => {
                         if(sonuc.success) {
                             const tbody = document.getElementById('ucusTabloGövde');
                             
+                            const aciklama = sonuc.data.gorevAciklamasi || '';
+                            const kisaltilmisAciklama = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
+
                             const tr = document.createElement('tr');
                             tr.id = 'row-' + sonuc.data._id;
                             tr.className = 'ucus-satiri';
@@ -478,16 +511,28 @@ app.post('/login', async (req, res) => {
                             tr.setAttribute('data-hava', sonuc.data.havaAraciTipi);
                             tr.setAttribute('data-egitim', sonuc.data.egitimTipi);
                             tr.setAttribute('data-sure', sonuc.data.sure);
+                            tr.onclick = function() { detayAcKapat(sonuc.data._id); };
 
                             tr.innerHTML = \`
                                 <td>\${sonuc.data.tarih}</td>
                                 <td style="font-weight:bold;">\${sonuc.data.havaAraciTipi}</td>
                                 <td>\${sonuc.data.egitimTipi}</td>
                                 <td style="color:#e67e22; font-weight:bold;">\${sonuc.data.sure}</td>
-                                <td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">\${sonuc.data.gorevAciklamasi || ''}</td>
-                                <td><button type="button" onclick="silUcus('\${sonuc.data._id}')" class="sil-btn">Sil</button></td>
+                                <td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="\${aciklama}">\${kisaltilmisAciklama}</td>
+                                <td onclick="event.stopPropagation()"><button type="button" onclick="silUcus('\${sonuc.data._id}')" class="sil-btn">Sil</button></td>
                             \`;
 
+                            const detayTr = document.createElement('tr');
+                            detayTr.id = 'detay-' + sonuc.data._id;
+                            detayTr.className = 'detay-satiri';
+                            detayTr.innerHTML = \`
+                                <td colspan="6">
+                                    <div style="font-size:11px; font-weight:bold; color:#64748b; margin-bottom:4px;">📋 Tam Görev Açıklaması:</div>
+                                    <div class="detay-kutu">\${aciklama || 'Görev açıklaması girilmemiş.'}</div>
+                                </td>
+                            \`;
+
+                            tbody.insertBefore(detayTr, tbody.firstChild);
                             tbody.insertBefore(tr, tbody.firstChild);
                             
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
@@ -507,7 +552,6 @@ app.post('/login', async (req, res) => {
                             document.getElementById('sure').value = '';
                             document.getElementById('gorevAciklamasi').value = '';
 
-                            // 🎯 Uçuş eklendikten sonra formu otomatik kapat
                             document.getElementById('ekleIcerikKutusu').classList.remove('acik');
                             document.getElementById('ekleOkIkon').innerText = '▼';
 
@@ -525,6 +569,7 @@ app.post('/login', async (req, res) => {
                         const sonuc = await response.json();
                         if(sonuc.success) { 
                             document.getElementById('row-'+id).remove(); 
+                            document.getElementById('detay-'+id).remove();
                             
                             document.getElementById('toplamSaatGosterge').innerText = sonuc.yeniToplamSaat;
                             document.getElementById('donemSaatGosterge').innerText = sonuc.yeniDonemSaat;
@@ -561,6 +606,8 @@ app.post('/login', async (req, res) => {
                         let gorunurSatirlar = [];
 
                         document.querySelectorAll('.ucus-satiri').forEach(satir => {
+                            const id = satir.id.replace('row-', '');
+                            const detaySatir = document.getElementById('detay-' + id);
                             const tStr = satir.getAttribute('data-tarih'); 
                             const h = satir.getAttribute('data-hava');
                             const e = satir.getAttribute('data-egitim');
@@ -588,6 +635,7 @@ app.post('/login', async (req, res) => {
                                 }
                             } else {
                                 satir.style.display = 'none';
+                                detaySatir.style.display = 'none'; // Filtreye uymayanın detayı da gizlenir
                             }
                         });
 
@@ -610,13 +658,17 @@ app.post('/login', async (req, res) => {
                         if (mevcutSayfa > toplamSayfaSayisi) mevcutSayfa = toplamSayfaSayisi;
 
                         aktifSatirlar.forEach((satir, index) => {
+                            const id = satir.id.replace('row-', '');
+                            const detaySatir = document.getElementById('detay-' + id);
                             const baslangicSınırı = (mevcutSayfa - 1) * satirBasinaVeri;
                             const bitisSınırı = mevcutSayfa * satirBasinaVeri;
 
                             if (index >= baslangicSınırı && index < bitisSınırı) {
                                 satir.style.display = '';
+                                // Not: Sayfalandığında detay satırı kapalı başlar, kullanıcı tıklarsa açılır
                             } else {
                                 satir.style.display = 'none';
+                                detaySatir.style.display = 'none';
                             }
                         });
 
