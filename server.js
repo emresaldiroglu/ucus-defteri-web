@@ -221,7 +221,7 @@ app.post('/login', async (req, res) => {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                 <style>
                     body { background: #f5f6fa; margin: 0; padding: 8px; font-family:'Segoe UI', sans-serif; }
-                    .container { max-width:900px; margin:5px auto; padding:12px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; position: relative; }
+                    .container { max-width:900px; margin:5px auto; padding:12px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; }
                     .ust-panel { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
                     .saatler-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
                     .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -234,29 +234,29 @@ app.post('/login', async (req, res) => {
                     .ekle-toggle-stil { background: #e8f8f5; border-color: #a3e4d7; }
                     .ekle-toggle-btn { background: #d1f2eb; color: #0e6655; }
 
-                    .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
-                    
-                    /* 🎯 KDU SİMGE BUTONU STİLİ */
-                    .kdu-btn {
-                        position: absolute;
-                        top: 15px;
-                        right: 15px;
+                    /* 🎯 KDU BUTONU STİLİ */
+                    .kdu-link-btn {
+                        display: block;
+                        width: 100%;
+                        padding: 14px;
                         background: #8e44ad;
                         color: white;
                         border: none;
-                        padding: 6px 12px;
-                        border-radius: 20px;
-                        font-size: 12px;
+                        border-radius: 10px;
                         font-weight: bold;
+                        font-size: 14px;
+                        text-align: left;
                         cursor: pointer;
-                        box-shadow: 0 2px 8px rgba(142, 68, 173, 0.4);
-                        display: flex;
-                        align-items: center;
-                        gap: 5px;
-                        z-index: 10;
+                        margin-bottom: 15px;
+                        text-decoration: none;
+                        box-sizing: border-box;
+                        box-shadow: 0 2px 8px rgba(142, 68, 173, 0.3);
+                        transition: background 0.2s;
                     }
-                    .kdu-btn:hover { background: #732d91; }
+                    .kdu-link-btn:hover { background: #732d91; }
 
+                    .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
+                    
                     @media(min-width: 768px) { 
                         .ust-panel { display: grid; grid-template-columns: 2fr 3fr; } 
                         .sayac-grid { grid-template-columns: repeat(3, 1fr); }
@@ -308,11 +308,7 @@ app.post('/login', async (req, res) => {
                 </style>
 
                 <div class="container">
-                    <!-- 🎯 SAĞ ÜST KÖŞEDEKİ KDU SİMGESİ / BUTONU -->
-                    <button type="button" class="kdu-btn" onclick="kduModalAc()">
-                        📟 <span>KDU</span>
-                    </button>
-
+                    
                     <div class="ust-panel">
                         <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 15px; border-radius: 10px; text-align: center; display:flex; flex-direction:column; justify-content:center;">
                             <div class="saatler-wrapper">
@@ -359,6 +355,11 @@ app.post('/login', async (req, res) => {
                             <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:10px; border-radius:6px; font-weight:bold; font-size:14px; display:none; width:100%; text-align:center;">⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
                         </div>
                     </div>
+
+                    <!-- 🎯 KDU UYGULAMASINI YENİ SEKMEDE AÇAN BUTON -->
+                    <a href="/kdu.html" target="_blank" class="kdu-link-btn">
+                        📟 KDU (Keyboard Display Unit) Aç
+                    </a>
 
                     <div class="akordeon-container ekle-toggle-stil">
                         <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" onclick="akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon')">
@@ -410,17 +411,6 @@ app.post('/login', async (req, res) => {
 
                 </div>
 
-                <!-- 🎯 KDU EKRANI İÇİN POPUP / MODAL -->
-                <div id="kduModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); justify-content:center; align-items:center; z-index:99999; padding:10px; box-sizing:border-box;">
-                    <div style="background:#1e293b; border-radius:12px; width:100%; max-width:650px; height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-                        <div style="background:#0f172a; color:white; padding:10px 15px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155;">
-                            <span style="font-weight:bold; font-size:14px;">📟 KDU Simülasyonu</span>
-                            <button type="button" onclick="kduModalKapat()" style="background:#e74c3c; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; width:auto; font-size:12px;">X Kapat</button>
-                        </div>
-                        <iframe src="/kdu.html" style="width:100%; height:100%; border:none; background:#000;"></iframe>
-                    </div>
-                </div>
-
                 <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
                     <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
                         <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:5px;">Tarih Girin</h3>
@@ -438,14 +428,6 @@ app.post('/login', async (req, res) => {
                 <script>
                     let mevcutSayfa = 1;
                     const satirBasinaVeri = 10;
-
-                    // 🎯 KDU EKRANINI AÇIP KAPATAN FONKSİYONLAR
-                    function kduModalAc() {
-                        document.getElementById('kduModal').style.display = 'flex';
-                    }
-                    function kduModalKapat() {
-                        document.getElementById('kduModal').style.display = 'none';
-                    }
 
                     function akordeonAcKapat(icerikId, okId) {
                         const icerik = document.getElementById(icerikId);
