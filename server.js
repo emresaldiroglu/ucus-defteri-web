@@ -234,7 +234,7 @@ app.post('/login', async (req, res) => {
                     .ekle-toggle-stil { background: #e8f8f5; border-color: #a3e4d7; }
                     .ekle-toggle-btn { background: #d1f2eb; color: #0e6655; }
 
-                    /* 🎯 KDU BUTONU STİLİ */
+                    /* 🎯 KDU BUTONU STİLİ (ARADA) */
                     .kdu-link-btn {
                         display: block;
                         width: 100%;
@@ -341,6 +341,7 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
+                    <!-- 1. GEÇMİŞ UÇUŞ ARAMA (FİLTRE) -->
                     <div class="akordeon-container">
                         <button type="button" class="akordeon-toggle-btn" onclick="akordeonAcKapat('filtreIcerikKutusu', 'filtreOkIkon')">
                             <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
@@ -356,11 +357,12 @@ app.post('/login', async (req, res) => {
                         </div>
                     </div>
 
-                    <!-- 🎯 KDU UYGULAMASINI YENİ SEKMEDE AÇAN BUTON -->
+                    <!-- 🎯 2. KDU BUTONU (ARADA) -->
                     <a href="/kdu.html" target="_blank" class="kdu-link-btn">
                         📟 KDU (Keyboard Display Unit) Aç
                     </a>
 
+                    <!-- 3. YENİ UÇUŞ SAATİ EKLEME -->
                     <div class="akordeon-container ekle-toggle-stil">
                         <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" onclick="akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon')">
                             <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
