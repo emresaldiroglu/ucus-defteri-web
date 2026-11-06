@@ -3,8 +3,44 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const app = express();
+
+// --- OTURUM ÇEREZİ (imzalı, ek paket gerektirmez) ---
+const OTURUM_SECRET = process.env.SESSION_SECRET || process.env.MONGO_URI || 'degistir-beni';
+const OTURUM_SURESI_MS = 1000 * 60 * 60 * 24 * 30; // 30 gün
+
+function oturumImzala(deger) {
+    return crypto.createHmac('sha256', OTURUM_SECRET).update(deger).digest('hex');
+}
+
+function oturumCerezOlustur(email) {
+    const payload = Buffer.from(JSON.stringify({ e: email, t: Date.now() })).toString('base64url');
+    return `${payload}.${oturumImzala(payload)}`;
+}
+
+function oturumEmailOku(req) {
+    const header = req.headers.cookie || '';
+    const parca = header.split(';').map(s => s.trim()).find(s => s.startsWith('oturum='));
+    if (!parca) return null;
+    const deger = decodeURIComponent(parca.substring('oturum='.length));
+    const [payload, imza] = deger.split('.');
+    if (!payload || !imza) return null;
+
+    const beklenen = oturumImzala(payload);
+    const a = Buffer.from(imza);
+    const b = Buffer.from(beklenen);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+
+    try {
+        const veri = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        if (Date.now() - veri.t > OTURUM_SURESI_MS) return null;
+        return veri.e;
+    } catch (e) {
+        return null;
+    }
+}
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -214,15 +250,20 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Sayfa yenilendiğinde (GET /login) geçerli oturum varsa paneli tekrar göster
 app.get('/login', (req, res) => {
-    res.redirect('/');
+    const email = oturumEmailOku(req);
+    if (!email) return res.redirect('/');
+    req.oturumEmail = email;
+    return loginHandler(req, res);
 });
 app.get('/register', (req, res) => {
     res.redirect('/');
 });
 
-app.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+const loginHandler = async (req, res) => {
+    const email = req.oturumEmail || (req.body && req.body.email) || '';
+    const password = (req.body && req.body.password) || '';
 
     try {
         let user = await User.findOne({ email: email.trim().toLowerCase() });
@@ -230,11 +271,18 @@ app.post('/login', async (req, res) => {
             return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Kullanıcı Bulunamadı!</h1><p>Bu e-posta adresi sistemde kayıtlı değil.</p><a href="/">Geri Dön</a></div>`);
         }
 
-        const dbPassword = user.password;
-        let isMatch = await bcrypt.compare(password, dbPassword);
-        if (!isMatch && password === dbPassword) isMatch = true;
+        let isMatch = false;
+        if (req.oturumEmail) {
+            isMatch = true; // geçerli imzalı oturum çerezi
+        } else {
+            const dbPassword = user.password;
+            isMatch = await bcrypt.compare(password, dbPassword);
+            if (!isMatch && password === dbPassword) isMatch = true;
+        }
 
         if (isMatch) {
+            const temizEmail = email.trim().toLowerCase();
+            res.setHeader('Set-Cookie', `oturum=${encodeURIComponent(oturumCerezOlustur(temizEmail))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${OTURUM_SURESI_MS / 1000}`);
             const flights = await Flight.find({ userEmail: email.trim().toLowerCase() }).sort({ tarih: -1 });
             const toplamUcusSüresi = hesaplaToplamSaat(flights);
             const aktifDonem = hesaplaAktifDonemSaati(flights);
@@ -715,7 +763,7 @@ app.post('/login', async (req, res) => {
                         const sonuc = await response.json();
                         if(sonuc.success) {
                             alert('Tarih veritabanına işlendi!');
-                            window.location.reload();
+                            window.location.href = window.location.href;
                         }
                     }
 
@@ -893,7 +941,9 @@ app.post('/login', async (req, res) => {
     } catch (error) {
         res.status(500).send("Sunucu hatası.");
     }
-});
+};
+
+app.post('/login', loginHandler);
 
 app.post('/register', async (req, res) => {
     const { email, password } = req.body;
