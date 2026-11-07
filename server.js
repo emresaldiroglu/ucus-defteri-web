@@ -338,8 +338,6 @@ function hesaplaAracaGoreDetayliDurum(flights) {
 
 const ARAC_SECENEKLERI = HAVA_ARACLARI_LISTESI.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
 const EGITIM_SECENEKLERI = EGITIM_TIPLERI.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
-const SAAT_SECENEKLERI = Array.from({ length: 24 }, (_, i) => { const n = String(i).padStart(2, '0'); return `<option value="${n}">${n} saat</option>`; }).join('');
-const DAKIKA_SECENEKLERI = Array.from({ length: 60 }, (_, i) => { const n = String(i).padStart(2, '0'); return `<option value="${n}">${n} dk</option>`; }).join('');
 const AY_SECENEKLERI =AYLAR.map((ad, i) => `<option value="${String(i + 1).padStart(2, '0')}">${ad}</option>`).join('');
 
 function tarihSayaciHtml(baslangicTarihi, periyotYil, etiket, alan) {
@@ -464,7 +462,10 @@ function panelHtmlOlustur(email, flights, kayitliTarihler) {
                         <div><label for="tarih">Tarih:</label><input type="date" id="tarih" value="${esc(bugunTarihStr)}"></div>
                         <div><label for="havaAraciTipi">Hava Aracı Tipi:</label><select id="havaAraciTipi">${ARAC_SECENEKLERI}</select></div>
                         <div><label for="egitimTipi">Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option>${EGITIM_SECENEKLERI}</select></div>
-                        <div><label for="sureSaat">Uçuş Süresi:</label><div class="sure-secici"><select id="sureSaat" aria-label="Saat">${SAAT_SECENEKLERI}</select><select id="sureDakika" aria-label="Dakika">${DAKIKA_SECENEKLERI}</select></div></div>
+                        <div>
+                            <label for="sureAlani">Uçuş Süresi:</label>
+                            <button type="button" id="sureAlani" class="sure-alani" data-eylem="sure-modal"><span id="sureAlaniMetin" class="yer-tutucu">Süre seçin</span><span aria-hidden="true">⏱️</span></button>
+                        </div>
                         <div class="span-2"><label for="gorevAciklamasi">Görev Açıklaması:</label><textarea id="gorevAciklamasi" maxlength="1000"></textarea></div>
                         <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">✈️ Uçuşu Ekle</button>
                     </form>
@@ -516,6 +517,22 @@ function panelHtmlOlustur(email, flights, kayitliTarihler) {
                 <div class="modal-butonlar">
                     <button type="button" class="btn-tamam" data-eylem="sifre-guncelle">Güncelle</button>
                     <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="sifreModal">İptal</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- UÇUŞ SÜRESİ SEÇİCİ MODALI -->
+        <div id="sureModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu kucuk">
+                <h3 class="modal-baslik">⏱️ Uçuş Süresi</h3>
+                <div class="sure-tekerlek">
+                    <div class="tekerlek-band"></div>
+                    <div class="tekerlek-kolon"><div class="tekerlek" id="sureSaat" data-max="23" tabindex="0" role="listbox" aria-label="Saat"></div><span class="tekerlek-birim">saat</span></div>
+                    <div class="tekerlek-kolon"><div class="tekerlek" id="sureDakika" data-max="59" tabindex="0" role="listbox" aria-label="Dakika"></div><span class="tekerlek-birim">dk</span></div>
+                </div>
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="sure-tamam">Tamam</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="sureModal">İptal</button>
                 </div>
             </div>
         </div>
