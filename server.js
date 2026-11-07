@@ -338,7 +338,9 @@ function hesaplaAracaGoreDetayliDurum(flights) {
 
 const ARAC_SECENEKLERI = HAVA_ARACLARI_LISTESI.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
 const EGITIM_SECENEKLERI = EGITIM_TIPLERI.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
-const AY_SECENEKLERI = AYLAR.map((ad, i) => `<option value="${String(i + 1).padStart(2, '0')}">${ad}</option>`).join('');
+const SAAT_SECENEKLERI = Array.from({ length: 24 }, (_, i) => { const n = String(i).padStart(2, '0'); return `<option value="${n}">${n} saat</option>`; }).join('');
+const DAKIKA_SECENEKLERI = Array.from({ length: 60 }, (_, i) => { const n = String(i).padStart(2, '0'); return `<option value="${n}">${n} dk</option>`; }).join('');
+const AY_SECENEKLERI =AYLAR.map((ad, i) => `<option value="${String(i + 1).padStart(2, '0')}">${ad}</option>`).join('');
 
 function tarihSayaciHtml(baslangicTarihi, periyotYil, etiket, alan) {
     if (!baslangicTarihi) {
@@ -462,7 +464,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler) {
                         <div><label for="tarih">Tarih:</label><input type="date" id="tarih" value="${esc(bugunTarihStr)}"></div>
                         <div><label for="havaAraciTipi">Hava Aracı Tipi:</label><select id="havaAraciTipi">${ARAC_SECENEKLERI}</select></div>
                         <div><label for="egitimTipi">Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option>${EGITIM_SECENEKLERI}</select></div>
-                        <div><label for="sure">Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" inputmode="decimal" placeholder="Süreyi girin" autocomplete="off"></div>
+                        <div><label for="sureSaat">Uçuş Süresi:</label><div class="sure-secici"><select id="sureSaat" aria-label="Saat">${SAAT_SECENEKLERI}</select><select id="sureDakika" aria-label="Dakika">${DAKIKA_SECENEKLERI}</select></div></div>
                         <div class="span-2"><label for="gorevAciklamasi">Görev Açıklaması:</label><textarea id="gorevAciklamasi" maxlength="1000"></textarea></div>
                         <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">✈️ Uçuşu Ekle</button>
                     </form>
