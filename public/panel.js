@@ -104,6 +104,7 @@
             $('uygulama').innerHTML = yeni.innerHTML;
             $('panelVeri').textContent = yeniVeri.textContent;
             veriyiOku();
+            tekerlekleriKur();
             mevcutSayfa = 1;
             filtreleUcuslari();
         } catch (e) {
@@ -171,6 +172,29 @@
         modalAc('sifreModal');
     }
 
+    function sureModalAc() {
+        var alan = $('sureAlani');
+        modalAc('sureModal');
+        // Pencere görünür olduktan sonra tekerlekler mevcut değere kaydırılır
+        tekerlekGit($('sureSaat'), parseInt(alan.dataset.saat || '0', 10), false);
+        tekerlekGit($('sureDakika'), parseInt(alan.dataset.dakika || '0', 10), false);
+    }
+
+    function sureTamam() {
+        var saat = String($('sureSaat').dataset.deger || '0').padStart(2, '0');
+        var dakika = String($('sureDakika').dataset.deger || '0').padStart(2, '0');
+        if (saat === '00' && dakika === '00') {
+            return bildir('Lütfen uçuş süresini seçin.', 'hata');
+        }
+        var alan = $('sureAlani');
+        alan.dataset.saat = saat;
+        alan.dataset.dakika = dakika;
+        var metin = $('sureAlaniMetin');
+        metin.textContent = saat + ' saat ' + dakika + ' dk';
+        metin.classList.remove('yer-tutucu');
+        modalKapat('sureModal');
+    }
+
     function tarihModalAc(etiket, alan, hamTarih) {
         $('modalBaslik').textContent = etiket + ' Başlangıç Tarihi';
         $('hedefAlan').value = alan;
@@ -227,8 +251,8 @@
         var tarih = $('tarih').value;
         var havaAraciTipi = $('havaAraciTipi').value;
         var egitimTipi = $('egitimTipi').value;
-        var sureSaat = $('sureSaat').value;
-        var sureDakika = $('sureDakika').value;
+        var sureSaat = $('sureAlani').dataset.saat || '00';
+        var sureDakika = $('sureAlani').dataset.dakika || '00';
         var sure = sureSaat + ':' + sureDakika;
         var gorevAciklamasi = $('gorevAciklamasi').value;
 
@@ -268,6 +292,59 @@
         } else {
             bildir(sonuc.message || 'Kayıt silinemedi.', 'hata');
         }
+    }
+
+    /* ---------- KAYDIRMALI SÜRE SEÇİCİ ---------- */
+
+    var OGE_YUKSEKLIK = 44;
+
+    function tekerlekIsaretle(el, i) {
+        if (el.dataset.deger === String(i) && el.querySelector('.secili')) return;
+        var eski = el.querySelector('.secili');
+        if (eski) eski.classList.remove('secili');
+        var yeni = el.querySelectorAll('.tekerlek-oge')[i];
+        if (yeni) yeni.classList.add('secili');
+        el.dataset.deger = String(i);
+    }
+
+    function tekerlekGit(el, i, yumusak) {
+        var max = parseInt(el.dataset.max, 10);
+        i = Math.max(0, Math.min(max, i));
+        el.scrollTo({ top: i * OGE_YUKSEKLIK, behavior: yumusak ? 'smooth' : 'auto' });
+        tekerlekIsaretle(el, i);
+    }
+
+    function tekerlekKur(el) {
+        var max = parseInt(el.dataset.max, 10);
+        el.textContent = '';
+        el.appendChild(eleman('div', 'tekerlek-bosluk'));
+        for (var i = 0; i <= max; i++) {
+            var oge = eleman('div', 'tekerlek-oge', String(i).padStart(2, '0'));
+            oge.dataset.index = String(i);
+            el.appendChild(oge);
+        }
+        el.appendChild(eleman('div', 'tekerlek-bosluk'));
+        tekerlekIsaretle(el, 0);
+
+        el.addEventListener('scroll', function () {
+            var i = Math.round(el.scrollTop / OGE_YUKSEKLIK);
+            tekerlekIsaretle(el, Math.max(0, Math.min(max, i)));
+        }, { passive: true });
+
+        el.addEventListener('click', function (e) {
+            var oge = e.target.closest('.tekerlek-oge');
+            if (oge) tekerlekGit(el, parseInt(oge.dataset.index, 10), true);
+        });
+
+        el.addEventListener('keydown', function (e) {
+            var simdiki = parseInt(el.dataset.deger || '0', 10);
+            if (e.key === 'ArrowUp') { e.preventDefault(); tekerlekGit(el, simdiki - 1, true); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); tekerlekGit(el, simdiki + 1, true); }
+        });
+    }
+
+    function tekerlekleriKur() {
+        document.querySelectorAll('.tekerlek').forEach(tekerlekKur);
     }
 
     /* ---------- LİSTE: AKORDEON, DETAY, FİLTRE, SAYFALAMA ---------- */
@@ -394,6 +471,8 @@
             case 'donem-modal': donemModalAc(); break;
             case 'sayac-modal': sayacModalAc(d.tip); break;
             case 'sifre-modal': sifreModalAc(); break;
+            case 'sure-modal': sureModalAc(); break;
+            case 'sure-tamam': sureTamam(); break;
             case 'sifre-guncelle': sifreyiGuncelle(hedef); break;
             case 'tarih-modal': tarihModalAc(d.etiket, d.alan, d.tarih); break;
             case 'tarih-kaydet': kaydetKategoriTarihi(hedef); break;
@@ -422,5 +501,6 @@
     });
 
     veriyiOku();
+    tekerlekleriKur();
     filtreleUcuslari();
 })();
