@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
@@ -68,6 +69,21 @@ function oturumGerekli(req, res, next) {
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+// Panel dosyaları public/ içinde aranır; bulunamazsa proje kökünde de aranır.
+// Hiçbiri yoksa sebebi açıkça loglanır.
+['panel.css', 'panel.js'].forEach(ad => {
+    app.get('/' + ad, (req, res) => {
+        const adaylar = [path.join(__dirname, 'public', ad), path.join(__dirname, ad)];
+        const bulunan = adaylar.find(p => fs.existsSync(p));
+        if (!bulunan) {
+            console.error(`❌ ${ad} bulunamadı. Aranan yerler: ${adaylar.join(' , ')}`);
+            return res.status(404).send(`/* ${ad} sunucuda bulunamadi */`);
+        }
+        res.set('Cache-Control', 'no-cache');
+        res.sendFile(bulunan);
+    });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const mongoURI = process.env.MONGO_URI;
