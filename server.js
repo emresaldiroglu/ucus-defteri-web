@@ -14,18 +14,19 @@ if (!process.env.SESSION_SECRET) {
     console.warn("⚠️ SESSION_SECRET tanımlı değil; çerez imzası MONGO_URI üzerinden üretiliyor. Ayrı bir SESSION_SECRET eklemeniz önerilir.");
 }
 const OTURUM_SECRET = process.env.SESSION_SECRET || process.env.MONGO_URI || 'degistir-beni';
-const OTURUM_SURESI_MS = 1000 * 60 * 60 * 24 * 30; // 30 gün
+const OTURUM_SURESI_MS = 1000 * 60 * 60 * 24 * 30;      // "Beni hatırla" işaretliyse: 30 gün
+const KISA_OTURUM_SURESI_MS = 1000 * 60 * 60 * 24;      // İşaretli değilse: tarayıcı kapanınca veya en geç 24 saat
 
 function oturumImzala(deger) {
     return crypto.createHmac('sha256', OTURUM_SECRET).update(deger).digest('hex');
 }
 
-function oturumCerezOlustur(email) {
-    const payload = Buffer.from(JSON.stringify({ e: email, t: Date.now() })).toString('base64url');
+function oturumCerezOlustur(email, kalici) {
+    const payload = Buffer.from(JSON.stringify({ e: email, t: Date.now(), k: kalici ? 1 : 0 })).toString('base64url');
     return `${payload}.${oturumImzala(payload)}`;
 }
 
-function oturumEmailOku(req) {
+function oturumOku(req) {
     const header = req.headers.cookie || '';
     const parca = header.split(';').map(s => s.trim()).find(s => s.startsWith('oturum='));
     if (!parca) return null;
@@ -40,16 +41,26 @@ function oturumEmailOku(req) {
 
     try {
         const veri = JSON.parse(Buffer.from(payload, 'base64url').toString());
-        if (Date.now() - veri.t > OTURUM_SURESI_MS) return null;
-        return veri.e;
+        // k alanı olmayan eski çerezler (bu özellikten önce verilenler) kalıcı sayılır
+        const kalici = veri.k !== 0;
+        const sure = kalici ? OTURUM_SURESI_MS : KISA_OTURUM_SURESI_MS;
+        if (Date.now() - veri.t > sure) return null;
+        return { email: veri.e, kalici };
     } catch (e) {
         return null;
     }
 }
 
-function oturumCerezYaz(req, res, email) {
+function oturumEmailOku(req) {
+    const oturum = oturumOku(req);
+    return oturum ? oturum.email : null;
+}
+
+function oturumCerezYaz(req, res, email, kalici) {
     const secure = req.secure ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `oturum=${encodeURIComponent(oturumCerezOlustur(email))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${OTURUM_SURESI_MS / 1000}${secure}`);
+    // Max-Age yoksa tarayıcı çerezi oturum çerezi sayar ve tarayıcı kapanınca siler
+    const omur = kalici ? `; Max-Age=${OTURUM_SURESI_MS / 1000}` : '';
+    res.setHeader('Set-Cookie', `oturum=${encodeURIComponent(oturumCerezOlustur(email, kalici))}; Path=/; HttpOnly; SameSite=Lax${omur}${secure}`);
 }
 
 function oturumCerezSil(req, res) {
@@ -646,9 +657,10 @@ app.get('/', (req, res) => {
 
 // Sayfa yenilendiğinde (GET /login) geçerli oturum varsa paneli tekrar göster
 app.get('/login', (req, res) => {
-    const email = oturumEmailOku(req);
-    if (!email) return res.redirect('/');
-    req.oturumEmail = email;
+    const oturum = oturumOku(req);
+    if (!oturum) return res.redirect('/');
+    req.oturumEmail = oturum.email;
+    req.oturumKalici = oturum.kalici;
     return loginHandler(req, res);
 });
 
@@ -667,6 +679,8 @@ const loginHandler = async (req, res) => {
     const email = String(cerezle ? req.oturumEmail : (metinMi(govde.email) ? govde.email : '')).trim().toLowerCase();
     const password = metinMi(govde.password) ? govde.password : '';
     const hesapAnahtar = `${req.ip}|${email}`;
+    // Çerezle gelen istekte seçim korunur; formdan gelen girişte "Beni hatırla" kutusuna bakılır
+    const kalici = cerezle ? req.oturumKalici !== false : (govde.hatirla === 'on' || govde.hatirla === '1');
 
     if (!cerezle) {
         if (!email || !password) return girisSayfasinaDon(res, 'hata', 'eksik', 'login');
@@ -708,7 +722,7 @@ const loginHandler = async (req, res) => {
         if (!isMatch) return basarisiz();
         if (!cerezle) girisSiniriHesap.temizle(hesapAnahtar);
 
-        oturumCerezYaz(req, res, email);
+        oturumCerezYaz(req, res, email, kalici);
 
         const flights = await Flight.find({ userEmail: email }).sort({ tarih: -1 });
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
