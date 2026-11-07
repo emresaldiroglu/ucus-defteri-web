@@ -15,7 +15,10 @@ if (!process.env.SESSION_SECRET) {
 }
 const OTURUM_SECRET = process.env.SESSION_SECRET || process.env.MONGO_URI || 'degistir-beni';
 const OTURUM_SURESI_MS = 1000 * 60 * 60 * 24 * 30;      // "Beni hatırla" işaretliyse: 30 gün
-const KISA_OTURUM_SURESI_MS = 1000 * 60 * 60 * 24;      // İşaretli değilse: tarayıcı kapanınca veya en geç 24 saat
+// "Beni hatırla" işaretli değilse: 15 dakika işlem yapılmazsa oturum biter (her işlemde süre yenilenir).
+// Telefon tarayıcıları kapatılan sekmeleri ve oturum çerezlerini geri yüklediği için
+// sunucu "tarayıcı kapandı mı" bilemez; bu yüzden işlem yapılmayan süreye bakılır.
+const KISA_OTURUM_SURESI_MS = 1000 * 60 * 15;
 
 function oturumImzala(deger) {
     return crypto.createHmac('sha256', OTURUM_SECRET).update(deger).digest('hex');
@@ -70,11 +73,13 @@ function oturumCerezSil(req, res) {
 
 // API için oturum doğrulama: e-posta istemciden değil, imzalı çerezden alınır
 function oturumGerekli(req, res, next) {
-    const email = oturumEmailOku(req);
-    if (!email) {
+    const oturum = oturumOku(req);
+    if (!oturum) {
         return res.status(401).json({ success: false, message: "Oturum süresi doldu, lütfen tekrar giriş yapın." });
     }
-    req.oturumEmail = email;
+    req.oturumEmail = oturum.email;
+    // Kısa oturumlarda her işlem süreyi yeniler (işlem yapıldığı sürece oturum açık kalır)
+    if (!oturum.kalici) oturumCerezYaz(req, res, oturum.email, false);
     next();
 }
 
