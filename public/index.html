@@ -2,34 +2,40 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#2c3e50">
     <title>Uçuş Logbook - Giriş & Kayıt</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E✈️%3C/text%3E%3C/svg%3E">
     <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
         body {
             margin: 0;
-            padding: 0;
+            padding: 16px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            height: 100vh;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             justify-content: center;
             align-items: center;
+            color: #2c3e50;
         }
         .auth-container {
             background: #ffffff;
-            padding: 30px;
+            padding: 28px 24px;
             border-radius: 12px;
             box-shadow: 0 8px 25px rgba(0,0,0,0.2);
             width: 100%;
-            max-width: 360px;
-            box-sizing: border-box;
+            max-width: 380px;
             text-align: center;
         }
-        h2 {
-            margin-top: 0;
+        h1 {
+            margin: 0 0 20px 0;
+            font-size: 22px;
             color: #2c3e50;
-            margin-bottom: 20px;
         }
+
         .tab-menu {
             display: flex;
             background: #f1f2f6;
@@ -48,16 +54,30 @@
             border-radius: 6px;
             transition: all 0.3s ease;
             font-size: 14px;
+            font-family: inherit;
         }
         .tab-btn.active {
             background: #ffffff;
-            color: #2a5298;
+            color: #2980b9;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        .form-group {
+
+        /* Hata / başarı mesajı */
+        .mesaj {
+            display: none;
             text-align: left;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.4;
             margin-bottom: 15px;
         }
+        .mesaj.goster { display: block; }
+        .mesaj.hata { background: #fdecea; color: #a93226; border: 1px solid #f5c6cb; }
+        .mesaj.basari { background: #e8f8f0; color: #1e8449; border: 1px solid #a9dfbf; }
+
+        .form-group { text-align: left; margin-bottom: 15px; }
         label {
             display: block;
             font-size: 13px;
@@ -70,91 +90,238 @@
             padding: 12px;
             border: 1px solid #ccc;
             border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 15px;
+            font-size: 16px; /* 16px: iPhone'da odaklanınca sayfa kendiliğinden yakınlaşmaz */
+            font-family: inherit;
         }
+        input:focus-visible {
+            outline: 2px solid #3498db;
+            outline-offset: 1px;
+            border-color: #3498db;
+        }
+
+        .sifre-alani { position: relative; }
+        .sifre-alani input { padding-right: 76px; }
+        .goster-btn {
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #2980b9;
+            font-weight: bold;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            padding: 10px 12px;
+        }
+
+        /* Kayıt şifre kuralları */
+        .kurallar { list-style: none; margin: -4px 0 15px 0; padding: 0; text-align: left; font-size: 12px; color: #7f8c8d; }
+        .kurallar li { margin-bottom: 3px; }
+        .kurallar li::before { content: '○'; display: inline-block; width: 18px; }
+        .kurallar li.tamam { color: #1e8449; font-weight: 600; }
+        .kurallar li.tamam::before { content: '✓'; }
+
         button.submit-btn {
             width: 100%;
             padding: 12px;
-            background: #2a5298;
+            background: #2980b9;
             color: white;
             border: none;
             border-radius: 6px;
             font-size: 16px;
             font-weight: bold;
+            font-family: inherit;
             cursor: pointer;
-            margin-top: 10px;
+            margin-top: 6px;
             transition: background 0.2s;
         }
-        button.submit-btn:hover {
-            background: #1e3c72;
-        }
-        .form-box {
-            display: none;
-        }
-        .form-box.active {
-            display: block;
-        }
+        button.submit-btn:hover { background: #21618c; }
+        button.submit-btn.kayit { background: #27ae60; }
+        button.submit-btn.kayit:hover { background: #1e8449; }
+        button.submit-btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        .form-box { display: none; }
+        .form-box.active { display: block; }
     </style>
 </head>
 <body>
 
 <div class="auth-container">
-    <h2>✈️ Uçuş Logbook</h2>
-    
-    <div class="tab-menu">
-        <button type="button" id="tabLogin" class="tab-btn active" onclick="switchTab('login')">Giriş Yap</button>
-        <button type="button" id="tabRegister" class="tab-btn" onclick="switchTab('register')">Kayıt Ol</button>
+    <h1>✈️ Uçuş Logbook</h1>
+
+    <div class="tab-menu" role="tablist">
+        <button type="button" id="tabLogin" class="tab-btn active" role="tab" aria-selected="true" aria-controls="loginFormBox" data-sekme="login">Giriş Yap</button>
+        <button type="button" id="tabRegister" class="tab-btn" role="tab" aria-selected="false" aria-controls="registerFormBox" data-sekme="register">Kayıt Ol</button>
     </div>
 
-    <div id="loginFormBox" class="form-box active">
-        <form action="/login" method="POST">
+    <div id="mesaj" class="mesaj" role="alert"></div>
+
+    <div id="loginFormBox" class="form-box active" role="tabpanel">
+        <form id="girisFormu" action="/login" method="POST">
             <div class="form-group">
-                <label>E-Posta Adresi</label>
-                <input type="email" name="email" required placeholder="ornek@eposta.com">
+                <label for="girisEposta">E-Posta Adresi</label>
+                <input type="email" id="girisEposta" name="email" required placeholder="ornek@eposta.com"
+                       autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
             <div class="form-group">
-                <label>Şifre</label>
-                <input type="password" name="password" required placeholder="••••••••">
+                <label for="girisSifre">Şifre</label>
+                <div class="sifre-alani">
+                    <input type="password" id="girisSifre" name="password" required placeholder="••••••••" autocomplete="current-password">
+                    <button type="button" class="goster-btn" data-hedef="girisSifre" aria-pressed="false" aria-label="Şifreyi göster">Göster</button>
+                </div>
             </div>
-            <button type="submit" class="submit-btn">Giriş Yap</button>
+            <button type="submit" id="girisBtn" class="submit-btn">Giriş Yap</button>
         </form>
     </div>
 
-    <div id="registerFormBox" class="form-box">
-        <form action="/register" method="POST">
+    <div id="registerFormBox" class="form-box" role="tabpanel">
+        <form id="kayitFormu" action="/register" method="POST">
             <div class="form-group">
-                <label>E-Posta Adresi</label>
-                <input type="email" name="email" required placeholder="ornek@eposta.com">
+                <label for="kayitEposta">E-Posta Adresi</label>
+                <input type="email" id="kayitEposta" name="email" required placeholder="ornek@eposta.com"
+                       autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false">
             </div>
             <div class="form-group">
-                <label>Şifre Oluştur</label>
-                <input type="password" name="password" required placeholder="En az 6 karakter">
+                <label for="kayitSifre">Şifre Oluştur</label>
+                <div class="sifre-alani">
+                    <input type="password" id="kayitSifre" name="password" required placeholder="En az 8 karakter" autocomplete="new-password">
+                    <button type="button" class="goster-btn" data-hedef="kayitSifre kayitSifre2" aria-pressed="false" aria-label="Şifreleri göster">Göster</button>
+                </div>
             </div>
-            <button type="submit" class="submit-btn" style="background: #2ecc71;">Hesap Oluştur</button>
+            <div class="form-group">
+                <label for="kayitSifre2">Şifre (Tekrar)</label>
+                <input type="password" id="kayitSifre2" name="password2" required placeholder="Şifreyi tekrar girin" autocomplete="new-password">
+            </div>
+            <ul class="kurallar" id="kurallar" aria-live="polite">
+                <li data-kural="uzunluk">En az 8 karakter</li>
+                <li data-kural="buyuk">En az 1 büyük harf</li>
+                <li data-kural="rakam">En az 1 rakam</li>
+                <li data-kural="eslesme">Şifreler eşleşiyor</li>
+            </ul>
+            <button type="submit" id="kayitBtn" class="submit-btn kayit" disabled>Hesap Oluştur</button>
         </form>
     </div>
 </div>
 
 <script>
-    function switchTab(type) {
-        const tabLogin = document.getElementById('tabLogin');
-        const tabRegister = document.getElementById('tabRegister');
-        const loginBox = document.getElementById('loginFormBox');
-        const registerBox = document.getElementById('registerFormBox');
+(function () {
+    'use strict';
 
-        if (type === 'login') {
-            tabLogin.classList.add('active');
-            tabRegister.classList.remove('active');
-            loginBox.classList.add('active');
-            registerBox.classList.remove('active');
-        } else {
-            tabRegister.classList.add('active');
-            tabLogin.classList.remove('active');
-            registerBox.classList.add('active');
-            loginBox.classList.remove('active');
-        }
+    // Sunucudan gelen kodlar buradaki sabit metinlere çevrilir (adresteki metin sayfaya basılmaz)
+    var HATALAR = {
+        'giris': 'E-posta veya şifre hatalı.',
+        'eksik': 'E-posta ve şifre alanları boş bırakılamaz.',
+        'eposta': 'Geçerli bir e-posta adresi girin.',
+        'eslesme': 'Şifreler birbiriyle uyuşmuyor.',
+        'kural': 'Şifre en az 8 karakter, 1 büyük harf ve 1 rakam içermelidir.',
+        'var': 'Bu e-posta adresiyle daha önce kayıt yapılmış. Giriş yapmayı deneyin.',
+        'cok-deneme': 'Çok fazla deneme yapıldı. {dk} dakika sonra tekrar deneyin.',
+        'sunucu': 'Bir sunucu hatası oluştu. Lütfen biraz sonra tekrar deneyin.'
+    };
+    var BASARILAR = {
+        'kayit': 'Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.'
+    };
+
+    function $(id) { return document.getElementById(id); }
+
+    function sekmeDegistir(tip, mesajiTemizle) {
+        var giris = tip === 'login';
+        $('tabLogin').classList.toggle('active', giris);
+        $('tabRegister').classList.toggle('active', !giris);
+        $('tabLogin').setAttribute('aria-selected', giris ? 'true' : 'false');
+        $('tabRegister').setAttribute('aria-selected', giris ? 'false' : 'true');
+        $('loginFormBox').classList.toggle('active', giris);
+        $('registerFormBox').classList.toggle('active', !giris);
+        if (mesajiTemizle) $('mesaj').className = 'mesaj';
     }
+
+    function mesajGoster(metin, tur) {
+        var kutu = $('mesaj');
+        kutu.textContent = metin;
+        kutu.className = 'mesaj goster ' + tur;
+    }
+
+    // Sekme düğmeleri
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { sekmeDegistir(btn.dataset.sekme, true); });
+    });
+
+    // Şifre göster / gizle
+    document.querySelectorAll('.goster-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var gorunur = btn.getAttribute('aria-pressed') !== 'true';
+            btn.dataset.hedef.split(' ').forEach(function (id) {
+                $(id).type = gorunur ? 'text' : 'password';
+            });
+            btn.setAttribute('aria-pressed', gorunur ? 'true' : 'false');
+            btn.textContent = gorunur ? 'Gizle' : 'Göster';
+        });
+    });
+
+    // Kayıt şifre kuralları
+    function kurallariGuncelle() {
+        var s = $('kayitSifre').value;
+        var s2 = $('kayitSifre2').value;
+        var durum = {
+            uzunluk: s.length >= 8,
+            buyuk: /[A-Z]/.test(s),
+            rakam: /[0-9]/.test(s),
+            eslesme: s.length > 0 && s === s2
+        };
+        var hepsi = true;
+        document.querySelectorAll('#kurallar li').forEach(function (li) {
+            var tamam = durum[li.dataset.kural];
+            li.classList.toggle('tamam', tamam);
+            if (!tamam) hepsi = false;
+        });
+        $('kayitBtn').disabled = !hepsi;
+        return hepsi;
+    }
+    $('kayitSifre').addEventListener('input', kurallariGuncelle);
+    $('kayitSifre2').addEventListener('input', kurallariGuncelle);
+
+    // Çift gönderimi önle
+    $('girisFormu').addEventListener('submit', function () {
+        var b = $('girisBtn');
+        b.disabled = true;
+        b.textContent = 'Giriş yapılıyor...';
+    });
+    $('kayitFormu').addEventListener('submit', function (e) {
+        if (!kurallariGuncelle()) { e.preventDefault(); return; }
+        var b = $('kayitBtn');
+        b.disabled = true;
+        b.textContent = 'Hesap oluşturuluyor...';
+    });
+
+    // Geri tuşuyla dönülürse düğmeler yeniden kullanılabilir olsun
+    window.addEventListener('pageshow', function () {
+        $('girisBtn').disabled = false;
+        $('girisBtn').textContent = 'Giriş Yap';
+        $('kayitBtn').textContent = 'Hesap Oluştur';
+        kurallariGuncelle();
+    });
+
+    // Sunucudan dönen hata / başarı mesajı
+    var q = new URLSearchParams(location.search);
+    var hataKodu = q.get('hata');
+    var basariKodu = q.get('basari');
+    if (q.get('sekme') === 'register') sekmeDegistir('register', false);
+
+    if (hataKodu && Object.prototype.hasOwnProperty.call(HATALAR, hataKodu)) {
+        var dk = parseInt(q.get('dk'), 10);
+        if (!(dk > 0 && dk <= 120)) dk = 15;
+        mesajGoster(HATALAR[hataKodu].replace('{dk}', String(dk)), 'hata');
+    } else if (basariKodu && Object.prototype.hasOwnProperty.call(BASARILAR, basariKodu)) {
+        mesajGoster(BASARILAR[basariKodu], 'basari');
+    }
+
+    // Adres çubuğunu temizle (yenilemede aynı mesaj tekrar görünmesin)
+    if (location.search) history.replaceState(null, '', location.pathname);
+
+    kurallariGuncelle();
+})();
 </script>
 
 </body>
