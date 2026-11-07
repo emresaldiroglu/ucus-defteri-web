@@ -84,7 +84,7 @@ app.use(bodyParser.json());
     });
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false })); // '/' adresini aşağıdaki rota yönetir
 
 const mongoURI = process.env.MONGO_URI;
 
@@ -583,9 +583,64 @@ function panelHtmlOlustur(email, flights, kayitliTarihler) {
 }
 
 
+// --- GİRİŞ / KAYIT YARDIMCILARI ---
+
+const EPOSTA_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Kullanıcı bulunamasa da bcrypt çalıştırılır; yanıt süresinden hesabın var olup olmadığı anlaşılmasın
+const SAHTE_HASH = bcrypt.hashSync('sahte-sifre-123A', 10);
+
+function sifreKuraliUygun(sifre) {
+    return sifre.length >= 8 && /[A-Z]/.test(sifre) && /[0-9]/.test(sifre);
+}
+
+// Basit bellek içi deneme sınırı. Sunucu yeniden başlarsa sayaçlar sıfırlanır.
+function denemeSiniri(limit, pencereMs) {
+    const kayitlar = new Map();
+    setInterval(() => {
+        const simdi = Date.now();
+        for (const [k, v] of kayitlar) {
+            if (simdi - v.ilk > pencereMs) kayitlar.delete(k);
+        }
+    }, 5 * 60 * 1000).unref();
+
+    return {
+        // Engelliyse kalan dakikayı, değilse 0 döner
+        engelli(anahtar) {
+            const k = kayitlar.get(anahtar);
+            if (!k) return 0;
+            const kalanMs = k.ilk + pencereMs - Date.now();
+            if (kalanMs <= 0) { kayitlar.delete(anahtar); return 0; }
+            return k.sayi >= limit ? Math.ceil(kalanMs / 60000) : 0;
+        },
+        hata(anahtar) {
+            const simdi = Date.now();
+            const k = kayitlar.get(anahtar);
+            if (!k || simdi - k.ilk > pencereMs) kayitlar.set(anahtar, { sayi: 1, ilk: simdi });
+            else k.sayi++;
+        },
+        temizle(anahtar) { kayitlar.delete(anahtar); }
+    };
+}
+
+const girisSiniriHesap = denemeSiniri(5, 15 * 60 * 1000);   // aynı IP + aynı e-posta: 15 dakikada 5 hatalı deneme
+const girisSiniriIp = denemeSiniri(50, 15 * 60 * 1000);     // aynı IP: 15 dakikada 50 hatalı deneme
+const kayitSiniriIp = denemeSiniri(10, 60 * 60 * 1000);     // aynı IP: saatte 10 kayıt denemesi
+
+// Mesaj giriş sayfasında gösterilir. Metin sunucudan değil, istemcideki sabit listeden gelir.
+function girisSayfasinaDon(res, anahtar, kod, sekme, dakika) {
+    let url = `/?${anahtar}=${encodeURIComponent(kod)}&sekme=${sekme}`;
+    if (dakika) url += `&dk=${dakika}`;
+    return res.redirect(url);
+}
+
+
 // --- ROTALAR ---
 
 app.get('/', (req, res) => {
+    // Geçerli oturum varsa giriş formu yerine doğrudan panel açılır
+    if (oturumEmailOku(req)) return res.redirect('/login');
+    res.set('Cache-Control', 'no-store');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -607,32 +662,51 @@ app.get('/logout', (req, res) => {
 });
 
 const loginHandler = async (req, res) => {
+    const cerezle = !!req.oturumEmail;
     const govde = req.body || {};
-    const email = String(req.oturumEmail || (metinMi(govde.email) ? govde.email : '')).trim().toLowerCase();
+    const email = String(cerezle ? req.oturumEmail : (metinMi(govde.email) ? govde.email : '')).trim().toLowerCase();
     const password = metinMi(govde.password) ? govde.password : '';
+    const hesapAnahtar = `${req.ip}|${email}`;
+
+    if (!cerezle) {
+        if (!email || !password) return girisSayfasinaDon(res, 'hata', 'eksik', 'login');
+        const bekle = girisSiniriHesap.engelli(hesapAnahtar) || girisSiniriIp.engelli(req.ip);
+        if (bekle) return girisSayfasinaDon(res, 'hata', 'cok-deneme', 'login', bekle);
+    }
+
+    const basarisiz = () => {
+        girisSiniriHesap.hata(hesapAnahtar);
+        girisSiniriIp.hata(req.ip);
+        // Hesap var mı yok mu belli olmasın diye iki durumda da aynı mesaj gösterilir
+        return girisSayfasinaDon(res, 'hata', 'giris', 'login');
+    };
 
     try {
         const user = await User.findOne({ email });
         if (!user) {
-            if (req.oturumEmail) {
+            if (cerezle) {
                 oturumCerezSil(req, res);
                 return res.redirect('/');
             }
-            return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Kullanıcı Bulunamadı!</h1><p>Bu e-posta adresi sistemde kayıtlı değil.</p><a href="/">Geri Dön</a></div>`);
+            await bcrypt.compare(password, SAHTE_HASH);
+            return basarisiz();
         }
 
         let isMatch = false;
-        if (req.oturumEmail) {
+        if (cerezle) {
             isMatch = true; // geçerli imzalı oturum çerezi
         } else {
-            const dbPassword = user.password;
-            isMatch = await bcrypt.compare(password, dbPassword);
-            if (!isMatch && password === dbPassword) isMatch = true;
+            isMatch = await bcrypt.compare(password, user.password || '');
+            if (!isMatch && user.password && password === user.password) {
+                // Eski, şifrelenmemiş kayıt: doğru girildiyse hemen şifrelenmiş haline çevrilir
+                isMatch = true;
+                user.password = await bcrypt.hash(password, 10);
+                await user.save();
+            }
         }
 
-        if (!isMatch) {
-            return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Şifre Hatalı!</h1><a href="/">Tekrar Dene</a></div>`);
-        }
+        if (!isMatch) return basarisiz();
+        if (!cerezle) girisSiniriHesap.temizle(hesapAnahtar);
 
         oturumCerezYaz(req, res, email);
 
@@ -643,7 +717,8 @@ const loginHandler = async (req, res) => {
         res.send(panelHtmlOlustur(email, flights, kayitliTarihler));
     } catch (error) {
         console.error(error);
-        res.status(500).send("Sunucu hatası.");
+        if (cerezle) return res.status(500).send("Sunucu hatası.");
+        return girisSayfasinaDon(res, 'hata', 'sunucu', 'login');
     }
 };
 
@@ -651,33 +726,32 @@ app.post('/login', loginHandler);
 
 app.post('/register', async (req, res) => {
     const govde = req.body || {};
-    const email = metinMi(govde.email) ? govde.email : '';
+    const email = metinMi(govde.email) ? govde.email.trim().toLowerCase() : '';
     const password = metinMi(govde.password) ? govde.password : '';
 
-    if(!email || !password) {
-        return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Eksik Bilgi!</h1><p>E-posta ve şifre alanları boş bırakılamaz.</p><a href="/">Geri Dön</a></div>`);
-    }
+    const bekle = kayitSiniriIp.engelli(req.ip);
+    if (bekle) return girisSayfasinaDon(res, 'hata', 'cok-deneme', 'register', bekle);
+    kayitSiniriIp.hata(req.ip);
+
+    if (!email || !password) return girisSayfasinaDon(res, 'hata', 'eksik', 'register');
+    if (email.length > 254 || !EPOSTA_REGEX.test(email)) return girisSayfasinaDon(res, 'hata', 'eposta', 'register');
+    if (metinMi(govde.password2) && govde.password2 !== password) return girisSayfasinaDon(res, 'hata', 'eslesme', 'register');
+    if (!sifreKuraliUygun(password)) return girisSayfasinaDon(res, 'hata', 'kural', 'register');
 
     try {
-        const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
-        if (existingUser) {
-            return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: #e67e22;">⚠️ Hesap Zaten Mevcut!</h1><p>Bu e-posta adresi ile daha önce kayıt yapılmış.</p><a href="/">Geri Dön ve Giriş Yap</a></div>`);
-        }
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return girisSayfasinaDon(res, 'hata', 'var', 'register');
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newUser = new User({
-            email: email.trim().toLowerCase(),
-            password: hashedPassword
-        });
+        const newUser = new User({ email, password: hashedPassword });
         await newUser.save();
 
-        res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: #2ecc71;">✔️ Kayıt Başarılı!</h1><p>Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.</p><a href="/">Giriş Ekranına Git</a></div>`);
-
+        return girisSayfasinaDon(res, 'basari', 'kayit', 'login');
     } catch (error) {
         console.error(error);
-        res.status(500).send("Kayıt esnasında sunucu hatası oluştu.");
+        return girisSayfasinaDon(res, 'hata', 'sunucu', 'register');
     }
 });
 
