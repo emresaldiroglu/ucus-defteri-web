@@ -44,6 +44,8 @@ body { background: #f5f6fa; margin: 0; padding: 8px; font-family: 'Segoe UI', sa
 .form-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 label { font-weight: bold; font-size: 13px; color: #34495e; display: block; margin-bottom: 4px; }
 input, select, textarea { width: 100%; height: 46px; padding: 0 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; background: #fff; line-height: normal; font-family: inherit; }
+.sure-secici { display: flex; gap: 8px; }
+.sure-secici select { flex: 1; }
 textarea { height: 70px; padding: 10px 12px; resize: none; }
 input[type="date"] { appearance: none; -webkit-appearance: none; }
 

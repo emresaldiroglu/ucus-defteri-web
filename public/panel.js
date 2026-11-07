@@ -227,11 +227,16 @@
         var tarih = $('tarih').value;
         var havaAraciTipi = $('havaAraciTipi').value;
         var egitimTipi = $('egitimTipi').value;
-        var sure = $('sure').value.trim();
+        var sureSaat = $('sureSaat').value;
+        var sureDakika = $('sureDakika').value;
+        var sure = sureSaat + ':' + sureDakika;
         var gorevAciklamasi = $('gorevAciklamasi').value;
 
-        if (!tarih || !egitimTipi || !sure) {
-            return bildir('Lütfen Tarih, Eğitim Sınıflandırması ve Süre alanlarını doldurun.', 'hata');
+        if (!tarih || !egitimTipi) {
+            return bildir('Lütfen Tarih ve Eğitim Sınıflandırması alanlarını doldurun.', 'hata');
+        }
+        if (sureSaat === '00' && sureDakika === '00') {
+            return bildir('Lütfen uçuş süresini seçin.', 'hata');
         }
         if (!(await onayIste('Yeni uçuş kaydını eklemek istiyor musunuz?'))) return;
 
