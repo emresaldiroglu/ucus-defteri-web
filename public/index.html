@@ -116,6 +116,22 @@
             padding: 10px 12px;
         }
 
+        /* Beni hatırla */
+        .hatirla {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+            color: #34495e;
+            margin: 0 0 4px 0;
+            padding: 6px 0;
+            cursor: pointer;
+        }
+        .hatirla input { width: 20px; height: 20px; margin: 0; padding: 0; flex: none; accent-color: #2980b9; cursor: pointer; }
+        .hatirla small { font-weight: normal; color: #7f8c8d; }
+
         /* Kayıt şifre kuralları */
         .kurallar { list-style: none; margin: -4px 0 15px 0; padding: 0; text-align: left; font-size: 12px; color: #7f8c8d; }
         .kurallar li { margin-bottom: 3px; }
@@ -172,6 +188,10 @@
                     <button type="button" class="goster-btn" data-hedef="girisSifre" aria-pressed="false" aria-label="Şifreyi göster">Göster</button>
                 </div>
             </div>
+            <label class="hatirla">
+                <input type="checkbox" id="girisHatirla" name="hatirla" value="on" checked>
+                <span>Beni hatırla <small>(30 gün)</small></span>
+            </label>
             <button type="submit" id="girisBtn" class="submit-btn">Giriş Yap</button>
         </form>
     </div>
