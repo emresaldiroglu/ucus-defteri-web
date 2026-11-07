@@ -6,8 +6,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const app = express();
+app.set('trust proxy', 1); // Render vb. proxy arkasında https'i doğru algılamak için
 
 // --- OTURUM ÇEREZİ (imzalı, ek paket gerektirmez) ---
+if (!process.env.SESSION_SECRET) {
+    console.warn("⚠️ SESSION_SECRET tanımlı değil; çerez imzası MONGO_URI üzerinden üretiliyor. Ayrı bir SESSION_SECRET eklemeniz önerilir.");
+}
 const OTURUM_SECRET = process.env.SESSION_SECRET || process.env.MONGO_URI || 'degistir-beni';
 const OTURUM_SURESI_MS = 1000 * 60 * 60 * 24 * 30; // 30 gün
 
@@ -42,6 +46,26 @@ function oturumEmailOku(req) {
     }
 }
 
+function oturumCerezYaz(req, res, email) {
+    const secure = req.secure ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `oturum=${encodeURIComponent(oturumCerezOlustur(email))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${OTURUM_SURESI_MS / 1000}${secure}`);
+}
+
+function oturumCerezSil(req, res) {
+    const secure = req.secure ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `oturum=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+}
+
+// API için oturum doğrulama: e-posta istemciden değil, imzalı çerezden alınır
+function oturumGerekli(req, res, next) {
+    const email = oturumEmailOku(req);
+    if (!email) {
+        return res.status(401).json({ success: false, message: "Oturum süresi doldu, lütfen tekrar giriş yapın." });
+    }
+    req.oturumEmail = email;
+    next();
+}
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -62,8 +86,8 @@ const User = mongoose.model('User', UserSchema, 'users');
 
 const ReportDateSchema = new mongoose.Schema({
     userEmail: String,
-    alan: String,   
-    tarih: String   
+    alan: String,
+    tarih: String
 });
 const ReportDate = mongoose.model('ReportDate', ReportDateSchema, 'report_dates');
 
@@ -78,56 +102,99 @@ const FlightSchema = new mongoose.Schema({
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 
-// --- YARDIMCI FONKSİYONLAR ---
+// --- SABİTLER ---
 
 const DONEM_HEDEF_SAAT = 140;
 const IZINLI_TARIH_ALANLARI = ['muayene1Tarih', 'muayene4Tarih', 'aletKartTarih', 'standTarih'];
-
 const HAVA_ARACLARI_LISTESI = ['s70', 's70i', 't70', 'atak', 'mi17', 'gökbey', 'cayrokopter', 'ab-205'];
+const EGITIM_TIPLERI = ['ggg', 'gş', 'au(sim)'];
+const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
-function formatUcusSaati(saatInput) {
-    if (!saatInput) return "00:00";
-    let inputStr = saatInput.toString().trim();
+const RENK_KIRMIZI = '#e74c3c';
+const RENK_TURUNCU = '#e67e22';
+const RENK_YESIL = '#2ecc71';
 
-    if (inputStr.includes(':')) {
-        let [saatPart, dakikaPart] = inputStr.split(':').map(Number);
-        if (isNaN(saatPart)) saatPart = 0;
-        if (isNaN(dakikaPart)) dakikaPart = 0;
-        return `${saatPart.toString().padStart(2, '0')}:${dakikaPart.toString().padStart(2, '0')}`;
-    } 
-    
-    let num = parseFloat(inputStr);
-    if (isNaN(num)) return "00:00";
-    let saat = Math.floor(num);
-    let dakika = Math.round((num - saat) * 60);
+
+// --- GÜVENLİK YARDIMCILARI ---
+
+// Kullanıcıdan gelen her metin HTML'e basılmadan önce buradan geçer
+function esc(deger) {
+    return String(deger === undefined || deger === null ? '' : deger)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// <script type="application/json"> içine güvenle gömülecek JSON
+function jsonGuvenli(nesne) {
+    return JSON.stringify(nesne)
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026')
+        .split('\u2028').join('\\u2028')
+        .split('\u2029').join('\\u2029');
+}
+
+function metinMi(v) {
+    return typeof v === 'string';
+}
+
+
+// --- YARDIMCI FONKSİYONLAR ---
+
+// "2:10", "2.5", "2,5" biçimlerini dakikaya çevirir; geçersizse null döner
+function sureyiDakikayaCevir(girdi) {
+    if (girdi === undefined || girdi === null) return null;
+    const s = String(girdi).trim().replace(',', '.');
+    if (!s) return null;
+
+    if (s.includes(':')) {
+        const [saatStr, dakikaStr = ''] = s.split(':');
+        const saat = Number(saatStr);
+        const dakika = Number(dakikaStr === '' ? 0 : dakikaStr);
+        if (!Number.isFinite(saat) || !Number.isFinite(dakika) || saat < 0 || dakika < 0) return null;
+        return Math.round(saat * 60 + dakika);
+    }
+
+    const sayi = Number(s);
+    if (!Number.isFinite(sayi) || sayi < 0) return null;
+    return Math.round(sayi * 60);
+}
+
+function dakikayiSaatMetnine(toplamDakika) {
+    const saat = Math.floor(toplamDakika / 60);
+    const dakika = toplamDakika % 60;
     return `${saat.toString().padStart(2, '0')}:${dakika.toString().padStart(2, '0')}`;
+}
+
+function sureMetniDakika(sure) {
+    if (sure && sure.includes(':')) {
+        const [saat, dakika] = sure.split(':').map(Number);
+        return (saat || 0) * 60 + (dakika || 0);
+    }
+    return 0;
 }
 
 function hesaplaToplamSaat(flights) {
     let toplamDakika = 0;
-    flights.forEach(f => {
-        if (f.sure && f.sure.includes(':')) {
-            const [saat, dakika] = f.sure.split(':').map(Number);
-            toplamDakika += (saat * 60) + dakika;
-        }
-    });
-    let toplamSaat = Math.floor(toplamDakika / 60);
-    let kalanDakika = toplamDakika % 60;
-    return `${toplamSaat.toString().padStart(2, '0')}:${kalanDakika.toString().padStart(2, '0')}`;
+    flights.forEach(f => { toplamDakika += sureMetniDakika(f.sure); });
+    return dakikayiSaatMetnine(toplamDakika);
 }
 
 function hesaplaAktifDonemSaati(flights) {
     const simdi = new Date();
     const buYil = simdi.getFullYear();
-    const eylulSiniri = new Date(buYil, 8, 1); 
+    const eylulSiniri = new Date(buYil, 8, 1);
 
     let aktifDonemYili = buYil;
     if (simdi >= eylulSiniri) {
-        aktifDonemYili = buYil + 1; 
+        aktifDonemYili = buYil + 1;
     }
 
-    const baslangicTarihi = new Date((aktifDonemYili - 1), 8, 1); 
-    const bitisTarihi = new Date(aktifDonemYili, 8, 1);           
+    const baslangicTarihi = new Date((aktifDonemYili - 1), 8, 1);
+    const bitisTarihi = new Date(aktifDonemYili, 8, 1);
 
     let toplamDakika = 0;
     let donemUcuslari = [];
@@ -137,26 +204,18 @@ function hesaplaAktifDonemSaati(flights) {
             const ucusTarihi = new Date(f.tarih);
             if (ucusTarihi >= baslangicTarihi && ucusTarihi < bitisTarihi) {
                 donemUcuslari.push(f);
-                if (f.sure && f.sure.includes(':')) {
-                    const [saat, dakika] = f.sure.split(':').map(Number);
-                    toplamDakika += (saat * 60) + dakika;
-                }
+                toplamDakika += sureMetniDakika(f.sure);
             }
         }
     });
 
-    let saat = Math.floor(toplamDakika / 60);
-    let dakika = toplamDakika % 60;
-
     // Dönem hedefi: 140 saat. Güncel dönem saati düşülerek kalan süre bulunur.
     const kalanDakika = Math.max(0, (DONEM_HEDEF_SAAT * 60) - toplamDakika);
-    const kalanSaat = Math.floor(kalanDakika / 60);
-    const kalanDk = kalanDakika % 60;
 
     return {
         yil: aktifDonemYili,
-        sure: `${saat.toString().padStart(2, '0')}:${dakika.toString().padStart(2, '0')}`,
-        kalan: `${kalanSaat.toString().padStart(2, '0')}:${kalanDk.toString().padStart(2, '0')}`,
+        sure: dakikayiSaatMetnine(toplamDakika),
+        kalan: dakikayiSaatMetnine(kalanDakika),
         donemUcuslari: donemUcuslari
     };
 }
@@ -164,8 +223,8 @@ function hesaplaAktifDonemSaati(flights) {
 function getGunFarki(hedefTarih) {
     if (!hedefTarih) return null;
     const bugun = new Date();
-    const healer = new Date(hedefTarih);
-    const zamanFarki = healer.getTime() - bugun.getTime();
+    const hedef = new Date(hedefTarih);
+    const zamanFarki = hedef.getTime() - bugun.getTime();
     return Math.ceil(zamanFarki / (1000 * 3600 * 24));
 }
 
@@ -182,12 +241,19 @@ function formatKalanGunMetni(kalanGun) {
     return `${kalanGun} Gün`;
 }
 
+// 60 günlük sayaçlar: 15 gün ve altı kırmızı, 16-30 gün turuncu, üstü yeşil
+function sayacRengi(kalanGun) {
+    if (kalanGun <= 15) return RENK_KIRMIZI;
+    if (kalanGun <= 30) return RENK_TURUNCU;
+    return RENK_YESIL;
+}
+
 function hesaplaGggVeSonUcusDurumu(flights) {
     const gercekUcuslar = flights.filter(f => f.egitimTipi !== 'au(sim)');
-    
+
     const sonUcus = gercekUcuslar[0];
     const sonGggUcus = gercekUcuslar.find(f => f.egitimTipi === 'ggg');
-    
+
     const sonUcusTarihStr = sonUcus ? sonUcus.tarih : new Date().toISOString().split('T')[0];
     const sonGggTarihStr = sonGggUcus ? sonGggUcus.tarih : new Date().toISOString().split('T')[0];
 
@@ -197,27 +263,24 @@ function hesaplaGggVeSonUcusDurumu(flights) {
     const kalanGgg = getGunFarki(hedefGgg);
     const kalanSonUcus = getGunFarki(hedefSonUcus);
 
-    const renkGgg = kalanGgg <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
-    const renkSonUcus = kalanSonUcus <= 15 ? 'background:#e74c3c;' : 'background:#2ecc71;';
-
     return {
         kalanGgg: formatKalanGunMetni(kalanGgg),
         hedefGggStr: formatTRTarih(hedefGgg),
-        renkGgg,
+        renkGgg: sayacRengi(kalanGgg),
         kalanSonUcus: formatKalanGunMetni(kalanSonUcus),
         hedefSonUcusStr: formatTRTarih(hedefSonUcus),
-        renkSonUcus
+        renkSonUcus: sayacRengi(kalanSonUcus)
     };
 }
 
 function hesaplaAracaGoreDetayliDurum(flights) {
     let sonuc = { ggg: {}, sonUcus: {} };
-    
+
     const gercekUcuslar = flights.filter(f => f.egitimTipi !== 'au(sim)');
 
     HAVA_ARACLARI_LISTESI.forEach(arac => {
         const aracGggUcuslari = gercekUcuslar.filter(f => f.havaAraciTipi === arac && f.egitimTipi === 'ggg');
-        const sonGgg = aracGggUcuslari[0]; 
+        const sonGgg = aracGggUcuslari[0];
 
         if (sonGgg) {
             const hedef = new Date(sonGgg.tarih);
@@ -226,7 +289,7 @@ function hesaplaAracaGoreDetayliDurum(flights) {
             sonuc.ggg[arac] = {
                 tarih: formatTRTarih(sonGgg.tarih),
                 kalanGunStr: formatKalanGunMetni(kalan),
-                renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
+                renk: sayacRengi(kalan)
             };
         } else {
             sonuc.ggg[arac] = { yok: true };
@@ -241,9 +304,9 @@ function hesaplaAracaGoreDetayliDurum(flights) {
             const kalan = getGunFarki(hedef);
             sonuc.sonUcus[arac] = {
                 tarih: formatTRTarih(sonGenel.tarih),
-                tip: sonGenel.egitimTipi.toUpperCase(),
+                tip: (sonGenel.egitimTipi || '').toUpperCase(),
                 kalanGunStr: formatKalanGunMetni(kalan),
-                renk: kalan <= 15 ? '#e74c3c' : '#2ecc71'
+                renk: sayacRengi(kalan)
             };
         } else {
             sonuc.sonUcus[arac] = { yok: true };
@@ -251,6 +314,237 @@ function hesaplaAracaGoreDetayliDurum(flights) {
     });
 
     return sonuc;
+}
+
+
+// --- PANEL HTML ÜRETİMİ ---
+// Tüm dinamik değerler esc() ile kaçışlanır. Stil ve istemci kodu public/panel.css ve public/panel.js içindedir.
+
+const ARAC_SECENEKLERI = HAVA_ARACLARI_LISTESI.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+const EGITIM_SECENEKLERI = EGITIM_TIPLERI.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+const AY_SECENEKLERI = AYLAR.map((ad, i) => `<option value="${String(i + 1).padStart(2, '0')}">${ad}</option>`).join('');
+
+function tarihSayaciHtml(baslangicTarihi, periyotYil, etiket, alan) {
+    if (!baslangicTarihi) {
+        return `<div class="sayac sayac-bos" data-eylem="tarih-modal" data-alan="${esc(alan)}" data-etiket="${esc(etiket)}" data-tarih=""><strong>${esc(etiket)}</strong><br><span class="uyari">⚠️ TARİH GİRİLMEDİ</span></div>`;
+    }
+    const hedef = new Date(baslangicTarihi);
+    hedef.setFullYear(hedef.getFullYear() + periyotYil);
+    const kalanGun = getGunFarki(hedef);
+    const renk = kalanGun <= 90 ? RENK_KIRMIZI : '#3498db';
+    return `<div class="sayac" data-eylem="tarih-modal" data-alan="${esc(alan)}" data-etiket="${esc(etiket)}" data-tarih="${esc(baslangicTarihi)}" style="background:${renk};"><strong>${esc(etiket)}</strong><br><span class="sayac-deger">${esc(kalanGun)} Gün</span><span class="tarih-etiket">Son Tarih: ${esc(formatTRTarih(hedef))}</span></div>`;
+}
+
+function ucusSatiriHtml(f) {
+    const id = esc(f._id);
+    const aciklama = f.gorevAciklamasi || '';
+    const kisa = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
+    return `
+        <tr id="row-${id}" class="ucus-satiri" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}">
+            <td class="c-tarih">${esc(f.tarih)}</td>
+            <td class="c-arac">${esc(f.havaAraciTipi)}</td>
+            <td class="c-egitim">${esc(f.egitimTipi)}</td>
+            <td class="c-sure">${esc(f.sure)}</td>
+            <td class="c-aciklama" title="${esc(aciklama)}">${esc(kisa)}</td>
+            <td class="c-islem"><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}">Sil</button></td>
+        </tr>
+        <tr id="detay-${id}" class="detay-satiri">
+            <td colspan="6">
+                <div class="detay-baslik">📋 Tam Görev Açıklaması:</div>
+                <div class="detay-kutu">${aciklama ? esc(aciklama) : 'Görev açıklaması girilmemiş.'}</div>
+            </td>
+        </tr>`;
+}
+
+function panelHtmlOlustur(email, flights, kayitliTarihler) {
+    const toplamUcusSuresi = hesaplaToplamSaat(flights);
+    const aktifDonem = hesaplaAktifDonemSaati(flights);
+    const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
+    const aracBazliDurum = hesaplaAracaGoreDetayliDurum(flights);
+
+    const staticYears = Array.from({ length: 10 }, (_, i) => 2024 + i);
+    const bugunTarihStr = new Date().toISOString().split('T')[0];
+
+    const tarihBul = (alanAdi) => {
+        const bulma = kayitliTarihler.find(t => t.alan === alanAdi);
+        return bulma ? bulma.tarih : null;
+    };
+
+    const panelVeri = {
+        aracBazli: aracBazliDurum,
+        donemUcuslari: aktifDonem.donemUcuslari.map(f => ({
+            tarih: f.tarih,
+            havaAraciTipi: f.havaAraciTipi,
+            egitimTipi: f.egitimTipi,
+            sure: f.sure
+        }))
+    };
+
+    const icerik = `
+        <div class="container">
+
+            <div class="ust-panel">
+                <div class="ozet-kart">
+                    <div class="saatler-wrapper">
+                        <div>
+                            <span class="mini-etiket">TOPLAM SAAT</span>
+                            <h2 id="toplamSaatGosterge">${esc(toplamUcusSuresi)}</h2>
+                        </div>
+                        <div class="donem-alani" data-eylem="donem-modal" title="Dönem Uçuşlarını Görmek İçin Tıkla">
+                            <span class="mini-etiket">${esc(aktifDonem.yil)} DÖNEMİ 🔍</span>
+                            <h2 id="donemSaatGosterge">${esc(aktifDonem.sure)}<span class="kalan-saat" title="${DONEM_HEDEF_SAAT} saatten kalan">(${esc(aktifDonem.kalan)})</span></h2>
+                        </div>
+                    </div>
+                    <div class="ozet-alt">
+                        <span class="user-email-link" data-eylem="sifre-modal" title="Şifreyi Değiştirmek İçin Tıkla">${esc(email)}</span>
+                        <a class="cikis-link" href="/logout">Çıkış</a>
+                    </div>
+                </div>
+
+                <div class="sayac-grid">
+                    <div class="sayac" data-eylem="sayac-modal" data-tip="ggg" style="background:${gggDurum.renkGgg};" title="Tüm Araçların GGG Durumunu Gör">
+                        <strong>GGG Sayaç (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanGgg)}</span>
+                        <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefGggStr)}</span>
+                    </div>
+                    <div class="sayac" data-eylem="sayac-modal" data-tip="sonUcus" style="background:${gggDurum.renkSonUcus};" title="Tüm Araçların Son Uçuş Durumunu Gör">
+                        <strong>Son Uçuş (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanSonUcus)}</span>
+                        <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefSonUcusStr)}</span>
+                    </div>
+                    ${tarihSayaciHtml(tarihBul('muayene1Tarih'), 1, '1 Yıllık Muayene', 'muayene1Tarih')}
+                    ${tarihSayaciHtml(tarihBul('muayene4Tarih'), 4, '4 Yıllık Muayene', 'muayene4Tarih')}
+                    ${tarihSayaciHtml(tarihBul('aletKartTarih'), 1, 'Alet Kart', 'aletKartTarih')}
+                    ${tarihSayaciHtml(tarihBul('standTarih'), 1, 'Standardizasyon', 'standTarih')}
+                </div>
+            </div>
+
+            <div class="akordeon-container">
+                <button type="button" class="akordeon-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="filtreIcerikKutusu" data-ok="filtreOkIkon">
+                    <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
+                    <span id="filtreOkIkon">▼</span>
+                </button>
+                <div id="filtreIcerikKutusu" class="akordeon-icerik">
+                    <div class="filtre-alan"><label for="filtreYil">📋 Yıl Seçimi (1 Eylül Dönemi):</label><select id="filtreYil"><option value="">Yıl Seçin</option>${staticYears.map(y => `<option value="${y}">${y}</option>`).join('')}</select></div>
+                    <div class="filtre-alan"><label for="filtreAy">Ay:</label><select id="filtreAy"><option value="">Ay Seçin</option>${AY_SECENEKLERI}</select></div>
+                    <div class="filtre-alan"><label for="filtreHavaAraci">Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option>${ARAC_SECENEKLERI}</select></div>
+                    <div class="filtre-alan"><label for="filtreUcusTipi">Uçuş Tipi:</label><select id="filtreUcusTipi"><option value="">Uçuş Tipi</option>${EGITIM_SECENEKLERI}</select></div>
+                    <div class="filtre-butonlar"><button type="button" class="btn-filtre" data-eylem="filtre-uygula">Uygula</button><button type="button" class="btn-temizle" data-eylem="filtre-temizle">Temizle</button></div>
+                    <div id="filtreSaatKutusu" class="filtre-saat-kutusu" hidden>⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
+                </div>
+            </div>
+
+            <a href="/kdu.html" target="_blank" rel="noopener" class="kdu-link-btn">
+                📟 KDU (Keyboard Display Unit) Aç
+            </a>
+
+            <div class="akordeon-container ekle-toggle-stil">
+                <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="ekleIcerikKutusu" data-ok="ekleOkIkon">
+                    <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
+                    <span id="ekleOkIkon">▼</span>
+                </button>
+                <div id="ekleIcerikKutusu" class="akordeon-icerik">
+                    <form id="ucusFormu" class="form-grid">
+                        <div><label for="tarih">Tarih:</label><input type="date" id="tarih" value="${esc(bugunTarihStr)}"></div>
+                        <div><label for="havaAraciTipi">Hava Aracı Tipi:</label><select id="havaAraciTipi">${ARAC_SECENEKLERI}</select></div>
+                        <div><label for="egitimTipi">Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option>${EGITIM_SECENEKLERI}</select></div>
+                        <div><label for="sure">Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" inputmode="decimal" placeholder="Süreyi girin" autocomplete="off"></div>
+                        <div class="span-2"><label for="gorevAciklamasi">Görev Açıklaması:</label><textarea id="gorevAciklamasi" maxlength="1000"></textarea></div>
+                        <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">✈️ Uçuşu Ekle</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tablo-sarmal">
+                <table>
+                    <thead><tr><th>Tarih</th><th>Hava Aracı</th><th>Eğitim</th><th>Süre</th><th>Görev Açıklaması</th><th>İşlem</th></tr></thead>
+                    <tbody id="ucusTabloGovde">
+                        ${flights.map(ucusSatiriHtml).join('')}
+                    </tbody>
+                </table>
+                <div id="bosMesaj" class="bos-mesaj" hidden>Kayıt bulunamadı.</div>
+            </div>
+
+            <div id="sayfalamaAlani" class="sayfalama-alani"></div>
+
+        </div>
+
+        <!-- DÖNEM UÇUŞLARI MODALI -->
+        <div id="donemUcuslariModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu genis">
+                <h3 class="modal-baslik">📋 ${esc(aktifDonem.yil)} Dönemi Uçuş Listesi</h3>
+                <div id="donemUcuslariIcerik" class="modal-liste"></div>
+                <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="donemUcuslariModal">Kapat</button>
+            </div>
+        </div>
+
+        <!-- ARAÇ BAZLI DETAYLI SAYAÇ MODALI -->
+        <div id="detayliSayacModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu">
+                <h3 id="sayacModalBaslik" class="modal-baslik">✈️ Hava Araçları Durumu</h3>
+                <div id="sayacModalIcerik" class="modal-liste"></div>
+                <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="detayliSayacModal">Kapat</button>
+            </div>
+        </div>
+
+        <!-- ŞİFRE GÜNCELLEME MODALI -->
+        <div id="sifreModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu dar">
+                <h3 class="modal-baslik">🔐 Şifre Güncelleme</h3>
+                <label for="eskiSifre">Mevcut Şifre:</label>
+                <input type="password" id="eskiSifre" placeholder="Mevcut şifreniz" autocomplete="current-password">
+                <label for="yeniSifre1">Yeni Şifre:</label>
+                <input type="password" id="yeniSifre1" placeholder="En az 8 karakter, 1 büyük, 1 rakam" autocomplete="new-password">
+                <label for="yeniSifre2">Yeni Şifre (Tekrar):</label>
+                <input type="password" id="yeniSifre2" placeholder="Yeni şifreyi tekrar girin" autocomplete="new-password">
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="sifre-guncelle">Güncelle</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="sifreModal">İptal</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TARİH MODALI -->
+        <div id="tarihModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu kucuk">
+                <h3 id="modalBaslik" class="modal-baslik">Tarih Girin</h3>
+                <div class="modal-mevcut-tarih">Mevcut Kayıtlı Tarih: <span id="modalMevcutTarihText">-</span></div>
+                <input type="hidden" id="hedefAlan">
+                <input type="date" id="yeniKategoriTarih">
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="tarih-kaydet">Kaydet</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="tarihModal">İptal</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    return `<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Uçuş Takip Paneli</title>
+    <link rel="stylesheet" href="/panel.css">
+</head>
+<body>
+    <div id="toastAlani" class="toast-alani" aria-live="polite"></div>
+
+    <div id="uygulama">${icerik}</div>
+
+    <!-- ONAY PENCERESİ (alert/confirm yerine) -->
+    <div id="onayModal" class="modal-arka" role="dialog" aria-modal="true">
+        <div class="modal-kutu kucuk">
+            <h3 id="onayMetin" class="modal-baslik"></h3>
+            <div class="modal-butonlar">
+                <button type="button" id="onayEvet" class="btn-tamam">Evet</button>
+                <button type="button" id="onayHayir" class="btn-iptal">Vazgeç</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="application/json" id="panelVeri">${jsonGuvenli(panelVeri)}</script>
+    <script src="/panel.js"></script>
+</body>
+</html>`;
 }
 
 
@@ -267,17 +561,28 @@ app.get('/login', (req, res) => {
     req.oturumEmail = email;
     return loginHandler(req, res);
 });
+
 app.get('/register', (req, res) => {
     res.redirect('/');
 });
 
+app.get('/logout', (req, res) => {
+    oturumCerezSil(req, res);
+    res.redirect('/');
+});
+
 const loginHandler = async (req, res) => {
-    const email = req.oturumEmail || (req.body && req.body.email) || '';
-    const password = (req.body && req.body.password) || '';
+    const govde = req.body || {};
+    const email = String(req.oturumEmail || (metinMi(govde.email) ? govde.email : '')).trim().toLowerCase();
+    const password = metinMi(govde.password) ? govde.password : '';
 
     try {
-        let user = await User.findOne({ email: email.trim().toLowerCase() });
+        const user = await User.findOne({ email });
         if (!user) {
+            if (req.oturumEmail) {
+                oturumCerezSil(req, res);
+                return res.redirect('/');
+            }
             return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Kullanıcı Bulunamadı!</h1><p>Bu e-posta adresi sistemde kayıtlı değil.</p><a href="/">Geri Dön</a></div>`);
         }
 
@@ -290,665 +595,19 @@ const loginHandler = async (req, res) => {
             if (!isMatch && password === dbPassword) isMatch = true;
         }
 
-        if (isMatch) {
-            const temizEmail = email.trim().toLowerCase();
-            res.setHeader('Set-Cookie', `oturum=${encodeURIComponent(oturumCerezOlustur(temizEmail))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${OTURUM_SURESI_MS / 1000}`);
-            const flights = await Flight.find({ userEmail: email.trim().toLowerCase() }).sort({ tarih: -1 });
-            const toplamUcusSüresi = hesaplaToplamSaat(flights);
-            const aktifDonem = hesaplaAktifDonemSaati(flights);
-            const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
-            const aracBazliDurum = hesaplaAracaGoreDetayliDurum(flights);
-
-            const kayitliTarihler = await ReportDate.find({ userEmail: email.trim().toLowerCase() });
-            const staticYears = Array.from({length: 10}, (_, i) => 2024 + i);
-            const bugunTarihStr = new Date().toISOString().split('T')[0];
-
-            const tarihBul = (alanAdi) => {
-                const bulma = kayitliTarihler.find(t => t.alan === alanAdi);
-                return bulma ? bulma.tarih : null;
-            };
-
-            const tMuayene1 = tarihBul('muayene1Tarih');
-            const tMuayene4 = tarihBul('muayene4Tarih');
-            const tAlet = tarihBul('aletKartTarih');
-            const tStand = tarihBul('standTarih');
-
-            const hesaplaTarihliSayaç = (baslangicTarihi, periyotYil, etiket, teknikAlan) => {
-                if (!baslangicTarihi) {
-                    return { 
-                        gun: null, 
-                        hamTarih: "",
-                        sonTarihStr: "",
-                        html: `<div onclick="tarihSecimiAc('${etiket}', '${teknikAlan}', '')" style="background:#f1f2f6; color:#2c3e50; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer; border:2px dashed #bdc3c7;"><strong>${etiket}</strong><br><span style="font-size:11px; font-weight:bold; color:#c0392b; display:inline-block; margin-top:4px;">⚠️ TARİH GİRİLMEDİ</span></div>` 
-                    };
-                }
-                const hedef = new Date(baslangicTarihi);
-                hedef.setFullYear(hedef.getFullYear() + periyotYil);
-                const kalanGün = getGunFarki(hedef);
-                let renk = kalanGün <= 90 ? 'background:#e74c3c;' : 'background:#3498db;';
-                return { gun: kalanGün, renk: renk, hamTarih: baslangicTarihi, sonTarihStr: formatTRTarih(hedef) };
-            };
-
-            const sMuayene1 = hesaplaTarihliSayaç(tMuayene1, 1, '1 Yıllık Muayene', 'muayene1Tarih');
-            const sMuayene4 = hesaplaTarihliSayaç(tMuayene4, 4, '4 Yıllık Muayene', 'muayene4Tarih');
-            const sAlet = hesaplaTarihliSayaç(tAlet, 1, 'Alet Kart', 'aletKartTarih');
-            const sStand = hesaplaTarihliSayaç(tStand, 1, 'Standardizasyon', 'standTarih');
-
-            res.send(`
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <style>
-                    body { background: #f5f6fa; margin: 0; padding: 8px; font-family:'Segoe UI', sans-serif; }
-                    .container { max-width:900px; margin:5px auto; padding:12px; border-radius:12px; background:#fff; box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; }
-                    .ust-panel { display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; }
-                    .saatler-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 5px; }
-                    .sayac-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-                    
-                    .akordeon-container { background: #eef1f4; border-radius: 10px; margin-bottom: 15px; overflow: hidden; border: 1px solid #dcdde1; }
-                    .akordeon-toggle-btn { width: 100%; padding: 14px; background: #dfe4ea; border: none; font-weight: bold; font-size: 14px; color: #2f3640; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-                    .akordeon-icerik { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; padding: 0 12px; background: #eef1f4; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
-                    .akordeon-icerik.acik { max-height: 550px; padding: 12px; transition: max-height 0.35s ease-in; }
-
-                    .ekle-toggle-stil { background: #e8f8f5; border-color: #a3e4d7; }
-                    .ekle-toggle-btn { background: #d1f2eb; color: #0e6655; }
-
-                    .kdu-link-btn {
-                        display: block;
-                        width: 100%;
-                        padding: 14px;
-                        background: #8e44ad;
-                        color: white;
-                        border: none;
-                        border-radius: 10px;
-                        font-weight: bold;
-                        font-size: 14px;
-                        text-align: left;
-                        cursor: pointer;
-                        margin-bottom: 15px;
-                        text-decoration: none;
-                        box-sizing: border-box;
-                        box-shadow: 0 2px 8px rgba(142, 68, 173, 0.3);
-                        transition: background 0.2s;
-                    }
-                    .kdu-link-btn:hover { background: #732d91; }
-
-                    .user-email-link {
-                        margin: 5px 0 0 0;
-                        font-size: 11px;
-                        opacity: 0.9;
-                        word-break: break-all;
-                        cursor: pointer;
-                        text-decoration: underline;
-                        display: inline-block;
-                        transition: color 0.2s;
-                    }
-                    .user-email-link:hover { color: #f1c40f; }
-
-                    .tarih-etiket { font-size: 10px; display: block; margin-top: 4px; opacity: 0.85; font-weight: bold; }
-                    
-                    @media(min-width: 768px) { 
-                        .ust-panel { display: grid; grid-template-columns: 2fr 3fr; } 
-                        .sayac-grid { grid-template-columns: repeat(3, 1fr); }
-                        .form-grid { display: grid; grid-template-columns: 1fr 1fr; }
-                        .span-mobil-2 { grid-column: span 2; }
-                        .akordeon-icerik { flex-direction: row; flex-wrap: wrap; align-items: center; }
-                    }
-
-                    .form-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-
-                    label { font-weight: bold; font-size: 13px; color: #34495e; display: block; margin-bottom: 4px; }
-                    
-                    input, select, textarea { 
-                        width: 100%; 
-                        height: 46px; 
-                        padding: 0 12px; 
-                        border: 1px solid #ccc; 
-                        border-radius: 6px; 
-                        box-sizing: border-box; 
-                        font-size: 15px; 
-                        background: #fff; 
-                        line-height: normal;
-                    }
-                    textarea { height: 60px; padding: 10px 12px; resize: none; }
-                    input[type="date"] { appearance: none; -webkit-appearance: none; }
-
-                    button { padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; box-sizing: border-box; }
-                    .btn-ekle { background:#2ecc71; color:white; height: 46px; }
-                    .btn-filtre { background:#34495e; color:white; }
-                    .btn-temizle { background:#7f8c8d; color:white; }
-                    @media(min-width: 768px) { .btn-filtre, .btn-temizle { width: auto; padding: 10px 20px; height: 46px; } }
-                    
-                    .tablo-sarmal { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; }
-                    table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 14px; }
-                    th { background: #2c3e50; color: white; padding: 12px; }
-                    td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
-                    
-                    .ucus-satiri { cursor: pointer; transition: background 0.2s; }
-                    .ucus-satiri:hover { background: #f8f9fa; }
-                    
-                    .detay-satiri { background: #fdfefe; display: none; }
-                    .detay-satiri td { padding: 15px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-                    .detay-kutu { background: #f1f5f9; padding: 12px; border-radius: 6px; border-left: 4px solid #3498db; font-size: 13px; color: #334155; line-height: 1.5; word-break: break-word; }
-
-                    .sil-btn { background:#e74c3c; color:white; padding:6px 12px; border-radius:4px; font-size:12px; width:auto; }
-                    .sayfalama-alani { display: flex; justify-content: center; align-items: center; gap: 5px; margin-top: 15px; padding: 10px 0; }
-                    .sayfa-btn { width: auto; padding: 8px 14px; background: #fff; border: 1px solid #ddd; color: #333; font-size: 14px; border-radius: 4px; }
-                    .sayfa-btn.aktif { background: #2c3e50; color: white; border-color: #2c3e50; }
-                </style>
-
-                <div class="container">
-                    
-                    <div class="ust-panel">
-                        <div style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 15px; border-radius: 10px; text-align: center; display:flex; flex-direction:column; justify-content:center;">
-                            <div class="saatler-wrapper">
-                                <div>
-                                    <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">TOPLAM SAAT</span>
-                                    <h2 id="toplamSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold;">${toplamUcusSüresi}</h2>
-                                </div>
-                                <div onclick="donemUcuslariModalAc()" style="cursor:pointer;" title="Dönem Uçuşlarını Görmek İçin Tıkla">
-                                    <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">${aktifDonem.yil} DÖNEMİ 🔍</span>
-                                    <h2 id="donemSaatGosterge" style="margin: 3px 0; font-size: 26px; font-weight: bold; color: #f1c40f;">${aktifDonem.sure}<span title="${DONEM_HEDEF_SAAT} saatten kalan" style="font-size: 12px; font-weight: normal; color: #fff; opacity: 0.85; margin-left: 4px;">(${aktifDonem.kalan})</span></h2>
-                                </div>
-                            </div>
-                            <div>
-                                <span class="user-email-link" onclick="sifreModalAc()" title="Şifreyi Değiştirmek İçin Tıkla">${email}</span>
-                            </div>
-                        </div>
-
-                        <div class="sayac-grid">
-                            <div id="boxGgg" onclick="detayliSayacModalAc('ggg')" style="${gggDurum.renkGgg} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;" title="Tüm Araçların GGG Durumunu Gör">
-                                <strong>GGG Sayaç (60G)</strong><br><span id="valGgg" style="font-size:16px; font-weight:bold;">${gggDurum.kalanGgg}</span>
-                                <span id="tarihGgg" class="tarih-etiket">Son Tarih: ${gggDurum.hedefGggStr}</span>
-                            </div>
-                            <div id="boxSonUcus" onclick="detayliSayacModalAc('sonUcus')" style="${gggDurum.renkSonUcus} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;" title="Tüm Araçların Son Uçuş Durumunu Gör">
-                                <strong>Son Uçuş (60G)</strong><br><span id="valSonUcus" style="font-size:16px; font-weight:bold;">${gggDurum.kalanSonUcus}</span>
-                                <span id="tarihSonUcus" class="tarih-etiket">Son Tarih: ${gggDurum.hedefSonUcusStr}</span>
-                            </div>
-                            
-                            ${sMuayene1.gun !== null ? `<div onclick="tarihSecimiAc('1 Yıllık Muayene', 'muayene1Tarih', '${sMuayene1.hamTarih}')" style="${sMuayene1.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>1 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene1.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene1.sonTarihStr}</span></div>` : sMuayene1.html}
-                            ${sMuayene4.gun !== null ? `<div onclick="tarihSecimiAc('4 Yıllık Muayene', 'muayene4Tarih', '${sMuayene4.hamTarih}')" style="${sMuayene4.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>4 Yıllık Muayene</strong><br><span style="font-size:18px; font-weight:bold;">${sMuayene4.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sMuayene4.sonTarihStr}</span></div>` : sMuayene4.html}
-                            ${sAlet.gun !== null ? `<div onclick="tarihSecimiAc('Alet Kart', 'aletKartTarih', '${sAlet.hamTarih}')" style="${sAlet.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Alet Kart</strong><br><span style="font-size:18px; font-weight:bold;">${sAlet.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sAlet.sonTarihStr}</span></div>` : sAlet.html}
-                            ${sStand.gun !== null ? `<div onclick="tarihSecimiAc('Standardizasyon', 'standTarih', '${sStand.hamTarih}')" style="${sStand.renk} color:white; padding:12px; border-radius:8px; text-align:center; font-size:12px; cursor:pointer;"><strong>Standardizasyon</strong><br><span style="font-size:18px; font-weight:bold;">${sStand.gun} Gün</span><span class="tarih-etiket">Son Tarih: ${sStand.sonTarihStr}</span></div>` : sStand.html}
-                        </div>
-                    </div>
-
-                    <div class="akordeon-container">
-                        <button type="button" class="akordeon-toggle-btn" onclick="akordeonAcKapat('filtreIcerikKutusu', 'filtreOkIkon')">
-                            <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
-                            <span id="filtreOkIkon">▼</span>
-                        </button>
-                        <div id="filtreIcerikKutusu" class="akordeon-icerik">
-                            <div style="flex:1; width:100%;"><label>📋 Yıl Seçimi (1 Eylül Dönemi):</label><select id="filtreYil"><option value="">Yıl Seçin</option>${staticYears.map(y => `<option value="${y}">${y}</option>`).join('')}</select></div>
-                            <div style="flex:1; width:100%;"><label>Ay:</label><select id="filtreAy"><option value="">Ay Seçin</option><option value="01">Ocak</option><option value="02">Şubat</option><option value="03">Mart</option><option value="04">Nisan</option><option value="05">Mayıs</option><option value="06">Haziran</option><option value="07">Temmuz</option><option value="08">Ağustos</option><option value="09">Eylül</option><option value="10">Ekim</option><option value="11">Kasım</option><option value="12">Aralık</option></select></div>
-                            <div style="flex:1; width:100%;"><label>Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option><option value="cayrokopter">cayrokopter</option><option value="ab-205">ab-205</option></select></div>
-                            <div style="flex:1; width:100%;"><label>Uçuş Tipi:</label><select id="filtreUcusTipi"><option value="">Uçuş Tipi</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
-                            <div style="display:flex; gap:8px; width:100%; margin-top:5px;"><button type="button" onclick="filtreleUcuslari()" class="btn-filtre">Uygula</button><button type="button" onclick="filtreleriTemizle()" class="btn-temizle">Temizle</button></div>
-                            <div id="filtreSaatKutusu" style="background:#2c3e50; color:#fff; padding:10px; border-radius:6px; font-weight:bold; font-size:14px; display:none; width:100%; text-align:center;">⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
-                        </div>
-                    </div>
-
-                    <a href="/kdu.html" target="_blank" class="kdu-link-btn">
-                        📟 KDU (Keyboard Display Unit) Aç
-                    </a>
-
-                    <div class="akordeon-container ekle-toggle-stil">
-                        <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" onclick="akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon')">
-                            <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
-                            <span id="ekleOkIkon">▼</span>
-                        </button>
-                        <div id="ekleIcerikKutusu" class="akordeon-icerik">
-                            <!-- MOBİLDE ANA SAYFAYA YÖNLENDİRMEYİ ENGELLEMEK İÇİN TYPE="BUTTON" KULLANILDI -->
-                            <form onsubmit="return false;" class="form-grid">
-                                <input type="hidden" id="userEmail" value="${email}">
-                                <div><label>Tarih:</label><input type="date" id="tarih" value="${bugunTarihStr}"></div>
-                                <div><label>Hava Aracı Tipi:</label><select id="havaAraciTipi"><option value="s70">s70</option><option value="s70i">s70i</option><option value="t70">t70</option><option value="atak">atak</option><option value="mi17">mi17</option><option value="gökbey">gökbey</option><option value="cayrokopter">cayrokopter</option><option value="ab-205">ab-205</option></select></div>
-                                <div><label>Eğitim Sınıflandırması:</label><select id="egitimTipi"><option value="" disabled selected>Lütfen Seçiniz</option><option value="ggg">ggg</option><option value="gş">gş</option><option value="au(sim)">au(sim)</option></select></div>
-                                <div><label>Uçuş Süresi (Örn: 2:10 veya 2.5):</label><input type="text" id="sure" placeholder="Süreyi girin"></div>
-                                <div class="span-mobil-2"><label>Görev Açıklaması:</label><textarea id="gorevAciklamasi"></textarea></div>
-                                <button type="button" id="btnUcusEkle" onclick="kaydetYeniUcus()" class="btn-ekle span-mobil-2">✈️ Uçuşu Ekle</button>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div class="tablo-sarmal">
-                        <table>
-                            <thead><tr><th>Tarih</th><th>Hava Aracı</th><th>Eğitim</th><th>Süre</th><th>Görev Açıklaması</th><th>İşlem</th></tr></thead>
-                            <tbody id="ucusTabloGövde">
-                                ${flights.map(f => {
-                                    const aciklama = f.gorevAciklamasi || '';
-                                    const kisaltilmisAciklama = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
-                                    return `
-                                        <tr id="row-${f._id}" class="ucus-satiri" data-tarih="${f.tarih}" data-hava="${f.havaAraciTipi}" data-egitim="${f.egitimTipi}" data-sure="${f.sure}" onclick="detayAcKapat('${f._id}')">
-                                            <td>${f.tarih}</td>
-                                            <td style="font-weight:bold;">${f.havaAraciTipi}</td>
-                                            <td>${f.egitimTipi}</td>
-                                            <td style="color:#e67e22; font-weight:bold;">${f.sure}</td>
-                                            <td style="text-align:left; font-size:13px; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${aciklama}">${kisaltilmisAciklama}</td>
-                                            <td onclick="event.stopPropagation()"><button type="button" onclick="silUcus('${f._id}')" class="sil-btn">Sil</button></td>
-                                        </tr>
-                                        <tr id="detay-${f._id}" class="detay-satiri">
-                                            <td colspan="6">
-                                                <div style="font-size:11px; font-weight:bold; color:#64748b; margin-bottom:4px;">📋 Tam Görev Açıklaması:</div>
-                                                <div class="detay-kutu">${aciklama || 'Görev açıklaması girilmemiş.'}</div>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div id="sayfalamaAlani" class="sayfalama-alani"></div>
-
-                </div>
-
-                <!-- DÖNEM UÇUŞLARI PRATİK MODAL -->
-                <div id="donemUcuslariModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
-                    <div style="background:white; padding:20px; border-radius:12px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:450px; width:100%; max-height:85vh; display:flex; flex-direction:column;">
-                        <h3 style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">📋 ${aktifDonem.yil} Dönemi Uçuş Listesi</h3>
-                        <div id="donemUcuslariIcerik" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
-                        <button type="button" onclick="document.getElementById('donemUcuslariModal').style.display='none'" style="background:#95a5a6; color:white; margin-top:15px;">Kapat</button>
-                    </div>
-                </div>
-
-                <!-- ARAÇ BAZLI DETAYLI SAYAÇ MODALI -->
-                <div id="detayliSayacModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
-                    <div style="background:white; padding:20px; border-radius:12px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:400px; width:100%; max-height:85vh; display:flex; flex-direction:column;">
-                        <h3 id="sayacModalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">✈️ Hava Araçları Durumu</h3>
-                        <div id="sayacModalIcerik" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; padding-right:5px;"></div>
-                        <button type="button" onclick="document.getElementById('detayliSayacModal').style.display='none'" style="background:#95a5a6; color:white; margin-top:15px;">Kapat</button>
-                    </div>
-                </div>
-
-                <!-- ŞİFRE GÜNCELLEME MODALI -->
-                <div id="sifreModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
-                    <div style="background:white; padding:20px; border-radius:10px; text-align:left; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:350px; width:100%;">
-                        <h3 style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:12px; text-align:center;">🔐 Şifre Güncelleme</h3>
-                        <label style="font-size:12px;">Mevcut Şifre:</label>
-                        <input type="password" id="eskiSifre" placeholder="Mevcut şifreniz" style="margin-bottom:10px;">
-                        <label style="font-size:12px;">Yeni Şifre:</label>
-                        <input type="password" id="yeniSifre1" placeholder="En az 8 karakter, 1 büyük, 1 rakam" style="margin-bottom:10px;">
-                        <label style="font-size:12px;">Yeni Şifre (Tekrar):</label>
-                        <input type="password" id="yeniSifre2" placeholder="Yeni şifreyi tekrar girin" style="margin-bottom:15px;">
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <button type="button" onclick="sifreyiGuncelle()" style="background:#2ecc71; color:white;">Güncelle</button>
-                            <button type="button" onclick="document.getElementById('sifreModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TARİH MODALI -->
-                <div id="tarihModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:9999; padding:15px; box-sizing:border-box;">
-                    <div style="background:white; padding:20px; border-radius:10px; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:320px; width:100%;">
-                        <h3 id="modalBaslik" style="color:#2c3e50; margin-top:0; font-size:16px; margin-bottom:5px;">Tarih Girin</h3>
-                        <div id="modalMevcutTarihKutusu" style="font-size:12px; color:#7f8c8d; font-weight:bold; margin-bottom:15px; background:#f8f9fa; padding:6px; border-radius:4px;">Mevcut Kayıtlı Tarih: <span id="modalMevcutTarihText">-</span></div>
-                        <input type="hidden" id="hedefAlan">
-                        <input type="date" id="yeniKategoriTarih" style="margin-bottom:15px;">
-                        <br>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <button type="button" onclick="kaydetKategoriTarihi()" style="background:#2ecc71; color:white;">Kaydet</button>
-                            <button type="button" onclick="document.getElementById('tarihModal').style.display='none'" style="background:#95a5a6; color:white;">İptal</button>
-                        </div>
-                    </div>
-                </div>
-
-                <script>
-                    let mevcutSayfa = 1;
-                    const satirBasinaVeri = 10;
-                    const aracBazliVeri = ${JSON.stringify(aracBazliDurum)};
-                    const donemUcuslariVerisi = ${JSON.stringify(aktifDonem.donemUcuslari)};
-
-                    function donemUcuslariModalAc() {
-                        const icerikDiv = document.getElementById('donemUcuslariIcerik');
-                        icerikDiv.innerHTML = '';
-
-                        if (donemUcuslariVerisi.length === 0) {
-                            icerikDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#7f8c8d; font-weight:bold;">Bu dönemde uçuş kaydı bulunmamaktadır.</div>';
-                        } else {
-                            donemUcuslariVerisi.forEach(f => {
-                                const itemDiv = document.createElement('div');
-                                itemDiv.style.cssText = "padding:10px 14px; border-radius:6px; background:#f8f9fa; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;";
-                                
-                                const ucusTarihiStr = f.tarih ? f.tarih.split('-').reverse().join('.') : '-';
-                                const aracStr = (f.havaAraciTipi || '').toUpperCase();
-                                const tipStr = (f.egitimTipi || '').toUpperCase();
-
-                                itemDiv.innerHTML = \`
-                                    <div>
-                                        <strong style="color:#2c3e50; font-size:14px;">\${ucusTarihiStr}</strong>
-                                        <span style="font-size:12px; color:#7f8c8d; margin-left:8px; font-weight:600;">\${aracStr} (\${tipStr})</span>
-                                    </div>
-                                    <div style="background:#3498db; color:white; padding:4px 10px; border-radius:4px; font-size:13px; font-weight:bold;">
-                                        \${f.sure}
-                                    </div>
-                                \`;
-                                icerikDiv.appendChild(itemDiv);
-                            });
-                        }
-
-                        document.getElementById('donemUcuslariModal').style.display = 'flex';
-                    }
-
-                    function detayliSayacModalAc(tip) {
-                        const baslik = document.getElementById('sayacModalBaslik');
-                        const icerikDiv = document.getElementById('sayacModalIcerik');
-                        icerikDiv.innerHTML = '';
-
-                        const veriSeti = tip === 'ggg' ? aracBazliVeri.ggg : aracBazliVeri.sonUcus;
-                        baslik.innerText = tip === 'ggg' ? '🚁 Hava Araçları GGG Durumları' : '🚁 Hava Araçları Son Uçuş Durumları';
-
-                        for (const [arac, bilgi] of Object.entries(veriSeti)) {
-                            const aracAdiStr = arac.toUpperCase();
-                            const itemDiv = document.createElement('div');
-                            itemDiv.style.cssText = "padding:10px; border-radius:6px; background:#f8f9fa; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;";
-
-                            if (bilgi.yok) {
-                                itemDiv.innerHTML = \`<strong style="color:#2c3e50;">\${aracAdiStr}</strong><span style="color:#c0392b; font-size:12px; font-weight:bold;">Uçuş yapılmamış</span>\`;
-                            } else {
-                                const tipYazisi = bilgi.tip ? \` (\${bilgi.tip})\` : '';
-                                itemDiv.innerHTML = \`
-                                    <div>
-                                        <strong style="color:#2c3e50;">\${aracAdiStr}</strong>\${tipYazisi}<br>
-                                        <span style="font-size:11px; color:#7f8c8d;">Son Tarih: \${bilgi.tarih}</span>
-                                    </div>
-                                    <div style="background:\${bilgi.renk}; color:white; padding:4px 8px; border-radius:4px; font-size:12px; font-weight:bold; text-align:center;">
-                                        \${bilgi.kalanGunStr}
-                                    </div>
-                                \`;
-                            }
-                            icerikDiv.appendChild(itemDiv);
-                        }
-
-                        document.getElementById('detayliSayacModal').style.display = 'flex';
-                    }
-
-                    function sifreModalAc() {
-                        document.getElementById('eskiSifre').value = '';
-                        document.getElementById('yeniSifre1').value = '';
-                        document.getElementById('yeniSifre2').value = '';
-                        document.getElementById('sifreModal').style.display = 'flex';
-                    }
-
-                    async function sifreyiGuncelle() {
-                        const eskiSifre = document.getElementById('eskiSifre').value;
-                        const yeniSifre1 = document.getElementById('yeniSifre1').value;
-                        const yeniSifre2 = document.getElementById('yeniSifre2').value;
-
-                        if(!eskiSifre || !yeniSifre1 || !yeniSifre2) {
-                            alert("Lütfen tüm alanları doldurun.");
-                            return;
-                        }
-
-                        if(yeniSifre1 !== yeniSifre2) {
-                            alert("Yeni şifreler birbiriyle uyuşmuyor!");
-                            return;
-                        }
-
-                        if(yeniSifre1.length < 8) {
-                            alert("Yeni şifre en az 8 karakter olmalıdır.");
-                            return;
-                        }
-                        if(!/[A-Z]/.test(yeniSifre1)) {
-                            alert("Yeni şifre en az 1 büyük harf içermelidir.");
-                            return;
-                        }
-                        if(!/[0-9]/.test(yeniSifre1)) {
-                            alert("Yeni şifre en az 1 rakam içermelidir.");
-                            return;
-                        }
-
-                        const response = await fetch('/api/update-password', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userEmail: document.getElementById('userEmail').value,
-                                eskiSifre: eskiSifre,
-                                yeniSifre: yeniSifre1
-                            })
-                        });
-
-                        const sonuc = await response.json();
-                        if(sonuc.success) {
-                            alert("Şifreniz başarıyla güncellendi!");
-                            document.getElementById('sifreModal').style.display = 'none';
-                        } else {
-                            alert("Hata: " + (sonuc.message || "Mevcut şifre hatalı."));
-                        }
-                    }
-
-                    function akordeonAcKapat(icerikId, okId) {
-                        const icerik = document.getElementById(icerikId);
-                        const ok = document.getElementById(okId);
-                        if (icerik.classList.contains('acik')) {
-                            icerik.classList.remove('acik');
-                            ok.innerText = '▼';
-                        } else {
-                            icerik.classList.add('acik');
-                            ok.innerText = '▲';
-                        }
-                    }
-
-                    function detayAcKapat(id) {
-                        const detaySatir = document.getElementById('detay-' + id);
-                        if (detaySatir.style.display === 'table-row') {
-                            detaySatir.style.display = 'none';
-                        } else {
-                            detaySatir.style.display = 'table-row';
-                        }
-                    }
-
-                    function tarihSecimiAc(etiketIsmi, alanAdi, hamTarih) {
-                        document.getElementById('modalBaslik').innerText = etiketIsmi + " Başlangıç Tarihi";
-                        document.getElementById('hedefAlan').value = alanAdi;
-                        
-                        const tTextAlan = document.getElementById('modalMevcutTarihText');
-                        const inputTarih = document.getElementById('yeniKategoriTarih');
-
-                        if(hamTarih && hamTarih !== 'null' && hamTarih !== '') {
-                            const d = new Date(hamTarih);
-                            const trFormati = \`\${d.getDate().toString().padStart(2, '0')}.\${(d.getMonth() + 1).toString().padStart(2, '0')}.\${d.getFullYear()}\`;
-                            tTextAlan.innerText = trFormati;
-                            inputTarih.value = hamTarih;
-                        } else {
-                            tTextAlan.innerText = "Girilmedi";
-                            inputTarih.value = "";
-                        }
-
-                        document.getElementById('tarihModal').style.display = 'flex';
-                    }
-
-                    async function kaydetKategoriTarihi() {
-                        const alan = document.getElementById('hedefAlan').value;
-                        const tarihDegeri = document.getElementById('yeniKategoriTarih').value;
-                        if(!tarihDegeri) { alert('Lütfen tarih seçin.'); return; }
-
-                        const response = await fetch('/api/update-user-date', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userEmail: document.getElementById('userEmail').value,
-                                alan: alan,
-                                tarih: tarihDegeri
-                            })
-                        });
-                        const sonuc = await response.json();
-                        if(sonuc.success) {
-                            alert('Tarih veritabanına işlendi!');
-                            window.location.href = window.location.href;
-                        }
-                    }
-
-                    async function kaydetYeniUcus() {
-                        const tarih = document.getElementById('tarih').value;
-                        const havaAraciTipi = document.getElementById('havaAraciTipi').value;
-                        const egitimTipi = document.getElementById('egitimTipi').value;
-                        const sure = document.getElementById('sure').value;
-                        const gorevAciklamasi = document.getElementById('gorevAciklamasi').value;
-
-                        if(!tarih || !egitimTipi || !sure) {
-                            alert("Lütfen Tarih, Eğitim Sınıflandırması ve Süre alanlarını eksiksiz doldurun.");
-                            return;
-                        }
-
-                        if(!confirm("Yeni uçuş kaydını eklemek istiyor musunuz?")) return;
-
-                        const veri = {
-                            userEmail: document.getElementById('userEmail').value,
-                            tarih: tarih,
-                            havaAraciTipi: havaAraciTipi,
-                            egitimTipi: egitimTipi,
-                            sure: sure,
-                            gorevAciklamasi: gorevAciklamasi
-                        };
-
-                        try {
-                            const response = await fetch('/api/add-flight', { 
-                                method: 'POST', 
-                                headers: { 'Content-Type': 'application/json' }, 
-                                body: JSON.stringify(veri) 
-                            });
-                            
-                            const sonuc = await response.json();
-                            if(sonuc.success) {
-                                // MOBİLDE OTURUM KAYBINI ENGELLEMEK İÇİN SAYFA YENİLEME DÜZELTMESİ
-                                window.location.href = window.location.href;
-                            } else {
-                                alert(sonuc.message || "Uçuş kaydedilirken bir hata oluştu.");
-                            }
-                        } catch(e) {
-                            alert("Ağ hatası oluştu.");
-                        }
-                    }
-
-                    async function silUcus(id) {
-                        if(!confirm("Bu uçuş kaydını silmek istediğinize emin misiniz?")) return;
-                        const response = await fetch('/api/delete-flight', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, userEmail: document.getElementById('userEmail').value }) });
-                        const sonuc = await response.json();
-                        if(sonuc.success) { 
-                            window.location.href = window.location.href;
-                        }
-                    }
-
-                    function filtreleUcuslari() {
-                        const secilenYil = document.getElementById('filtreYil').value;
-                        const ay = document.getElementById('filtreAy').value;
-                        const hava = document.getElementById('filtreHavaAraci').value;
-                        const egitim = document.getElementById('filtreUcusTipi').value;
-                        
-                        let toplamFiltreDakika = 0;
-                        let filtreAktifMi = (secilenYil || ay || hava || egitim);
-
-                        let baslangicTarihi = null;
-                        let bitisTarihi = null;
-                        if(secilenYil) {
-                            let y = parseInt(secilenYil);
-                            baslangicTarihi = new Date((y - 1) + '-09-01'); 
-                            bitisTarihi = new Date(y + '-09-01');           
-                        }
-
-                        let gorunurSatirlar = [];
-
-                        document.querySelectorAll('.ucus-satiri').forEach(satir => {
-                            const id = satir.id.replace('row-', '');
-                            const detaySatir = document.getElementById('detay-' + id);
-                            const tStr = satir.getAttribute('data-tarih'); 
-                            const h = satir.getAttribute('data-hava');
-                            const e = satir.getAttribute('data-egitim');
-                            const s = satir.getAttribute('data-sure');
-
-                            let u = true;
-
-                            if(secilenYil) {
-                                const mevcutUcusTarihi = new Date(tStr);
-                                if(mevcutUcusTarihi < baslangicTarihi || mevcutUcusTarihi > bitisTarihi) u = false;
-                            }
-
-                            if(ay && tStr.split('-')[1] !== ay) u = false;
-                            if(egitim && e !== egitim) u = false;
-                            if(hava) {
-                                if(hava === 'sikorsky') { if(h !== 's70' && h !== 's70i' && h !== 't70') u = false; }
-                                else if(h !== hava) u = false;
-                            }
-                            
-                            if(u) {
-                                gorunurSatirlar.push(satir);
-                                if (s && s.includes(':')) {
-                                    const [saat, dakika] = s.split(':').map(Number);
-                                    toplamFiltreDakika += (saat * 60) + dakika;
-                                }
-                            } else {
-                                satir.style.display = 'none';
-                                detaySatir.style.display = 'none';
-                            }
-                        });
-
-                        if(filtreAktifMi) {
-                            let fSaat = Math.floor(toplamFiltreDakika / 60).toString().padStart(2, '0');
-                            let fDakika = (toplamFiltreDakika % 60).toString().padStart(2, '0');
-                            document.getElementById('filtreliSaatGosterge').innerText = fSaat + ":" + fDakika;
-                            document.getElementById('filtreSaatKutusu').style.display = 'block';
-                        } else {
-                            document.getElementById('filtreSaatKutusu').style.display = 'none';
-                        }
-
-                        sayfalamayiCiz(gorunurSatirlar);
-                    }
-
-                    function sayfalamayiCiz(aktifSatirlar) {
-                        const toplamSatirSayisi = aktifSatirlar.length;
-                        const toplamSayfaSayisi = Math.ceil(toplamSatirSayisi / satirBasinaVeri) || 1;
-
-                        if (mevcutSayfa > toplamSayfaSayisi) mevcutSayfa = toplamSayfaSayisi;
-
-                        aktifSatirlar.forEach((satir, index) => {
-                            const id = satir.id.replace('row-', '');
-                            const detaySatir = document.getElementById('detay-' + id);
-                            const baslangicSınırı = (mevcutSayfa - 1) * satirBasinaVeri;
-                            const bitisSınırı = mevcutSayfa * satirBasinaVeri;
-
-                            if (index >= baslangicSınırı && index < bitisSınırı) {
-                                satir.style.display = '';
-                            } else {
-                                satir.style.display = 'none';
-                                detaySatir.style.display = 'none';
-                            }
-                        });
-
-                        const sayfalamaKutusu = document.getElementById('sayfalamaAlani');
-                        sayfalamaKutusu.innerHTML = '';
-
-                        if (toplamSayfaSayisi > 1) {
-                            for (let i = 1; i <= toplamSayfaSayisi; i++) {
-                                const btn = document.createElement('button');
-                                btn.type = 'button';
-                                btn.innerText = i;
-                                btn.className = 'sayfa-btn' + (i === mevcutSayfa ? ' aktif' : '');
-                                btn.onclick = function() {
-                                    mevcutSayfa = i;
-                                    filtreleUcuslari();
-                                };
-                                sayfalamaKutusu.appendChild(btn);
-                            }
-                        }
-                    }
-
-                    function filtreleriTemizle() {
-                        document.getElementById('filtreYil').value = '';
-                        document.getElementById('filtreAy').value = '';
-                        document.getElementById('filtreHavaAraci').value = '';
-                        document.getElementById('filtreUcusTipi').value = '';
-                        mevcutSayfa = 1;
-                        filtreleUcuslari();
-                    }
-
-                    window.onload = function() {
-                        filtreleUcuslari();
-                    };
-                </script>
-            `);
-        } else {
-            res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Şifre Hatalı!</h1><a href="/">Tekrar Dene</a></div>`);
+        if (!isMatch) {
+            return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Şifre Hatalı!</h1><a href="/">Tekrar Dene</a></div>`);
         }
+
+        oturumCerezYaz(req, res, email);
+
+        const flights = await Flight.find({ userEmail: email }).sort({ tarih: -1 });
+        const kayitliTarihler = await ReportDate.find({ userEmail: email });
+
+        res.set('Cache-Control', 'no-store');
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler));
     } catch (error) {
+        console.error(error);
         res.status(500).send("Sunucu hatası.");
     }
 };
@@ -956,8 +615,10 @@ const loginHandler = async (req, res) => {
 app.post('/login', loginHandler);
 
 app.post('/register', async (req, res) => {
-    const { email, password } = req.body;
-    
+    const govde = req.body || {};
+    const email = metinMi(govde.email) ? govde.email : '';
+    const password = metinMi(govde.password) ? govde.password : '';
+
     if(!email || !password) {
         return res.send(`<div style="font-family:Arial; text-align:center; margin-top:100px;"><h1 style="color: red;">❌ Eksik Bilgi!</h1><p>E-posta ve şifre alanları boş bırakılamaz.</p><a href="/">Geri Dön</a></div>`);
     }
@@ -985,19 +646,18 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// --- API İÇİN OTURUM DOĞRULAMA ---
-// E-posta artık istemciden gelen veriye değil, imzalı çerezden alınır.
-function oturumGerekli(req, res, next) {
-    const email = oturumEmailOku(req);
-    if (!email) {
-        return res.status(401).json({ success: false, message: "Oturum süresi doldu, lütfen tekrar giriş yapın." });
-    }
-    req.oturumEmail = email;
-    next();
-}
+
+// --- API (hepsi oturum çerezi gerektirir) ---
 
 app.post('/api/update-password', oturumGerekli, async (req, res) => {
-    const { eskiSifre, yeniSifre } = req.body;
+    const { eskiSifre, yeniSifre } = req.body || {};
+    if (!metinMi(eskiSifre) || !metinMi(yeniSifre)) {
+        return res.json({ success: false, message: "Geçersiz istek." });
+    }
+    if (yeniSifre.length < 8 || !/[A-Z]/.test(yeniSifre) || !/[0-9]/.test(yeniSifre)) {
+        return res.json({ success: false, message: "Yeni şifre en az 8 karakter, 1 büyük harf ve 1 rakam içermelidir." });
+    }
+
     try {
         const user = await User.findOne({ email: req.oturumEmail });
         if(!user) {
@@ -1024,9 +684,9 @@ app.post('/api/update-password', oturumGerekli, async (req, res) => {
 });
 
 app.post('/api/update-user-date', oturumGerekli, async (req, res) => {
-    const { alan, tarih } = req.body;
-    if (!IZINLI_TARIH_ALANLARI.includes(alan) || !tarih) {
-        return res.json({ success: false });
+    const { alan, tarih } = req.body || {};
+    if (!IZINLI_TARIH_ALANLARI.includes(alan) || !metinMi(tarih) || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || isNaN(new Date(tarih).getTime())) {
+        return res.json({ success: false, message: "Geçersiz tarih." });
     }
     try {
         await ReportDate.findOneAndUpdate(
@@ -1041,7 +701,10 @@ app.post('/api/update-user-date', oturumGerekli, async (req, res) => {
 });
 
 app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
-    const { id } = req.body;
+    const { id } = req.body || {};
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) {
+        return res.json({ success: false, message: "Geçersiz kayıt." });
+    }
     try {
         // Sadece oturumdaki kullanıcının kendi kaydı silinebilir
         await Flight.findOneAndDelete({ _id: id, userEmail: req.oturumEmail });
@@ -1050,16 +713,34 @@ app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
 });
 
 app.post('/api/add-flight', oturumGerekli, async (req, res) => {
+    const { tarih, havaAraciTipi, egitimTipi, sure, gorevAciklamasi } = req.body || {};
+
+    if (!metinMi(tarih) || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || isNaN(new Date(tarih).getTime())) {
+        return res.json({ success: false, message: "Geçersiz tarih." });
+    }
+    if (!HAVA_ARACLARI_LISTESI.includes(havaAraciTipi)) {
+        return res.json({ success: false, message: "Geçersiz hava aracı." });
+    }
+    if (!EGITIM_TIPLERI.includes(egitimTipi)) {
+        return res.json({ success: false, message: "Geçersiz eğitim sınıflandırması." });
+    }
+
+    const dakika = sureyiDakikayaCevir(sure);
+    if (dakika === null || dakika <= 0) {
+        return res.json({ success: false, message: "Geçersiz uçuş süresi. Örnek: 2:10 veya 2.5" });
+    }
+    if (dakika > 24 * 60) {
+        return res.json({ success: false, message: "Uçuş süresi 24 saatten uzun olamaz." });
+    }
+
     try {
-        const { tarih, havaAraciTipi, egitimTipi, sure, gorevAciklamasi } = req.body;
-        const formatliSure = formatUcusSaati(sure);
         const nf = new Flight({
             userEmail: req.oturumEmail,
             tarih,
             havaAraciTipi,
             egitimTipi,
-            sure: formatliSure,
-            gorevAciklamasi
+            sure: dakikayiSaatMetnine(dakika),
+            gorevAciklamasi: metinMi(gorevAciklamasi) ? gorevAciklamasi.trim().substring(0, 1000) : ''
         });
         await nf.save();
         res.json({ success: true });
