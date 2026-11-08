@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#2c3e50">
+    <title>Yönetim Paneli</title>
+    <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+    <div id="toastAlani" class="toast-alani" aria-live="polite"></div>
+
+    <header class="ust">
+        <h1>🛠️ Yönetim Paneli</h1>
+        <nav class="menu">
+            <a href="#" id="menuKullanicilar" class="aktif">Kullanıcılar</a>
+            <a href="#gunluk" id="menuGunluk">İşlem Geçmişi</a>
+            <a href="/login">Panelim</a>
+            <a href="/logout">Çıkış</a>
+        </nav>
+    </header>
+
+    <main class="kap">
+
+        <!-- KULLANICI LİSTESİ -->
+        <section id="gorunumListe">
+            <div id="ozet" class="ozet-grid"></div>
+
+            <div class="arac-cubugu">
+                <input type="search" id="ara" placeholder="E-posta ara..." autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="E-posta ara">
+                <select id="filtre" aria-label="Filtre">
+                    <option value="">Tüm kullanıcılar</option>
+                    <option value="dolan">Dönem saatini dolduranlar</option>
+                    <option value="pasif">30+ gündür uçmayanlar</option>
+                    <option value="hic">Hiç uçuşu olmayanlar</option>
+                </select>
+                <select id="sirala" aria-label="Sıralama">
+                    <option value="kayit-yeni">Yeni kayıt önce</option>
+                    <option value="kayit-eski">Eski kayıt önce</option>
+                    <option value="saat-cok">Toplam saat (çoktan aza)</option>
+                    <option value="donem-cok">Dönem saati (çoktan aza)</option>
+                    <option value="ucus-cok">Uçuş sayısı (çoktan aza)</option>
+                    <option value="son-ucus">Son uçuş (yeniden eskiye)</option>
+                    <option value="eposta">E-posta (A-Z)</option>
+                </select>
+            </div>
+
+            <div class="alt-cubuk">
+                <span id="sayacMetin" class="sayac-metin"></span>
+                <span class="indir">
+                    <a class="btn-ikincil" href="/api/admin/csv?tur=kullanicilar">⬇ Kullanıcılar (CSV)</a>
+                    <a class="btn-ikincil" href="/api/admin/csv?tur=ucuslar">⬇ Tüm uçuşlar (CSV)</a>
+                </span>
+            </div>
+
+            <div class="tablo-sarmal">
+                <table class="tablo kullanici-tablo">
+                    <thead>
+                        <tr><th>E-posta</th><th>Kayıt</th><th>Uçuş</th><th>Toplam Saat</th><th>Dönem (kalan)</th><th>Son Uçuş</th></tr>
+                    </thead>
+                    <tbody id="kullaniciGovde"></tbody>
+                </table>
+            </div>
+            <div id="bosListe" class="bos" hidden>Kayıt bulunamadı.</div>
+        </section>
+
+        <!-- KULLANICI DETAYI -->
+        <section id="gorunumDetay" hidden>
+            <div id="detayIcerik"></div>
+        </section>
+
+        <!-- İŞLEM GEÇMİŞİ -->
+        <section id="gorunumGunluk" hidden>
+            <h2 class="bolum-baslik">İşlem Geçmişi <small>(son 200 işlem)</small></h2>
+            <div class="tablo-sarmal">
+                <table class="tablo gunluk-tablo">
+                    <thead>
+                        <tr><th>Zaman</th><th>Yönetici</th><th>İşlem</th><th>Kullanıcı</th><th>Ayrıntı</th></tr>
+                    </thead>
+                    <tbody id="gunlukGovde"></tbody>
+                </table>
+            </div>
+            <div id="bosGunluk" class="bos" hidden>Henüz kayıtlı bir işlem yok.</div>
+        </section>
+
+    </main>
+
+    <!-- UÇUŞ EKLE / DÜZENLE -->
+    <div id="ucusModal" class="modal-arka" role="dialog" aria-modal="true">
+        <div class="modal-kutu">
+            <h3 id="ucusModalBaslik" class="modal-baslik">Uçuş</h3>
+            <div class="form-satir"><label for="ucTarih">Tarih</label><input type="date" id="ucTarih"></div>
+            <div class="form-satir"><label for="ucArac">Hava Aracı</label><select id="ucArac"></select></div>
+            <div class="form-satir"><label for="ucEgitim">Eğitim Sınıflandırması</label><select id="ucEgitim"></select></div>
+            <div class="form-satir"><label for="ucSure">Süre (örn. 02:10 veya 2.5)</label><input type="text" id="ucSure" inputmode="decimal" autocomplete="off" placeholder="SS:DD"></div>
+            <div class="form-satir"><label for="ucAciklama">Görev Açıklaması</label><textarea id="ucAciklama" maxlength="1000"></textarea></div>
+            <div class="modal-butonlar">
+                <button type="button" class="btn btn-tamam" data-eylem="ucus-kaydet">Kaydet</button>
+                <button type="button" class="btn btn-iptal" data-eylem="modal-kapat" data-modal="ucusModal">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TARİH DÜZENLE -->
+    <div id="tarihModal" class="modal-arka" role="dialog" aria-modal="true">
+        <div class="modal-kutu kucuk">
+            <h3 id="tarihModalBaslik" class="modal-baslik">Tarih</h3>
+            <div class="form-satir"><label for="tarihDeger">Başlangıç tarihi</label><input type="date" id="tarihDeger"></div>
+            <div class="modal-butonlar">
+                <button type="button" class="btn btn-tamam" data-eylem="tarih-kaydet">Kaydet</button>
+                <button type="button" class="btn btn-iptal" data-eylem="modal-kapat" data-modal="tarihModal">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ONAY -->
+    <div id="onayModal" class="modal-arka" role="alertdialog" aria-modal="true">
+        <div class="modal-kutu kucuk">
+            <h3 id="onayBaslik" class="modal-baslik">Emin misiniz?</h3>
+            <p id="onayMetin" class="modal-metin"></p>
+            <div class="modal-butonlar">
+                <button type="button" id="onayEvet" class="btn btn-tehlike">Evet</button>
+                <button type="button" id="onayHayir" class="btn btn-iptal">Vazgeç</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HESAP SİL -->
+    <div id="silModal" class="modal-arka" role="alertdialog" aria-modal="true">
+        <div class="modal-kutu kucuk">
+            <h3 class="modal-baslik">Hesabı sil</h3>
+            <p id="silMetin" class="modal-metin"></p>
+            <div class="form-satir"><label for="silOnay">Onaylamak için e-posta adresini yazın:</label>
+                <input type="text" id="silOnay" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+            <div class="modal-butonlar">
+                <button type="button" id="silEvet" class="btn btn-tehlike" data-eylem="kullanici-sil-onayla" disabled>Kalıcı olarak sil</button>
+                <button type="button" class="btn btn-iptal" data-eylem="modal-kapat" data-modal="silModal">Vazgeç</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GEÇİCİ ŞİFRE -->
+    <div id="sifreModal" class="modal-arka" role="dialog" aria-modal="true">
+        <div class="modal-kutu kucuk">
+            <h3 class="modal-baslik">Geçici şifre oluşturuldu</h3>
+            <p id="sifreMetin" class="modal-metin"></p>
+            <div class="form-satir"><input type="text" id="sifreDeger" readonly class="sifre-kutu"></div>
+            <p class="modal-uyari">Bu şifre yalnızca şimdi gösterilir. Kullanıcıya iletin; giriş yaptıktan sonra panelden şifresini değiştirmesini söyleyin.</p>
+            <div class="modal-butonlar">
+                <button type="button" class="btn btn-tamam" data-eylem="sifre-kopyala">Kopyala</button>
+                <button type="button" class="btn btn-iptal" data-eylem="modal-kapat" data-modal="sifreModal">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/admin/admin.js"></script>
+</body>
+</html>
