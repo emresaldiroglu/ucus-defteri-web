@@ -124,11 +124,13 @@
             kap.appendChild(eleman('div', 'bos-mesaj', 'Bu dönemde uçuş kaydı bulunmamaktadır.'));
         } else {
             panelVeri.donemUcuslari.forEach(function (f) {
-                var satir = eleman('div', 'liste-satir');
+                var tema = f.egitimTipi === 'ggg' ? ' tema-ay' : (f.egitimTipi === 'gş' ? ' tema-gunes' : '');
+                var ikon = f.egitimTipi === 'ggg' ? '🌙 ' : (f.egitimTipi === 'gş' ? '☀️ ' : '');
+                var satir = eleman('div', 'liste-satir' + tema);
                 var sol = document.createElement('div');
                 sol.appendChild(eleman('strong', 'liste-tarih', trTarih(f.tarih)));
                 sol.appendChild(eleman('span', 'liste-alt',
-                    (f.havaAraciTipi || '').toUpperCase() + ' (' + (f.egitimTipi || '').toUpperCase() + ')'));
+                    ikon + (f.havaAraciTipi || '').toUpperCase() + ' (' + (f.egitimTipi || '').toUpperCase() + ')'));
                 satir.appendChild(sol);
                 satir.appendChild(eleman('div', 'rozet', f.sure || ''));
                 kap.appendChild(satir);
