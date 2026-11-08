@@ -396,15 +396,23 @@ function tarihSayaciHtml(baslangicTarihi, periyotYil, etiket, alan) {
     return `<div class="sayac" data-eylem="tarih-modal" data-alan="${esc(alan)}" data-etiket="${esc(etiket)}" data-tarih="${esc(baslangicTarihi)}" style="background:${renk};"><strong>${esc(etiket)}</strong><br><span class="sayac-deger">${esc(kalanGun)} Gün</span><span class="tarih-etiket">Son Tarih: ${esc(formatTRTarih(hedef))}</span></div>`;
 }
 
+// Uçuş temaları: GGG (gece görüş gözlüğü) = ay ışığı, GŞ (gündüz) = gün ışığı. Diğer türler (ör. simülatör) sade kalır.
+function ucusTemasi(egitimTipi) {
+    if (egitimTipi === 'ggg') return { sinif: ' tema-ay', ikon: '<span class="tema-ikon" aria-hidden="true">🌙</span>' };
+    if (egitimTipi === 'gş') return { sinif: ' tema-gunes', ikon: '<span class="tema-ikon" aria-hidden="true">☀️</span>' };
+    return { sinif: '', ikon: '' };
+}
+
 function ucusSatiriHtml(f) {
     const id = esc(f._id);
     const aciklama = f.gorevAciklamasi || '';
     const kisa = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
+    const tema = ucusTemasi(f.egitimTipi);
     return `
-        <tr id="row-${id}" class="ucus-satiri" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}">
+        <tr id="row-${id}" class="ucus-satiri${tema.sinif}" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}">
             <td class="c-tarih">${esc(f.tarih)}</td>
             <td class="c-arac">${esc(f.havaAraciTipi)}</td>
-            <td class="c-egitim">${esc(f.egitimTipi)}</td>
+            <td class="c-egitim">${tema.ikon}${esc(f.egitimTipi)}</td>
             <td class="c-sure">${esc(f.sure)}</td>
             <td class="c-aciklama" title="${esc(aciklama)}">${esc(kisa)}</td>
             <td class="c-islem"><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}">Sil</button></td>
@@ -465,7 +473,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
 
                 <div class="sayac-grid">
                     <div class="sayac" data-eylem="sayac-modal" data-tip="ggg" style="background:${gggDurum.renkGgg};" title="Tüm Araçların GGG Durumunu Gör">
-                        <strong>GGG Sayaç (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanGgg)}</span>
+                        <strong>🌙 GGG Sayaç (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanGgg)}</span>
                         <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefGggStr)}</span>
                     </div>
                     <div class="sayac" data-eylem="sayac-modal" data-tip="sonUcus" style="background:${gggDurum.renkSonUcus};" title="Tüm Araçların Son Uçuş Durumunu Gör">
