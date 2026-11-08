@@ -393,7 +393,7 @@ function tarihSayaciHtml(baslangicTarihi, periyotYil, etiket, alan) {
     hedef.setFullYear(hedef.getFullYear() + periyotYil);
     const kalanGun = getGunFarki(hedef);
     const renk = kalanGun <= 90 ? RENK_KIRMIZI : '#3498db';
-    return `<div class="sayac" data-eylem="tarih-modal" data-alan="${esc(alan)}" data-etiket="${esc(etiket)}" data-tarih="${esc(baslangicTarihi)}" style="background:${renk};"><strong>${esc(etiket)}</strong><br><span class="sayac-deger">${esc(kalanGun)} Gün</span><span class="tarih-etiket">Son Tarih: ${esc(formatTRTarih(hedef))}</span></div>`;
+    return `<div class="sayac" data-eylem="tarih-modal" data-alan="${esc(alan)}" data-etiket="${esc(etiket)}" data-tarih="${esc(baslangicTarihi)}" style="--renk:${renk};"><strong>${esc(etiket)}</strong><br><span class="sayac-deger">${esc(kalanGun)} Gün</span><span class="tarih-etiket">Son Tarih: ${esc(formatTRTarih(hedef))}</span></div>`;
 }
 
 // Uçuş temaları: GGG (gece görüş gözlüğü) = ay ışığı, GŞ (gündüz) = gün ışığı. Diğer türler (ör. simülatör) sade kalır.
@@ -452,6 +452,11 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
     const icerik = `
         <div class="container">
 
+            <div class="marka">
+                <span class="marka-ikon" aria-hidden="true">✈</span>
+                <span class="marka-ad">Uçuş <b>Logbook</b></span>
+            </div>
+
             <div class="ust-panel">
                 <div class="ozet-kart">
                     <div class="saatler-wrapper">
@@ -472,11 +477,11 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
                 </div>
 
                 <div class="sayac-grid">
-                    <div class="sayac" data-eylem="sayac-modal" data-tip="ggg" style="background:${gggDurum.renkGgg};" title="Tüm Araçların GGG Durumunu Gör">
+                    <div class="sayac" data-eylem="sayac-modal" data-tip="ggg" style="--renk:${gggDurum.renkGgg};" title="Tüm Araçların GGG Durumunu Gör">
                         <strong>🌙 GGG Sayaç (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanGgg)}</span>
                         <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefGggStr)}</span>
                     </div>
-                    <div class="sayac" data-eylem="sayac-modal" data-tip="sonUcus" style="background:${gggDurum.renkSonUcus};" title="Tüm Araçların Son Uçuş Durumunu Gör">
+                    <div class="sayac" data-eylem="sayac-modal" data-tip="sonUcus" style="--renk:${gggDurum.renkSonUcus};" title="Tüm Araçların Son Uçuş Durumunu Gör">
                         <strong>Son Uçuş (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanSonUcus)}</span>
                         <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefSonUcusStr)}</span>
                     </div>
@@ -610,11 +615,13 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b1220">
     <title>Uçuş Takip Paneli</title>
     <link rel="stylesheet" href="/panel.css">
 </head>
 <body>
+    <div class="yildizlar" aria-hidden="true"></div>
     <div id="toastAlani" class="toast-alani" aria-live="polite"></div>
 
     <div id="uygulama">${icerik}</div>
