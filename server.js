@@ -72,10 +72,20 @@ function oturumCerezSil(req, res) {
 }
 
 // API için oturum doğrulama: e-posta istemciden değil, imzalı çerezden alınır
-function oturumGerekli(req, res, next) {
+async function oturumGerekli(req, res, next) {
     const oturum = oturumOku(req);
     if (!oturum) {
         return res.status(401).json({ success: false, message: "Oturum süresi doldu, lütfen tekrar giriş yapın." });
+    }
+    // Hesap silinmişse eski çerez artık işlem yapamaz
+    try {
+        if (!(await User.exists({ email: oturum.email }))) {
+            oturumCerezSil(req, res);
+            return res.status(401).json({ success: false, message: "Hesap bulunamadı, lütfen tekrar giriş yapın." });
+        }
+    } catch (e) {
+        console.error(e);
+        return res.status(500).json({ success: false, message: "Sunucu hatası." });
     }
     req.oturumEmail = oturum.email;
     // Kısa oturumlarda her işlem süreyi yeniler (işlem yapıldığı sürece oturum açık kalır)
@@ -132,6 +142,25 @@ const FlightSchema = new mongoose.Schema({
     gorevAciklamasi: String
 });
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
+
+// Yönetici işlemlerinin kaydı (kim, ne zaman, neyi değiştirdi)
+const AdminLogSchema = new mongoose.Schema({
+    admin: String,
+    islem: String,
+    hedef: String,
+    detay: String,
+    zaman: { type: Date, default: Date.now }
+});
+const AdminLog = mongoose.model('AdminLog', AdminLogSchema, 'admin_logs');
+
+// Yönetici hesapları: ADMIN_EMAIL ortam değişkeni (virgülle birden fazla yazılabilir)
+const ADMIN_EMAILLERI = (process.env.ADMIN_EMAIL || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+if (!ADMIN_EMAILLERI.length) {
+    console.warn("⚠️ ADMIN_EMAIL tanımlı değil; yönetim paneli kapalı.");
+}
+function adminMi(email) {
+    return !!email && ADMIN_EMAILLERI.includes(String(email).toLowerCase());
+}
 
 
 // --- SABİTLER ---
@@ -388,7 +417,7 @@ function ucusSatiriHtml(f) {
         </tr>`;
 }
 
-function panelHtmlOlustur(email, flights, kayitliTarihler) {
+function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
     const toplamUcusSuresi = hesaplaToplamSaat(flights);
     const aktifDonem = hesaplaAktifDonemSaati(flights);
     const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
@@ -429,6 +458,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler) {
                     </div>
                     <div class="ozet-alt">
                         <span class="user-email-link" data-eylem="sifre-modal" title="Şifreyi Değiştirmek İçin Tıkla">${esc(email)}</span>
+                        ${yonetici ? '<a class="cikis-link" href="/admin">Yönetim</a>' : ''}
                         <a class="cikis-link" href="/logout">Çıkış</a>
                     </div>
                 </div>
@@ -733,7 +763,7 @@ const loginHandler = async (req, res) => {
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
 
         res.set('Cache-Control', 'no-store');
-        res.send(panelHtmlOlustur(email, flights, kayitliTarihler));
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email)));
     } catch (error) {
         console.error(error);
         if (cerezle) return res.status(500).send("Sunucu hatası.");
@@ -841,38 +871,409 @@ app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
 });
 
 app.post('/api/add-flight', oturumGerekli, async (req, res) => {
-    const { tarih, havaAraciTipi, egitimTipi, sure, gorevAciklamasi } = req.body || {};
-
-    if (!metinMi(tarih) || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || isNaN(new Date(tarih).getTime())) {
-        return res.json({ success: false, message: "Geçersiz tarih." });
-    }
-    if (!HAVA_ARACLARI_LISTESI.includes(havaAraciTipi)) {
-        return res.json({ success: false, message: "Geçersiz hava aracı." });
-    }
-    if (!EGITIM_TIPLERI.includes(egitimTipi)) {
-        return res.json({ success: false, message: "Geçersiz eğitim sınıflandırması." });
-    }
-
-    const dakika = sureyiDakikayaCevir(sure);
-    if (dakika === null || dakika <= 0) {
-        return res.json({ success: false, message: "Geçersiz uçuş süresi. Örnek: 2:10 veya 2.5" });
-    }
-    if (dakika > 24 * 60) {
-        return res.json({ success: false, message: "Uçuş süresi 24 saatten uzun olamaz." });
-    }
+    const d = ucusGovdesiniDogrula(req.body);
+    if (d.hata) return res.json({ success: false, message: d.hata });
 
     try {
-        const nf = new Flight({
-            userEmail: req.oturumEmail,
-            tarih,
-            havaAraciTipi,
-            egitimTipi,
-            sure: dakikayiSaatMetnine(dakika),
-            gorevAciklamasi: metinMi(gorevAciklamasi) ? gorevAciklamasi.trim().substring(0, 1000) : ''
-        });
-        await nf.save();
+        await new Flight({ userEmail: req.oturumEmail, ...d.veri }).save();
         res.json({ success: true });
     } catch (e) { res.json({ success: false }); }
+});
+
+// =====================================================================
+// YÖNETİM PANELİ
+// Yalnızca ADMIN_EMAIL ortam değişkenindeki hesap(lar) erişebilir.
+// Yönetici olmayanlara her adres 404 döner (sayfanın varlığı belli olmaz).
+// =====================================================================
+
+function escapeRegex(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Eski kayıtlarda e-posta büyük/küçük harf karışık saklanmış olabilir; bu yüzden harfe duyarsız eşleşir
+function emailFiltresi(email) {
+    return new RegExp('^' + escapeRegex(email) + '$', 'i');
+}
+
+function epostaTemizle(deger) {
+    return metinMi(deger) ? deger.trim().toLowerCase() : '';
+}
+
+function donemSiniri() {
+    const simdi = new Date();
+    const yil = simdi.getMonth() >= 8 ? simdi.getFullYear() + 1 : simdi.getFullYear();
+    return { yil, bas: `${yil - 1}-09-01`, bit: `${yil}-09-01` };
+}
+
+function gunOncesiTarih(gun) {
+    return new Date(Date.now() - gun * 24 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+// Uçuş formunu doğrular; kullanıcı ve yönetici aynı kuralları kullanır
+function ucusGovdesiniDogrula(g) {
+    g = g || {};
+    if (!metinMi(g.tarih) || !/^\d{4}-\d{2}-\d{2}$/.test(g.tarih) || isNaN(new Date(g.tarih).getTime())) {
+        return { hata: "Geçersiz tarih." };
+    }
+    if (!HAVA_ARACLARI_LISTESI.includes(g.havaAraciTipi)) {
+        return { hata: "Geçersiz hava aracı." };
+    }
+    if (!EGITIM_TIPLERI.includes(g.egitimTipi)) {
+        return { hata: "Geçersiz eğitim sınıflandırması." };
+    }
+    const dakika = sureyiDakikayaCevir(g.sure);
+    if (dakika === null || dakika <= 0) {
+        return { hata: "Geçersiz uçuş süresi. Örnek: 2:10 veya 2.5" };
+    }
+    if (dakika > 24 * 60) {
+        return { hata: "Uçuş süresi 24 saatten uzun olamaz." };
+    }
+    return {
+        veri: {
+            tarih: g.tarih,
+            havaAraciTipi: g.havaAraciTipi,
+            egitimTipi: g.egitimTipi,
+            sure: dakikayiSaatMetnine(dakika),
+            gorevAciklamasi: metinMi(g.gorevAciklamasi) ? g.gorevAciklamasi.trim().substring(0, 1000) : ''
+        }
+    };
+}
+
+function geciciSifreUret() {
+    const BUYUK = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const KUCUK = 'abcdefghijkmnpqrstuvwxyz';
+    const RAKAM = '23456789';
+    const hepsi = BUYUK + KUCUK + RAKAM;
+    const sec = (k) => k[crypto.randomInt(k.length)];
+    const harfler = [sec(BUYUK), sec(KUCUK), sec(RAKAM)];
+    while (harfler.length < 10) harfler.push(sec(hepsi));
+    for (let i = harfler.length - 1; i > 0; i--) {
+        const j = crypto.randomInt(i + 1);
+        [harfler[i], harfler[j]] = [harfler[j], harfler[i]];
+    }
+    return harfler.join('');
+}
+
+async function logYaz(admin, islem, hedef, detay) {
+    try {
+        await new AdminLog({ admin, islem, hedef, detay: String(detay || '').substring(0, 500) }).save();
+    } catch (e) {
+        console.error('Yönetim günlüğü yazılamadı:', e);
+    }
+}
+
+// Sayfa istekleri için: yönetici değilse 404
+function adminSayfaGerekli(req, res, next) {
+    const oturum = oturumOku(req);
+    if (!oturum || !adminMi(oturum.email)) return res.status(404).send('Bulunamadı');
+    req.adminEmail = oturum.email;
+    if (!oturum.kalici) oturumCerezYaz(req, res, oturum.email, false);
+    next();
+}
+
+// API istekleri için: yönetici değilse 404; değişiklik isteklerinde özel başlık şart
+// (başka bir sitedeki form veya betik bu başlığı gönderemez)
+function adminApiGerekli(req, res, next) {
+    const oturum = oturumOku(req);
+    if (!oturum || !adminMi(oturum.email)) return res.status(404).json({ success: false, message: 'Bulunamadı' });
+    if (req.method !== 'GET' && req.headers['x-yonetim'] !== '1') {
+        return res.status(403).json({ success: false, message: 'Geçersiz istek.' });
+    }
+    req.adminEmail = oturum.email;
+    if (!oturum.kalici) oturumCerezYaz(req, res, oturum.email, false);
+    next();
+}
+
+const ADMIN_DOSYALARI = {
+    '/admin': 'index.html',
+    '/admin/admin.css': 'admin.css',
+    '/admin/admin.js': 'admin.js'
+};
+Object.keys(ADMIN_DOSYALARI).forEach(url => {
+    app.get(url, adminSayfaGerekli, (req, res) => {
+        const yol = path.join(__dirname, 'admin', ADMIN_DOSYALARI[url]);
+        if (!fs.existsSync(yol)) {
+            console.error(`❌ Yönetim dosyası bulunamadı: ${yol}`);
+            return res.status(404).send('Yönetim dosyası sunucuda bulunamadı.');
+        }
+        res.set('Cache-Control', 'no-store');
+        res.set('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'");
+        res.sendFile(yol);
+    });
+});
+
+// Tüm kullanıcılar için uçuş sayısı, toplam saat, dönem saati ve son uçuş tarihi
+async function kullaniciOzetleriniHesapla() {
+    const [kullanicilar, ucuslar] = await Promise.all([
+        User.find({}, 'email').lean(),
+        Flight.find({}, 'userEmail tarih sure').lean()
+    ]);
+    const donem = donemSiniri();
+    const harita = new Map();
+    kullanicilar.forEach(u => {
+        const e = String(u.email || '').toLowerCase();
+        harita.set(e, {
+            email: u.email,
+            kayit: u._id && u._id.getTimestamp ? u._id.getTimestamp().toISOString() : null,
+            ucusSayisi: 0,
+            toplamDakika: 0,
+            donemDakika: 0,
+            sonUcus: null
+        });
+    });
+    ucuslar.forEach(f => {
+        const k = harita.get(String(f.userEmail || '').toLowerCase());
+        if (!k) return;
+        const dk = sureMetniDakika(f.sure);
+        k.ucusSayisi++;
+        k.toplamDakika += dk;
+        if (f.tarih && f.tarih >= donem.bas && f.tarih < donem.bit) k.donemDakika += dk;
+        if (f.tarih && (!k.sonUcus || f.tarih > k.sonUcus)) k.sonUcus = f.tarih;
+    });
+    return { liste: Array.from(harita.values()), donem };
+}
+
+app.get('/api/admin/kullanicilar', adminApiGerekli, async (req, res) => {
+    try {
+        const { liste, donem } = await kullaniciOzetleriniHesapla();
+        const simdi = new Date();
+        const ayBasi = new Date(simdi.getFullYear(), simdi.getMonth(), 1);
+        const otuzGun = gunOncesiTarih(30);
+        const ozet = {
+            kullaniciSayisi: liste.length,
+            buAyKayit: liste.filter(u => u.kayit && new Date(u.kayit) >= ayBasi).length,
+            aktif30: liste.filter(u => u.sonUcus && u.sonUcus >= otuzGun).length,
+            ucusSayisi: liste.reduce((t, u) => t + u.ucusSayisi, 0),
+            toplamDakika: liste.reduce((t, u) => t + u.toplamDakika, 0),
+            donemDakika: liste.reduce((t, u) => t + u.donemDakika, 0)
+        };
+        res.json({ success: true, ozet, kullanicilar: liste, donem: { yil: donem.yil, bas: donem.bas, bit: donem.bit, hedefDakika: DONEM_HEDEF_SAAT * 60 }, adminEmail: req.adminEmail });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Liste alınamadı.' });
+    }
+});
+
+app.get('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.query && req.query.email);
+    if (!email) return res.json({ success: false, message: 'E-posta gerekli.' });
+    try {
+        const user = await User.findOne({ email }, 'email').lean();
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+
+        const ucuslar = await Flight.find({ userEmail: emailFiltresi(email) })
+            .sort({ tarih: -1 })
+            .lean();
+        const tarihler = await ReportDate.find({ userEmail: emailFiltresi(email) }).lean();
+        const donem = donemSiniri();
+
+        res.json({
+            success: true,
+            kullanici: {
+                email: user.email,
+                kayit: user._id && user._id.getTimestamp ? user._id.getTimestamp().toISOString() : null
+            },
+            ucuslar: ucuslar.map(f => ({
+                id: String(f._id),
+                tarih: f.tarih,
+                havaAraciTipi: f.havaAraciTipi,
+                egitimTipi: f.egitimTipi,
+                sure: f.sure,
+                gorevAciklamasi: f.gorevAciklamasi || ''
+            })),
+            tarihler: tarihler.map(t => ({ alan: t.alan, tarih: t.tarih })),
+            donem: { yil: donem.yil, bas: donem.bas, bit: donem.bit, hedefDakika: DONEM_HEDEF_SAAT * 60 },
+            araclar: HAVA_ARACLARI_LISTESI,
+            egitimTipleri: EGITIM_TIPLERI
+        });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Kullanıcı bilgisi alınamadı.' });
+    }
+});
+
+// Geçici şifre üretir ve kaydeder; yeni şifre yalnızca bu yanıtta görünür
+app.post('/api/admin/sifre-sifirla', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.body && req.body.email);
+    try {
+        const user = await User.findOne({ email });
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+
+        const sifre = geciciSifreUret();
+        user.password = await bcrypt.hash(sifre, 10);
+        await user.save();
+        await logYaz(req.adminEmail, 'Şifre sıfırlandı', email, 'Geçici şifre üretildi');
+        res.json({ success: true, sifre });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Şifre sıfırlanamadı.' });
+    }
+});
+
+// Hesabı, uçuşlarını ve kayıtlı tarihlerini siler. Onay için e-postanın aynen yazılması gerekir.
+app.delete('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.body && req.body.email);
+    const onay = epostaTemizle(req.body && req.body.onay);
+    if (!email || onay !== email) return res.json({ success: false, message: 'Onay için e-posta adresini aynen yazın.' });
+    if (email === req.adminEmail) return res.json({ success: false, message: 'Kendi hesabınızı buradan silemezsiniz.' });
+
+    try {
+        const user = await User.findOne({ email });
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+
+        const ucusSonuc = await Flight.deleteMany({ userEmail: emailFiltresi(email) });
+        const tarihSonuc = await ReportDate.deleteMany({ userEmail: emailFiltresi(email) });
+        await User.deleteOne({ email });
+
+        const ucusAdedi = (ucusSonuc && ucusSonuc.deletedCount) || 0;
+        const tarihAdedi = (tarihSonuc && tarihSonuc.deletedCount) || 0;
+        await logYaz(req.adminEmail, 'Hesap silindi', email, `${ucusAdedi} uçuş ve ${tarihAdedi} tarih kaydı da silindi`);
+        res.json({ success: true, silinenUcus: ucusAdedi });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Hesap silinemedi.' });
+    }
+});
+
+app.post('/api/admin/ucus', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.body && req.body.email);
+    const d = ucusGovdesiniDogrula(req.body);
+    if (d.hata) return res.json({ success: false, message: d.hata });
+    try {
+        const user = await User.findOne({ email }, 'email').lean();
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+
+        await new Flight({ userEmail: user.email, ...d.veri }).save();
+        await logYaz(req.adminEmail, 'Uçuş eklendi', email, `${d.veri.tarih} ${d.veri.havaAraciTipi} ${d.veri.egitimTipi} ${d.veri.sure}`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Uçuş eklenemedi.' });
+    }
+});
+
+app.put('/api/admin/ucus', adminApiGerekli, async (req, res) => {
+    const id = req.body && req.body.id;
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
+    const d = ucusGovdesiniDogrula(req.body);
+    if (d.hata) return res.json({ success: false, message: d.hata });
+    try {
+        const ucus = await Flight.findById(id);
+        if (!ucus) return res.json({ success: false, message: 'Uçuş kaydı bulunamadı.' });
+
+        const eski = `${ucus.tarih} ${ucus.havaAraciTipi} ${ucus.egitimTipi} ${ucus.sure}`;
+        ucus.tarih = d.veri.tarih;
+        ucus.havaAraciTipi = d.veri.havaAraciTipi;
+        ucus.egitimTipi = d.veri.egitimTipi;
+        ucus.sure = d.veri.sure;
+        ucus.gorevAciklamasi = d.veri.gorevAciklamasi;
+        await ucus.save();
+        await logYaz(req.adminEmail, 'Uçuş düzenlendi', String(ucus.userEmail || '').toLowerCase(), `Önce: ${eski} → Sonra: ${d.veri.tarih} ${d.veri.havaAraciTipi} ${d.veri.egitimTipi} ${d.veri.sure}`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Uçuş güncellenemedi.' });
+    }
+});
+
+app.delete('/api/admin/ucus', adminApiGerekli, async (req, res) => {
+    const id = req.body && req.body.id;
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
+    try {
+        const ucus = await Flight.findByIdAndDelete(id);
+        if (!ucus) return res.json({ success: false, message: 'Uçuş kaydı bulunamadı.' });
+        await logYaz(req.adminEmail, 'Uçuş silindi', String(ucus.userEmail || '').toLowerCase(), `${ucus.tarih} ${ucus.havaAraciTipi} ${ucus.egitimTipi} ${ucus.sure}`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Uçuş silinemedi.' });
+    }
+});
+
+// Muayene, alet kart ve standardizasyon başlangıç tarihleri. Boş tarih gönderilirse kayıt temizlenir.
+app.post('/api/admin/tarih', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.body && req.body.email);
+    const { alan, tarih } = req.body || {};
+    if (!IZINLI_TARIH_ALANLARI.includes(alan)) return res.json({ success: false, message: 'Geçersiz alan.' });
+    try {
+        const user = await User.findOne({ email }, 'email').lean();
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+
+        if (tarih === '' || tarih === null || tarih === undefined) {
+            await ReportDate.deleteMany({ userEmail: emailFiltresi(email), alan });
+            await logYaz(req.adminEmail, 'Tarih temizlendi', email, alan);
+            return res.json({ success: true });
+        }
+        if (!metinMi(tarih) || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || isNaN(new Date(tarih).getTime())) {
+            return res.json({ success: false, message: 'Geçersiz tarih.' });
+        }
+        await ReportDate.findOneAndUpdate({ userEmail: email, alan }, { tarih }, { upsert: true, new: true });
+        await logYaz(req.adminEmail, 'Tarih değiştirildi', email, `${alan} = ${tarih}`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Tarih kaydedilemedi.' });
+    }
+});
+
+app.get('/api/admin/gunluk', adminApiGerekli, async (req, res) => {
+    try {
+        const kayitlar = await AdminLog.find({}).sort({ zaman: -1 }).limit(200).lean();
+        res.json({
+            success: true,
+            kayitlar: kayitlar.map(k => ({ zaman: k.zaman, admin: k.admin, islem: k.islem, hedef: k.hedef, detay: k.detay }))
+        });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Geçmiş alınamadı.' });
+    }
+});
+
+// CSV: Excel'in Türkçe ayarlarında doğru açılması için ayırıcı ";" ve BOM kullanılır.
+// "=", "+", "-", "@" ile başlayan hücreler formül sayılmasın diye başına ' eklenir.
+function csvHucre(deger) {
+    let s = String(deger === undefined || deger === null ? '' : deger);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    if (/[";\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+}
+
+function csvGonder(res, dosyaAdi, satirlar) {
+    const govde = '﻿' + satirlar.map(s => s.map(csvHucre).join(';')).join('\r\n') + '\r\n';
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="${dosyaAdi}"`);
+    res.set('Cache-Control', 'no-store');
+    res.send(govde);
+}
+
+app.get('/api/admin/csv', adminApiGerekli, async (req, res) => {
+    const tur = req.query && req.query.tur;
+    const bugun = new Date().toISOString().slice(0, 10);
+    try {
+        if (tur === 'kullanicilar') {
+            const { liste } = await kullaniciOzetleriniHesapla();
+            const satirlar = [['E-posta', 'Kayıt Tarihi', 'Uçuş Sayısı', 'Toplam Saat', 'Dönem Saati', 'Son Uçuş']];
+            liste.forEach(u => satirlar.push([
+                u.email,
+                u.kayit ? u.kayit.slice(0, 10) : '',
+                u.ucusSayisi,
+                dakikayiSaatMetnine(u.toplamDakika),
+                dakikayiSaatMetnine(u.donemDakika),
+                u.sonUcus || ''
+            ]));
+            return csvGonder(res, `kullanicilar-${bugun}.csv`, satirlar);
+        }
+        if (tur === 'ucuslar') {
+            const ucuslar = await Flight.find({}).sort({ userEmail: 1, tarih: -1 }).lean();
+            const satirlar = [['E-posta', 'Tarih', 'Hava Aracı', 'Eğitim', 'Süre', 'Görev Açıklaması']];
+            ucuslar.forEach(f => satirlar.push([f.userEmail, f.tarih, f.havaAraciTipi, f.egitimTipi, f.sure, f.gorevAciklamasi || '']));
+            return csvGonder(res, `ucuslar-${bugun}.csv`, satirlar);
+        }
+        res.status(400).json({ success: false, message: 'Geçersiz tür.' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ success: false, message: 'Dışa aktarılamadı.' });
+    }
 });
 
 const PORT = process.env.PORT || 3000;
