@@ -6,6 +6,9 @@
     var SATIR_BASINA_VERI = 10;
     var mevcutSayfa = 1;
     var panelVeri = { aracBazli: { ggg: {}, sonUcus: {} }, donemUcuslari: [] };
+    var sureHedef = { alan: 'sureAlani', metin: 'sureAlaniMetin' };
+    var sonFiltreli = [];
+    var sonFiltreOzet = '';
 
     function $(id) { return document.getElementById(id); }
 
@@ -107,6 +110,7 @@
             tekerlekleriKur();
             mevcutSayfa = 1;
             filtreleUcuslari();
+            sonKopyaGuncelle();
         } catch (e) {
             bildir('Panel yenilenemedi, sayfayı elle yenileyin.', 'hata');
         }
@@ -174,12 +178,20 @@
         modalAc('sifreModal');
     }
 
-    function sureModalAc() {
-        var alan = $('sureAlani');
+    function sureModalAc(hedefId, metinId) {
+        sureHedef = { alan: hedefId || 'sureAlani', metin: metinId || 'sureAlaniMetin' };
+        var alan = $(sureHedef.alan);
         modalAc('sureModal');
         // Pencere görünür olduktan sonra tekerlekler mevcut değere kaydırılır
         tekerlekGit($('sureSaat'), parseInt(alan.dataset.saat || '0', 10), false);
         tekerlekGit($('sureDakika'), parseInt(alan.dataset.dakika || '0', 10), false);
+    }
+
+    function sureyiYaz(alan, metin, saat, dakika) {
+        alan.dataset.saat = saat;
+        alan.dataset.dakika = dakika;
+        metin.textContent = saat + ' saat ' + dakika + ' dk';
+        metin.classList.remove('yer-tutucu');
     }
 
     function sureTamam() {
@@ -188,12 +200,7 @@
         if (saat === '00' && dakika === '00') {
             return bildir('Lütfen uçuş süresini seçin.', 'hata');
         }
-        var alan = $('sureAlani');
-        alan.dataset.saat = saat;
-        alan.dataset.dakika = dakika;
-        var metin = $('sureAlaniMetin');
-        metin.textContent = saat + ' saat ' + dakika + ' dk';
-        metin.classList.remove('yer-tutucu');
+        sureyiYaz($(sureHedef.alan), $(sureHedef.metin), saat, dakika);
         modalKapat('sureModal');
     }
 
@@ -296,6 +303,252 @@
         }
     }
 
+
+    /* ---------- UÇUŞ DÜZENLEME ---------- */
+
+    function duzenleModalAc(id) {
+        var satir = $('row-' + id);
+        if (!satir) return;
+        var d = satir.dataset;
+        $('duzId').value = id;
+        $('duzTarih').value = d.tarih || '';
+        $('duzArac').value = d.hava || '';
+        $('duzEgitim').value = d.egitim || '';
+        $('duzAciklama').value = d.aciklama || '';
+        var p = String(d.sure || '00:00').split(':');
+        sureyiYaz($('duzSureAlani'), $('duzSureMetin'), String(p[0] || '0').padStart(2, '0'), String(p[1] || '0').padStart(2, '0'));
+        modalAc('duzenleModal');
+    }
+
+    async function duzenleKaydet(dugme) {
+        var alan = $('duzSureAlani');
+        var saat = alan.dataset.saat || '00';
+        var dakika = alan.dataset.dakika || '00';
+        if (!$('duzTarih').value) return bildir('Lütfen tarih seçin.', 'hata');
+        if (saat === '00' && dakika === '00') return bildir('Lütfen uçuş süresini seçin.', 'hata');
+
+        dugme.disabled = true;
+        var sonuc = await apiCagir('/api/update-flight', 'POST', {
+            id: $('duzId').value,
+            tarih: $('duzTarih').value,
+            havaAraciTipi: $('duzArac').value,
+            egitimTipi: $('duzEgitim').value,
+            sure: saat + ':' + dakika,
+            gorevAciklamasi: $('duzAciklama').value
+        });
+        dugme.disabled = false;
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) {
+            modalKapat('duzenleModal');
+            bildir('Uçuş güncellendi.', 'basari');
+            await paneliYenile();
+        } else {
+            bildir(sonuc.message || 'Uçuş güncellenemedi.', 'hata');
+        }
+    }
+
+    /* ---------- SON UÇUŞU KOPYALA ---------- */
+
+    function sonUcusSatiri() {
+        return document.querySelector('.ucus-satiri');
+    }
+
+    function sonKopyaGuncelle() {
+        var btn = $('sonKopyaBtn');
+        if (!btn) return;
+        var satir = sonUcusSatiri();
+        if (!satir) { btn.hidden = true; return; }
+        var d = satir.dataset;
+        $('sonKopyaOzet').textContent = (d.hava || '').toUpperCase() + ' · ' + (d.egitim || '').toUpperCase() + ' · ' + (d.sure || '');
+        btn.hidden = false;
+    }
+
+    function sonUcusuKopyala() {
+        var satir = sonUcusSatiri();
+        if (!satir) return;
+        var d = satir.dataset;
+        $('havaAraciTipi').value = d.hava || $('havaAraciTipi').value;
+        $('egitimTipi').value = d.egitim || '';
+        $('gorevAciklamasi').value = d.aciklama || '';
+        var p = String(d.sure || '00:00').split(':');
+        sureyiYaz($('sureAlani'), $('sureAlaniMetin'), String(p[0] || '0').padStart(2, '0'), String(p[1] || '0').padStart(2, '0'));
+        bildir('Son uçuş bilgileri forma kopyalandı. Tarihi ve süreyi kontrol edin.', 'basari');
+    }
+
+    /* ---------- DIŞA AKTARMA: CSV ve PDF ---------- */
+
+    function bugunDamga() {
+        var t = new Date();
+        return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+    }
+
+    // Excel'de formül olarak çalışmasın diye tehlikeli başlangıçlar etkisizleştirilir
+    function csvHucre(v) {
+        v = String(v === undefined || v === null ? '' : v);
+        if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+        return '"' + v.replace(/"/g, '""') + '"';
+    }
+
+    function satirVerisi(satir) {
+        var d = satir.dataset;
+        return [trTarih(d.tarih), (d.hava || '').toUpperCase(), (d.egitim || '').toUpperCase(), d.sure || '', d.aciklama || ''];
+    }
+
+    function csvIndir() {
+        if (!sonFiltreli.length) return bildir('İndirilecek uçuş kaydı yok.', 'hata');
+        var satirlar = [['Tarih', 'Hava Aracı', 'Eğitim', 'Süre', 'Görev Açıklaması']];
+        sonFiltreli.forEach(function (s) { satirlar.push(satirVerisi(s)); });
+        var metin = '﻿' + satirlar.map(function (r) { return r.map(csvHucre).join(';'); }).join('\r\n');
+        var blob = new Blob([metin], { type: 'text/csv;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'ucus-logbook-' + bugunDamga() + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+        bildir(sonFiltreli.length + ' uçuş indirildi.', 'basari');
+    }
+
+    function pdfIndir() {
+        if (!sonFiltreli.length) return bildir('Yazdırılacak uçuş kaydı yok.', 'hata');
+        var kap = $('yazdirAlani');
+        kap.textContent = '';
+        var mail = document.querySelector('.user-email-link');
+        var toplam = 0;
+        sonFiltreli.forEach(function (s) { toplam += sureDakika(s.dataset.sure); });
+
+        kap.appendChild(eleman('h1', '', '✈ Uçuş Logbook'));
+        kap.appendChild(eleman('p', 'yz-alt',
+            (mail ? mail.textContent + ' · ' : '') + trTarih(bugunDamga()) + (sonFiltreOzet ? ' · Filtre: ' + sonFiltreOzet : '')));
+        kap.appendChild(eleman('p', 'yz-toplam',
+            'Toplam: ' + String(Math.floor(toplam / 60)).padStart(2, '0') + ':' + String(toplam % 60).padStart(2, '0') +
+            ' saat · ' + sonFiltreli.length + ' uçuş'));
+
+        var tablo = document.createElement('table');
+        var ust = document.createElement('tr');
+        ['Tarih', 'Hava Aracı', 'Eğitim', 'Süre', 'Görev Açıklaması'].forEach(function (b) { ust.appendChild(eleman('th', '', b)); });
+        var thead = document.createElement('thead'); thead.appendChild(ust); tablo.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        sonFiltreli.forEach(function (s) {
+            var tr = document.createElement('tr');
+            satirVerisi(s).forEach(function (h) { tr.appendChild(eleman('td', '', h)); });
+            tbody.appendChild(tr);
+        });
+        tablo.appendChild(tbody);
+        kap.appendChild(tablo);
+
+        document.body.classList.add('yazdiriliyor');
+        setTimeout(function () { window.print(); }, 60);
+    }
+
+    window.addEventListener('afterprint', function () { document.body.classList.remove('yazdiriliyor'); });
+
+    /* ---------- İSTATİSTİK ---------- */
+
+    var AY_KISA = { '09': 'Eyl', '10': 'Eki', '11': 'Kas', '12': 'Ara', '01': 'Oca', '02': 'Şub', '03': 'Mar', '04': 'Nis', '05': 'May', '06': 'Haz', '07': 'Tem', '08': 'Ağu' };
+    var AY_SIRASI = ['09', '10', '11', '12', '01', '02', '03', '04', '05', '06', '07', '08'];
+
+    function dkSaat(dk) {
+        return String(Math.floor(dk / 60)).padStart(2, '0') + ':' + String(dk % 60).padStart(2, '0');
+    }
+    function saatKisa(dk) {
+        return String(Math.round(dk / 6) / 10).replace('.', ',');
+    }
+
+    function istatistikAc() {
+        var kap = $('istatistikIcerik');
+        kap.textContent = '';
+        var liste = panelVeri.donemUcuslari || [];
+        if (!liste.length) {
+            kap.appendChild(eleman('div', 'bos-mesaj', 'Bu dönemde uçuş kaydı bulunmamaktadır.'));
+            return modalAc('istatistikModal');
+        }
+
+        var toplam = 0, aylar = {}, tipler = { ggg: 0, 'gş': 0, 'au(sim)': 0 }, araclar = {};
+        liste.forEach(function (f) {
+            var dk = sureDakika(f.sure);
+            toplam += dk;
+            var ay = String(f.tarih || '').split('-')[1];
+            aylar[ay] = (aylar[ay] || 0) + dk;
+            if (tipler[f.egitimTipi] !== undefined) tipler[f.egitimTipi] += dk;
+            araclar[f.havaAraciTipi] = (araclar[f.havaAraciTipi] || 0) + dk;
+        });
+
+        // Özet kutuları
+        var ozet = eleman('div', 'ist-ozet');
+        [['Toplam', dkSaat(toplam)], ['Uçuş', String(liste.length)], ['Ortalama', dkSaat(Math.round(toplam / liste.length))]].forEach(function (x) {
+            var k = eleman('div', 'ist-kutu');
+            k.appendChild(eleman('b', '', x[1]));
+            k.appendChild(eleman('span', '', x[0]));
+            ozet.appendChild(k);
+        });
+        kap.appendChild(ozet);
+
+        // Aylık grafik
+        kap.appendChild(eleman('div', 'ist-baslik', 'Aylık uçuş saati'));
+        var enCok = 0;
+        AY_SIRASI.forEach(function (a) { if ((aylar[a] || 0) > enCok) enCok = aylar[a]; });
+        var grafik = eleman('div', 'ist-grafik');
+        AY_SIRASI.forEach(function (a) {
+            var dk = aylar[a] || 0;
+            var sutun = eleman('div', 'ist-sutun');
+            var cubuk = eleman('div', 'ist-cubuk');
+            cubuk.style.height = (enCok ? Math.max(dk ? 4 : 0, Math.round((dk / enCok) * 100)) : 0) + '%';
+            cubuk.title = AY_KISA[a] + ': ' + dkSaat(dk);
+            if (dk) cubuk.appendChild(eleman('em', '', saatKisa(dk)));
+            sutun.appendChild(cubuk);
+            sutun.appendChild(eleman('span', '', AY_KISA[a]));
+            grafik.appendChild(sutun);
+        });
+        kap.appendChild(grafik);
+
+        // Tür dağılımı
+        kap.appendChild(eleman('div', 'ist-baslik', 'Uçuş türü dağılımı'));
+        var dagilim = eleman('div', 'ist-dagilim');
+        var etiketler = [['ggg', '🌙 GGG', 'd-ggg'], ['gş', '☀️ GŞ', 'd-gs'], ['au(sim)', '🖥️ Sim', 'd-sim']];
+        var lejant = eleman('div', 'ist-lejant');
+        etiketler.forEach(function (t) {
+            var yuzde = toplam ? Math.round((tipler[t[0]] / toplam) * 100) : 0;
+            if (tipler[t[0]] > 0) {
+                var parca = eleman('div', t[2]);
+                parca.style.width = (tipler[t[0]] / toplam * 100) + '%';
+                dagilim.appendChild(parca);
+            }
+            lejant.appendChild(eleman('span', '', t[1] + ' %' + yuzde + ' (' + dkSaat(tipler[t[0]]) + ')'));
+        });
+        kap.appendChild(dagilim);
+        kap.appendChild(lejant);
+
+        // Hava aracı dağılımı
+        kap.appendChild(eleman('div', 'ist-baslik', 'Hava aracına göre'));
+        var sirali = Object.keys(araclar).sort(function (a, b) { return araclar[b] - araclar[a]; });
+        sirali.forEach(function (a) {
+            var satir = eleman('div', 'ist-arac');
+            satir.appendChild(eleman('span', 'ist-arac-ad', a.toUpperCase()));
+            var seritKap = eleman('div', 'ist-serit');
+            var serit = eleman('i');
+            serit.style.width = Math.round((araclar[a] / araclar[sirali[0]]) * 100) + '%';
+            seritKap.appendChild(serit);
+            satir.appendChild(seritKap);
+            satir.appendChild(eleman('b', '', dkSaat(araclar[a])));
+            kap.appendChild(satir);
+        });
+        modalAc('istatistikModal');
+    }
+
+    /* ---------- TEMA (koyu / açık) ---------- */
+
+    function temaDegistir() {
+        var acik = document.documentElement.getAttribute('data-tema') === 'acik';
+        if (acik) document.documentElement.removeAttribute('data-tema');
+        else document.documentElement.setAttribute('data-tema', 'acik');
+        try { localStorage.setItem('logbookTema', acik ? 'koyu' : 'acik'); } catch (e) { /* tarayıcı depolamayı engelliyor olabilir */ }
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', acik ? '#0b1220' : '#eef3fb');
+    }
+
     /* ---------- KAYDIRMALI SÜRE SEÇİCİ ---------- */
 
     var OGE_YUKSEKLIK = 44;
@@ -385,6 +638,12 @@
 
         var toplamDakika = 0;
         var gorunur = [];
+        var ozetParcalari = [];
+        if (yil) ozetParcalari.push(yil + ' dönemi');
+        if (ay) ozetParcalari.push($('filtreAy').selectedOptions[0].textContent);
+        if (hava) ozetParcalari.push(hava.toUpperCase());
+        if (egitim) ozetParcalari.push(egitim.toUpperCase());
+        sonFiltreOzet = ozetParcalari.join(' · ');
 
         document.querySelectorAll('.ucus-satiri').forEach(function (satir) {
             var t = satir.dataset.tarih || '';
@@ -413,6 +672,7 @@
             kutu.hidden = true;
         }
 
+        sonFiltreli = gorunur;
         sayfalamayiCiz(gorunur);
     }
 
@@ -473,7 +733,14 @@
             case 'donem-modal': donemModalAc(); break;
             case 'sayac-modal': sayacModalAc(d.tip); break;
             case 'sifre-modal': sifreModalAc(); break;
-            case 'sure-modal': sureModalAc(); break;
+            case 'sure-modal': sureModalAc(d.hedef, d.metin); break;
+            case 'ucus-duzenle': e.stopPropagation(); duzenleModalAc(d.id); break;
+            case 'duzenle-kaydet': duzenleKaydet(hedef); break;
+            case 'son-kopyala': sonUcusuKopyala(); break;
+            case 'istatistik-ac': istatistikAc(); break;
+            case 'csv-indir': csvIndir(); break;
+            case 'pdf-indir': pdfIndir(); break;
+            case 'tema-degistir': temaDegistir(); break;
             case 'sure-tamam': sureTamam(); break;
             case 'sifre-guncelle': sifreyiGuncelle(hedef); break;
             case 'tarih-modal': tarihModalAc(d.etiket, d.alan, d.tarih); break;
@@ -505,4 +772,5 @@
     veriyiOku();
     tekerlekleriKur();
     filtreleUcuslari();
+    sonKopyaGuncelle();
 })();

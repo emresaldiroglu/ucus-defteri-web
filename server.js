@@ -273,11 +273,27 @@ function hesaplaAktifDonemSaati(flights) {
     // Dönem hedefi: 140 saat. Güncel dönem saati düşülerek kalan süre bulunur.
     const kalanDakika = Math.max(0, (DONEM_HEDEF_SAAT * 60) - toplamDakika);
 
+    // İlerleme çubuğu ve tempo bilgisi
+    const yuzde = Math.min(100, Math.floor((toplamDakika / (DONEM_HEDEF_SAAT * 60)) * 100));
+    const kalanGun = Math.max(0, Math.ceil((bitisTarihi.getTime() - simdi.getTime()) / (1000 * 3600 * 24)));
+    let tempo = '';
+    if (kalanDakika === 0) {
+        tempo = 'Dönem hedefi tamamlandı. 🎉';
+    } else if (kalanGun > 0) {
+        const gunlukDk = Math.ceil(kalanDakika / kalanGun);
+        const gunlukMetin = gunlukDk >= 60
+            ? `${Math.floor(gunlukDk / 60)} sa ${gunlukDk % 60} dk`
+            : `${gunlukDk} dk`;
+        tempo = `Dönem bitimine ${kalanGun} gün var. Hedef için günde ortalama ~${gunlukMetin} yeterli.`;
+    }
+
     return {
         yil: aktifDonemYili,
         sure: dakikayiSaatMetnine(toplamDakika),
         kalan: dakikayiSaatMetnine(kalanDakika),
-        donemUcuslari: donemUcuslari
+        donemUcuslari: donemUcuslari,
+        yuzde: yuzde,
+        tempo: tempo
     };
 }
 
@@ -378,6 +394,61 @@ function hesaplaAracaGoreDetayliDurum(flights) {
 }
 
 
+// Yaklaşan süreler (30 gün ve altı) için uyarı listesi
+const UYARI_ESIGI_GUN = 30;
+function hesaplaUyarilar(flights, kayitliTarihler) {
+    const liste = [];
+    const ekle = (simge, metin, kalan) => {
+        liste.push({ simge, metin, kalan, seviye: kalan <= 15 ? 'k' : 't' });
+    };
+
+    // Tarihli belgeler: süresi dolmuşsa da gösterilir
+    const belgeler = [
+        ['muayene1Tarih', 1, '1 Yıllık Muayene'],
+        ['muayene4Tarih', 4, '4 Yıllık Muayene'],
+        ['aletKartTarih', 1, 'Alet Kart'],
+        ['standTarih', 1, 'Standardizasyon']
+    ];
+    belgeler.forEach(([alan, yil, etiket]) => {
+        const kayit = (kayitliTarihler || []).find(t => t.alan === alan);
+        if (!kayit || !kayit.tarih) return;
+        const hedef = new Date(kayit.tarih);
+        if (isNaN(hedef.getTime())) return;
+        hedef.setFullYear(hedef.getFullYear() + yil);
+        const kalan = getGunFarki(hedef);
+        if (kalan <= UYARI_ESIGI_GUN) ekle('⚠️', etiket, kalan);
+    });
+
+    // 60 günlük sayaçlar: araç bazında, süresi dolmak üzere olanlar (dolmuşlar gürültü yapmasın diye gösterilmez)
+    const gercek = flights.filter(f => f.egitimTipi !== 'au(sim)');
+    HAVA_ARACLARI_LISTESI.forEach(arac => {
+        const sonGgg = gercek.find(f => f.havaAraciTipi === arac && f.egitimTipi === 'ggg');
+        if (sonGgg) {
+            const h = new Date(sonGgg.tarih); h.setDate(h.getDate() + 60);
+            const k = getGunFarki(h);
+            if (k >= 0 && k <= UYARI_ESIGI_GUN) ekle('🌙', `GGG sayacı (${arac.toUpperCase()})`, k);
+        }
+        const sonGenel = gercek.find(f => f.havaAraciTipi === arac);
+        if (sonGenel) {
+            const h = new Date(sonGenel.tarih); h.setDate(h.getDate() + 60);
+            const k = getGunFarki(h);
+            if (k >= 0 && k <= UYARI_ESIGI_GUN) ekle('⏳', `Son uçuş sayacı (${arac.toUpperCase()})`, k);
+        }
+    });
+
+    liste.sort((a, b) => a.kalan - b.kalan);
+    return liste.slice(0, 6);
+}
+
+function uyariBandiHtml(uyarilar) {
+    if (!uyarilar.length) return '';
+    return `<div class="uyari-alani" role="status">${uyarilar.map(u => {
+        const sag = u.kalan < 0 ? 'Süresi doldu' : (u.kalan === 0 ? 'Bugün doluyor' : `${u.kalan} gün kaldı`);
+        return `<div class="uyari-satiri uy-${u.seviye}"><span aria-hidden="true">${u.simge}</span><span>${esc(u.metin)}</span><b>${esc(sag)}</b></div>`;
+    }).join('')}</div>`;
+}
+
+
 // --- PANEL HTML ÜRETİMİ ---
 // Tüm dinamik değerler esc() ile kaçışlanır. Stil ve istemci kodu public/panel.css ve public/panel.js içindedir.
 
@@ -409,13 +480,13 @@ function ucusSatiriHtml(f) {
     const kisa = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
     const tema = ucusTemasi(f.egitimTipi);
     return `
-        <tr id="row-${id}" class="ucus-satiri${tema.sinif}" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}">
+        <tr id="row-${id}" class="ucus-satiri${tema.sinif}" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}" data-aciklama="${esc(aciklama)}">
             <td class="c-tarih">${esc(f.tarih)}</td>
             <td class="c-arac">${esc(f.havaAraciTipi)}</td>
             <td class="c-egitim">${tema.ikon}${esc(f.egitimTipi)}</td>
             <td class="c-sure">${esc(f.sure)}</td>
             <td class="c-aciklama" title="${esc(aciklama)}">${esc(kisa)}</td>
-            <td class="c-islem"><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}">Sil</button></td>
+            <td class="c-islem"><button type="button" class="duz-btn" data-eylem="ucus-duzenle" data-id="${id}" aria-label="Uçuşu düzenle">Düzenle</button><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}">Sil</button></td>
         </tr>
         <tr id="detay-${id}" class="detay-satiri">
             <td colspan="6">
@@ -430,6 +501,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
     const aktifDonem = hesaplaAktifDonemSaati(flights);
     const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
     const aracBazliDurum = hesaplaAracaGoreDetayliDurum(flights);
+    const uyarilar = hesaplaUyarilar(flights, kayitliTarihler);
 
     const staticYears = Array.from({ length: 10 }, (_, i) => 2024 + i);
     const bugunTarihStr = new Date().toISOString().split('T')[0];
@@ -455,7 +527,12 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
             <div class="marka">
                 <span class="marka-ikon" aria-hidden="true">✈</span>
                 <span class="marka-ad">Uçuş <b>Logbook</b></span>
+                <button type="button" class="tema-btn" data-eylem="tema-degistir" aria-label="Koyu / açık tema">
+                    <span class="tb-koyu" aria-hidden="true">🌙</span><span class="tb-acik" aria-hidden="true">☀️</span>
+                </button>
             </div>
+
+            ${uyariBandiHtml(uyarilar)}
 
             <div class="ust-panel">
                 <div class="ozet-kart">
@@ -482,7 +559,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
                         <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefGggStr)}</span>
                     </div>
                     <div class="sayac" data-eylem="sayac-modal" data-tip="sonUcus" style="--renk:${gggDurum.renkSonUcus};" title="Tüm Araçların Son Uçuş Durumunu Gör">
-                        <strong>Son Uçuş (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanSonUcus)}</span>
+                        <strong>☀️ Son Uçuş (60G)</strong><br><span class="sayac-deger">${esc(gggDurum.kalanSonUcus)}</span>
                         <span class="tarih-etiket">Son Tarih: ${esc(gggDurum.hedefSonUcusStr)}</span>
                     </div>
                     ${tarihSayaciHtml(tarihBul('muayene1Tarih'), 1, '1 Yıllık Muayene', 'muayene1Tarih')}
@@ -490,6 +567,15 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
                     ${tarihSayaciHtml(tarihBul('aletKartTarih'), 1, 'Alet Kart', 'aletKartTarih')}
                     ${tarihSayaciHtml(tarihBul('standTarih'), 1, 'Standardizasyon', 'standTarih')}
                 </div>
+            </div>
+
+            <div class="ilerleme-kart">
+                <div class="ilerleme-ust">
+                    <span class="ilerleme-saat">${esc(aktifDonem.sure)} <small>/ ${DONEM_HEDEF_SAAT}:00</small></span>
+                    <span class="ilerleme-yuzde">%${esc(aktifDonem.yuzde)}</span>
+                </div>
+                <div class="ilerleme-cubuk" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(aktifDonem.yuzde)}" aria-label="${esc(aktifDonem.yil)} dönemi hedef ilerlemesi"><i style="width:${esc(aktifDonem.yuzde)}%"></i></div>
+                ${aktifDonem.tempo ? `<div class="ilerleme-not">📈 ${esc(aktifDonem.tempo)}</div>` : ''}
             </div>
 
             <div class="akordeon-container">
@@ -517,6 +603,10 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
                     <span id="ekleOkIkon">▼</span>
                 </button>
                 <div id="ekleIcerikKutusu" class="akordeon-icerik">
+                    <button type="button" id="sonKopyaBtn" class="kopya-btn" data-eylem="son-kopyala" hidden>
+                        <span aria-hidden="true">📋</span>
+                        <span><b>Son uçuşu kopyala</b><small id="sonKopyaOzet"></small></span>
+                    </button>
                     <form id="ucusFormu" class="form-grid">
                         <div><label for="tarih">Tarih:</label><input type="date" id="tarih" value="${esc(bugunTarihStr)}"></div>
                         <div><label for="havaAraciTipi">Hava Aracı Tipi:</label><select id="havaAraciTipi">${ARAC_SECENEKLERI}</select></div>
@@ -529,6 +619,12 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
                         <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">✈️ Uçuşu Ekle</button>
                     </form>
                 </div>
+            </div>
+
+            <div class="arac-cubugu">
+                <button type="button" class="arac-btn" data-eylem="istatistik-ac">📊 İstatistik</button>
+                <button type="button" class="arac-btn" data-eylem="csv-indir">⬇ Excel (CSV)</button>
+                <button type="button" class="arac-btn" data-eylem="pdf-indir">⬇ PDF</button>
             </div>
 
             <div class="tablo-sarmal">
@@ -580,6 +676,40 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
             </div>
         </div>
 
+        <!-- UÇUŞ DÜZENLEME MODALI -->
+        <div id="duzenleModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu">
+                <h3 class="modal-baslik">✏️ Uçuşu Düzenle</h3>
+                <input type="hidden" id="duzId">
+                <div class="duz-grid">
+                    <div><label for="duzTarih">Tarih</label><input type="date" id="duzTarih"></div>
+                    <div><label for="duzArac">Hava Aracı</label><select id="duzArac">${ARAC_SECENEKLERI}</select></div>
+                    <div><label for="duzEgitim">Eğitim</label><select id="duzEgitim">${EGITIM_SECENEKLERI}</select></div>
+                    <div><label for="duzSureAlani">Süre</label>
+                        <button type="button" id="duzSureAlani" class="sure-alani" data-eylem="sure-modal" data-hedef="duzSureAlani" data-metin="duzSureMetin"><span id="duzSureMetin" class="yer-tutucu">Süre seçin</span><span aria-hidden="true">⏱️</span></button>
+                    </div>
+                </div>
+                <label for="duzAciklama">Görev Açıklaması</label>
+                <textarea id="duzAciklama" maxlength="1000"></textarea>
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="duzenle-kaydet">Kaydet</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="duzenleModal">İptal</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- İSTATİSTİK MODALI -->
+        <div id="istatistikModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu genis">
+                <h3 class="modal-baslik">📊 ${esc(aktifDonem.yil)} Dönemi İstatistikleri</h3>
+                <div id="istatistikIcerik" class="modal-liste"></div>
+                <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="istatistikModal">Kapat</button>
+            </div>
+        </div>
+
+        <!-- YAZDIRMA (PDF) ALANI: yalnızca yazdırırken görünür -->
+        <div id="yazdirAlani" class="yazdir-alani"></div>
+
         <!-- UÇUŞ SÜRESİ SEÇİCİ MODALI -->
         <div id="sureModal" class="modal-arka" role="dialog" aria-modal="true">
             <div class="modal-kutu kucuk">
@@ -617,7 +747,15 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0b1220">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Logbook">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <title>Uçuş Takip Paneli</title>
+    <script>try{var t=localStorage.getItem('logbookTema');if(t==='acik')document.documentElement.setAttribute('data-tema','acik');}catch(e){}</script>
     <link rel="stylesheet" href="/panel.css">
 </head>
 <body>
@@ -881,6 +1019,22 @@ app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
     try {
         // Sadece oturumdaki kullanıcının kendi kaydı silinebilir
         await Flight.findOneAndDelete({ _id: id, userEmail: req.oturumEmail });
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
+
+app.post('/api/update-flight', oturumGerekli, async (req, res) => {
+    const govde = req.body || {};
+    if (!metinMi(govde.id) || !mongoose.isValidObjectId(govde.id)) {
+        return res.json({ success: false, message: "Geçersiz kayıt." });
+    }
+    const d = ucusGovdesiniDogrula(govde);
+    if (d.hata) return res.json({ success: false, message: d.hata });
+
+    try {
+        // Sadece oturumdaki kullanıcının kendi kaydı güncellenir
+        const sonuc = await Flight.findOneAndUpdate({ _id: govde.id, userEmail: req.oturumEmail }, { $set: d.veri }, { new: true });
+        if (!sonuc) return res.json({ success: false, message: "Kayıt bulunamadı." });
         res.json({ success: true });
     } catch (e) { res.json({ success: false }); }
 });
