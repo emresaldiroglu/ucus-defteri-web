@@ -122,7 +122,15 @@ mongoose.connect(mongoURI, { dbName: 'ucusDB' })
 
 const UserSchema = new mongoose.Schema({
     email: String,
-    password: String
+    password: String,
+    // Kişisel bilgiler (hepsi isteğe bağlı; yalnızca kullanıcının kendisi görür/değiştirir)
+    profil: {
+        adSoyad: String,
+        boy: Number,
+        kilo: Number,
+        dogumTarihi: String,
+        kanGrubu: String
+    }
 });
 const User = mongoose.model('User', UserSchema, 'users');
 
@@ -169,6 +177,7 @@ const DONEM_HEDEF_SAAT = 140;
 const IZINLI_TARIH_ALANLARI = ['muayene1Tarih', 'muayene4Tarih', 'aletKartTarih', 'standTarih'];
 const HAVA_ARACLARI_LISTESI = ['s70', 's70i', 't70', 'atak', 'mi17', 'gökbey', 'cayrokopter', 'ab-205'];
 const EGITIM_TIPLERI = ['ggg', 'gş', 'au(sim)'];
+const KAN_GRUPLARI = ['A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', 'AB Rh+', 'AB Rh-', '0 Rh+', '0 Rh-'];
 const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
 const RENK_KIRMIZI = '#e74c3c';
@@ -496,7 +505,8 @@ function ucusSatiriHtml(f) {
         </tr>`;
 }
 
-function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
+function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
+    profil = profil || {};
     const toplamUcusSuresi = hesaplaToplamSaat(flights);
     const aktifDonem = hesaplaAktifDonemSaati(flights);
     const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
@@ -547,7 +557,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
                         </div>
                     </div>
                     <div class="ozet-alt">
-                        <span class="user-email-link" data-eylem="sifre-modal" title="Şifreyi Değiştirmek İçin Tıkla">${esc(email)}</span>
+                        <button type="button" class="profil-btn" data-eylem="profil-modal" title="Profil ve şifre ayarları">👤 ${esc(profil.adSoyad || email)}</button>
                         ${yonetici ? '<a class="cikis-link" href="/admin">Yönetim</a>' : ''}
                         <a class="cikis-link" href="/logout">Çıkış</a>
                     </div>
@@ -659,19 +669,44 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici) {
             </div>
         </div>
 
-        <!-- ŞİFRE GÜNCELLEME MODALI -->
-        <div id="sifreModal" class="modal-arka" role="dialog" aria-modal="true">
-            <div class="modal-kutu dar">
-                <h3 class="modal-baslik">🔐 Şifre Güncelleme</h3>
-                <label for="eskiSifre">Mevcut Şifre:</label>
-                <input type="password" id="eskiSifre" placeholder="Mevcut şifreniz" autocomplete="current-password">
-                <label for="yeniSifre1">Yeni Şifre:</label>
-                <input type="password" id="yeniSifre1" placeholder="En az 8 karakter, 1 büyük, 1 rakam" autocomplete="new-password">
-                <label for="yeniSifre2">Yeni Şifre (Tekrar):</label>
-                <input type="password" id="yeniSifre2" placeholder="Yeni şifreyi tekrar girin" autocomplete="new-password">
-                <div class="modal-butonlar">
-                    <button type="button" class="btn-tamam" data-eylem="sifre-guncelle">Güncelle</button>
-                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="sifreModal">İptal</button>
+        <!-- PROFİL VE ŞİFRE MODALI -->
+        <div id="profilModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu profil-kutu">
+                <h3 class="modal-baslik">👤 Profilim</h3>
+                <div class="profil-mail">${esc(email)}</div>
+                <div class="sekme-cubugu" role="tablist">
+                    <button type="button" class="sekme aktif" role="tab" data-eylem="profil-sekme" data-sekme="bilgi">Bilgilerim</button>
+                    <button type="button" class="sekme" role="tab" data-eylem="profil-sekme" data-sekme="sifre">🔐 Şifre</button>
+                </div>
+                <div class="profil-govde">
+                    <div id="profilBilgi">
+                        <label for="profilAd">Ad Soyad</label>
+                        <input type="text" id="profilAd" maxlength="60" autocomplete="name" value="${esc(profil.adSoyad || '')}" placeholder="İsteğe bağlı">
+                        <div class="duz-grid">
+                            <div><label for="profilBoy">Boy (cm)</label><input type="number" id="profilBoy" inputmode="numeric" min="100" max="250" step="1" value="${esc(profil.boy || '')}" placeholder="175"></div>
+                            <div><label for="profilKilo">Kilo (kg)</label><input type="number" id="profilKilo" inputmode="decimal" min="30" max="300" step="0.1" value="${esc(profil.kilo || '')}" placeholder="75"></div>
+                            <div><label for="profilDogum">Doğum Tarihi</label><input type="date" id="profilDogum" value="${esc(profil.dogumTarihi || '')}"></div>
+                            <div><label for="profilKan">Kan Grubu</label><select id="profilKan"><option value="">Seçin</option>${KAN_GRUPLARI.map(k => `<option value="${esc(k)}"${profil.kanGrubu === k ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+                        </div>
+                        <div id="profilHesap" class="profil-hesap" hidden></div>
+                        <p class="profil-not">Bu bilgiler yalnızca sana aittir, başka kullanıcılar göremez.</p>
+                        <div class="modal-butonlar">
+                            <button type="button" class="btn-tamam" data-eylem="profil-kaydet">Kaydet</button>
+                            <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>
+                        </div>
+                    </div>
+                    <div id="profilSifre" hidden>
+                        <label for="eskiSifre">Mevcut Şifre:</label>
+                        <input type="password" id="eskiSifre" placeholder="Mevcut şifreniz" autocomplete="current-password">
+                        <label for="yeniSifre1">Yeni Şifre:</label>
+                        <input type="password" id="yeniSifre1" placeholder="En az 8 karakter, 1 büyük, 1 rakam" autocomplete="new-password">
+                        <label for="yeniSifre2">Yeni Şifre (Tekrar):</label>
+                        <input type="password" id="yeniSifre2" placeholder="Yeni şifreyi tekrar girin" autocomplete="new-password">
+                        <div class="modal-butonlar">
+                            <button type="button" class="btn-tamam" data-eylem="sifre-guncelle">Güncelle</button>
+                            <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -916,7 +951,7 @@ const loginHandler = async (req, res) => {
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
 
         res.set('Cache-Control', 'no-store');
-        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email)));
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil));
     } catch (error) {
         console.error(error);
         if (cerezle) return res.status(500).send("Sunucu hatası.");
@@ -958,7 +993,60 @@ app.post('/register', async (req, res) => {
 });
 
 
+// Profil formunu doğrular. Tüm alanlar isteğe bağlıdır; boş bırakılan alan silinir.
+function profilDogrula(g) {
+    g = g || {};
+    const sayiOku = (v) => {
+        if (v === undefined || v === null || v === '') return { bos: true };
+        const n = Number(String(v).trim().replace(',', '.'));
+        return Number.isFinite(n) ? { n } : { hata: true };
+    };
+
+    const adSoyad = metinMi(g.adSoyad) ? g.adSoyad.replace(/[\u0000-\u001f\u007f]/g, '').trim() : '';
+    if (adSoyad.length > 60) return { hata: 'Ad soyad en fazla 60 karakter olabilir.' };
+
+    const boy = sayiOku(g.boy);
+    if (boy.hata || (!boy.bos && (boy.n < 100 || boy.n > 250))) return { hata: 'Boy 100 ile 250 cm arasında olmalıdır.' };
+
+    const kilo = sayiOku(g.kilo);
+    if (kilo.hata || (!kilo.bos && (kilo.n < 30 || kilo.n > 300))) return { hata: 'Kilo 30 ile 300 kg arasında olmalıdır.' };
+
+    let dogumTarihi = '';
+    if (g.dogumTarihi !== undefined && g.dogumTarihi !== null && g.dogumTarihi !== '') {
+        const bugun = new Date().toISOString().slice(0, 10);
+        if (!metinMi(g.dogumTarihi) || !/^\d{4}-\d{2}-\d{2}$/.test(g.dogumTarihi) || isNaN(new Date(g.dogumTarihi).getTime())
+            || g.dogumTarihi < '1930-01-01' || g.dogumTarihi > bugun) {
+            return { hata: 'Geçerli bir doğum tarihi girin.' };
+        }
+        dogumTarihi = g.dogumTarihi;
+    }
+
+    const kanGrubu = metinMi(g.kanGrubu) ? g.kanGrubu : '';
+    if (kanGrubu && !KAN_GRUPLARI.includes(kanGrubu)) return { hata: 'Geçersiz kan grubu.' };
+
+    return {
+        veri: {
+            adSoyad,
+            boy: boy.bos ? null : Math.round(boy.n),
+            kilo: kilo.bos ? null : Math.round(kilo.n * 10) / 10,
+            dogumTarihi,
+            kanGrubu
+        }
+    };
+}
+
+
 // --- API (hepsi oturum çerezi gerektirir) ---
+
+app.post('/api/update-profile', oturumGerekli, async (req, res) => {
+    const d = profilDogrula(req.body);
+    if (d.hata) return res.json({ success: false, message: d.hata });
+    try {
+        const sonuc = await User.findOneAndUpdate({ email: req.oturumEmail }, { $set: { profil: d.veri } });
+        if (!sonuc) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
 
 app.post('/api/update-password', oturumGerekli, async (req, res) => {
     const { eskiSifre, yeniSifre } = req.body || {};

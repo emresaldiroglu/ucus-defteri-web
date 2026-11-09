@@ -173,9 +173,63 @@
         modalAc('detayliSayacModal');
     }
 
-    function sifreModalAc() {
+    /* ---------- PROFİL ve ŞİFRE ---------- */
+
+    function profilSekme(sekme) {
+        var sifre = sekme === 'sifre';
+        $('profilBilgi').hidden = sifre;
+        $('profilSifre').hidden = !sifre;
+        document.querySelectorAll('#profilModal .sekme').forEach(function (b) {
+            b.classList.toggle('aktif', b.dataset.sekme === (sifre ? 'sifre' : 'bilgi'));
+        });
+    }
+
+    function profilHesapla() {
+        var kutu = $('profilHesap');
+        if (!kutu) return;
+        var parcalar = [];
+        var boy = parseFloat($('profilBoy').value);
+        var kilo = parseFloat(String($('profilKilo').value).replace(',', '.'));
+        if (boy >= 100 && boy <= 250 && kilo >= 30 && kilo <= 300) {
+            var vki = kilo / Math.pow(boy / 100, 2);
+            parcalar.push('VKİ: ' + (Math.round(vki * 10) / 10).toString().replace('.', ','));
+        }
+        var dogum = $('profilDogum').value;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dogum)) {
+            var d = new Date(dogum), t = new Date();
+            var yas = t.getFullYear() - d.getFullYear();
+            if (t.getMonth() < d.getMonth() || (t.getMonth() === d.getMonth() && t.getDate() < d.getDate())) yas--;
+            if (yas >= 0 && yas < 120) parcalar.push('Yaş: ' + yas);
+        }
+        kutu.textContent = parcalar.join('  ·  ');
+        kutu.hidden = !parcalar.length;
+    }
+
+    function profilModalAc(sekme) {
         ['eskiSifre', 'yeniSifre1', 'yeniSifre2'].forEach(function (id) { $(id).value = ''; });
-        modalAc('sifreModal');
+        profilSekme(sekme || 'bilgi');
+        profilHesapla();
+        modalAc('profilModal');
+    }
+
+    async function profilKaydet(dugme) {
+        dugme.disabled = true;
+        var sonuc = await apiCagir('/api/update-profile', 'POST', {
+            adSoyad: $('profilAd').value,
+            boy: $('profilBoy').value,
+            kilo: $('profilKilo').value,
+            dogumTarihi: $('profilDogum').value,
+            kanGrubu: $('profilKan').value
+        });
+        dugme.disabled = false;
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) {
+            modalKapat('profilModal');
+            bildir('Profil bilgileri kaydedildi.', 'basari');
+            await paneliYenile();
+        } else {
+            bildir(sonuc.message || 'Profil kaydedilemedi.', 'hata');
+        }
     }
 
     function sureModalAc(hedefId, metinId) {
@@ -231,7 +285,7 @@
         dugme.disabled = false;
         if (sonuc.oturumYok) return;
         if (sonuc.success) {
-            modalKapat('sifreModal');
+            modalKapat('profilModal');
             bildir('Şifreniz başarıyla güncellendi.', 'basari');
         } else {
             bildir(sonuc.message || 'Mevcut şifre hatalı.', 'hata');
@@ -415,7 +469,7 @@
         if (!sonFiltreli.length) return bildir('Yazdırılacak uçuş kaydı yok.', 'hata');
         var kap = $('yazdirAlani');
         kap.textContent = '';
-        var mail = document.querySelector('.user-email-link');
+        var mail = document.querySelector('.profil-mail');
         var toplam = 0;
         sonFiltreli.forEach(function (s) { toplam += sureDakika(s.dataset.sure); });
 
@@ -732,7 +786,9 @@
             case 'ucus-ekle': kaydetYeniUcus(hedef); break;
             case 'donem-modal': donemModalAc(); break;
             case 'sayac-modal': sayacModalAc(d.tip); break;
-            case 'sifre-modal': sifreModalAc(); break;
+            case 'profil-modal': profilModalAc('bilgi'); break;
+            case 'profil-sekme': profilSekme(d.sekme); break;
+            case 'profil-kaydet': profilKaydet(hedef); break;
             case 'sure-modal': sureModalAc(d.hedef, d.metin); break;
             case 'ucus-duzenle': e.stopPropagation(); duzenleModalAc(d.id); break;
             case 'duzenle-kaydet': duzenleKaydet(hedef); break;
@@ -750,6 +806,11 @@
             case 'filtre-temizle': filtreleriTemizle(); break;
             case 'sayfa': mevcutSayfa = parseInt(d.sayfa, 10) || 1; filtreleUcuslari(); break;
         }
+    });
+
+    // Boy / kilo / doğum tarihi değişince VKİ ve yaş anında güncellenir
+    document.addEventListener('input', function (e) {
+        if (e.target && /^profil(Boy|Kilo|Dogum)$/.test(e.target.id)) profilHesapla();
     });
 
     // Enter tuşu formu göndermesin; uçuş formunda kaydet düğmesi gibi davransın
