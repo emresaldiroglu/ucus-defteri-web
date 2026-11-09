@@ -603,6 +603,135 @@
         if (meta) meta.setAttribute('content', acik ? '#0b1220' : '#eef3fb');
     }
 
+
+    /* ---------- ANA EKRANA EKLEME KARTI ---------- */
+
+    var kurulumOlayi = null;
+    var EKLE_ERTELE_GUN = 7;
+
+    function depoOku(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function depoYaz(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* depolama kapalı olabilir */ } }
+
+    function uygulamaModundaMi() {
+        return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    }
+    function iosMu() {
+        return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+    function mobilMi() {
+        return window.matchMedia && matchMedia('(max-width: 820px)').matches && matchMedia('(pointer: coarse)').matches;
+    }
+
+    function eklemeKartiKapat() {
+        var k = $('eklemeKarti');
+        if (k) k.remove();
+    }
+
+    function eklemeKartiAc() {
+        eklemeKartiKapat();
+        var kart = eleman('div', 'ekleme-karti');
+        kart.id = 'eklemeKarti';
+        kart.setAttribute('role', 'dialog');
+        kart.setAttribute('aria-label', 'Ana ekrana ekle');
+
+        var ust = eleman('div', 'ekleme-ust');
+        var ikon = document.createElement('img');
+        ikon.src = '/icon-192.png'; ikon.alt = ''; ikon.className = 'ekleme-ikon'; ikon.width = 48; ikon.height = 48;
+        ust.appendChild(ikon);
+        var metin = document.createElement('div');
+        metin.appendChild(eleman('b', '', 'Logbook\'u ana ekrana ekle'));
+        metin.appendChild(eleman('small', '', 'Uygulama gibi tek dokunuşla aç, tam ekran kullan.'));
+        ust.appendChild(metin);
+        kart.appendChild(ust);
+
+        var butonlar = eleman('div', 'ekleme-butonlar');
+
+        if (kurulumOlayi) {
+            // Android / Chrome: tek dokunuşla yükleme penceresi
+            var ekle = eleman('button', 'btn-tamam', 'Ana ekrana ekle');
+            ekle.type = 'button';
+            ekle.onclick = function () {
+                var olay = kurulumOlayi;
+                kurulumOlayi = null;
+                eklemeKartiKapat();
+                try {
+                    olay.prompt();
+                    if (olay.userChoice) olay.userChoice.then(function (s) {
+                        if (s && s.outcome === 'accepted') depoYaz('logbookEklendi', '1');
+                    });
+                } catch (e) { /* tarayıcı izin vermediyse sessizce geçilir */ }
+            };
+            butonlar.appendChild(ekle);
+        } else if (iosMu()) {
+            var adimlar = eleman('ol', 'ekleme-adimlar');
+            var a1 = document.createElement('li');
+            a1.appendChild(document.createTextNode('Alttaki '));
+            var simge = eleman('span', 'ekleme-simge');
+            simge.setAttribute('aria-hidden', 'true');
+            simge.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7.5 7.5 4.5-4.5 4.5 4.5"/><path d="M5 11H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+            a1.appendChild(simge);
+            a1.appendChild(document.createTextNode(' Paylaş düğmesine dokun'));
+            adimlar.appendChild(a1);
+            adimlar.appendChild(eleman('li', '', 'Listeyi kaydırıp "Ana Ekrana Ekle" seçeneğini seç'));
+            adimlar.appendChild(eleman('li', '', 'Sağ üstteki "Ekle"ye dokun'));
+            kart.appendChild(adimlar);
+            var tamam = eleman('button', 'btn-tamam', 'Anladım');
+            tamam.type = 'button';
+            tamam.onclick = function () { eklemeKartiKapat(); depoYaz('logbookEkleErtele', String(Date.now())); };
+            butonlar.appendChild(tamam);
+        } else {
+            var adimlar2 = eleman('ol', 'ekleme-adimlar');
+            adimlar2.appendChild(eleman('li', '', 'Tarayıcının menüsünü aç (⋮ veya ⋯)'));
+            adimlar2.appendChild(eleman('li', '', '"Ana ekrana ekle" ya da "Uygulamayı yükle" seçeneğine dokun'));
+            kart.appendChild(adimlar2);
+            var tamam2 = eleman('button', 'btn-tamam', 'Anladım');
+            tamam2.type = 'button';
+            tamam2.onclick = function () { eklemeKartiKapat(); depoYaz('logbookEkleErtele', String(Date.now())); };
+            butonlar.appendChild(tamam2);
+        }
+
+        var sonra = eleman('button', 'btn-iptal', 'Daha sonra');
+        sonra.type = 'button';
+        sonra.onclick = function () { eklemeKartiKapat(); depoYaz('logbookEkleErtele', String(Date.now())); };
+        butonlar.appendChild(sonra);
+        kart.appendChild(butonlar);
+
+        var hic = eleman('button', 'ekleme-hic', 'Bir daha gösterme');
+        hic.type = 'button';
+        hic.onclick = function () { eklemeKartiKapat(); depoYaz('logbookEkleGizle', '1'); };
+        kart.appendChild(hic);
+
+        document.body.appendChild(kart);
+    }
+
+    // Otomatik gösterim: yalnızca telefonda, uygulama olarak açık değilse, daha önce eklenmemiş/gizlenmemişse
+    function eklemeKartiniBelirle() {
+        if (uygulamaModundaMi() || !mobilMi()) return;
+        if (depoOku('logbookEklendi') === '1' || depoOku('logbookEkleGizle') === '1') return;
+        var ertele = parseInt(depoOku('logbookEkleErtele') || '0', 10);
+        if (ertele && Date.now() - ertele < EKLE_ERTELE_GUN * 24 * 3600 * 1000) return;
+        setTimeout(function () {
+            if (!document.getElementById('eklemeKarti') && !document.querySelector('.modal-arka.acik')) eklemeKartiAc();
+        }, 3500);
+    }
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        kurulumOlayi = e;
+    });
+    window.addEventListener('appinstalled', function () {
+        depoYaz('logbookEklendi', '1');
+        kurulumOlayi = null;
+        eklemeKartiKapat();
+    });
+
+    // Hizmet işçisi: yalnızca "uygulama olarak yüklenebilir" olmak için (önbellek tutmaz)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function () { /* desteklenmiyorsa sorun değil */ });
+        });
+    }
+
     /* ---------- KAYDIRMALI SÜRE SEÇİCİ ---------- */
 
     var OGE_YUKSEKLIK = 44;
@@ -787,6 +916,7 @@
             case 'donem-modal': donemModalAc(); break;
             case 'sayac-modal': sayacModalAc(d.tip); break;
             case 'profil-modal': profilModalAc('bilgi'); break;
+            case 'ekle-goster': modalKapat('profilModal'); eklemeKartiAc(); break;
             case 'profil-sekme': profilSekme(d.sekme); break;
             case 'profil-kaydet': profilKaydet(hedef); break;
             case 'sure-modal': sureModalAc(d.hedef, d.metin); break;
@@ -834,4 +964,6 @@
     tekerlekleriKur();
     filtreleUcuslari();
     sonKopyaGuncelle();
+    eklemeKartiniBelirle();
+    if (uygulamaModundaMi()) document.querySelectorAll('[data-eylem="ekle-goster"]').forEach(function (b) { b.hidden = true; });
 })();

@@ -690,6 +690,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
                         </div>
                         <div id="profilHesap" class="profil-hesap" hidden></div>
                         <p class="profil-not">Bu bilgiler yalnızca sana aittir, başka kullanıcılar göremez.</p>
+                        <button type="button" class="uygulama-btn" data-eylem="ekle-goster">📲 Uygulamayı ana ekrana ekle</button>
                         <div class="modal-butonlar">
                             <button type="button" class="btn-tamam" data-eylem="profil-kaydet">Kaydet</button>
                             <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>

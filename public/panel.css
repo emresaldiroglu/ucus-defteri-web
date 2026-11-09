@@ -523,3 +523,23 @@ html[data-tema="acik"] .ist-cubuk em { color: var(--yazi); }
 .profil-not { margin: 6px 0 0; font-size: 11.5px; text-align: center; color: var(--yazi-soluk); }
 html[data-tema="acik"] .sekme.aktif { color: #fff; }
 html[data-tema="acik"] .profil-hesap { color: #8a5200; }
+
+
+/* ===================== ANA EKRANA EKLEME KARTI ===================== */
+.ekleme-karti { position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); max-width: 460px; margin: 0 auto; z-index: 10000; padding: 16px; border-radius: 22px; color: var(--yazi);
+    background: linear-gradient(180deg, #16284b, #0f1c36); border: 1px solid var(--cizgi); box-shadow: 0 20px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.12); animation: yuksel .35s ease; }
+@keyframes yuksel { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+.ekleme-ust { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.ekleme-ikon { border-radius: 12px; flex: none; box-shadow: 0 6px 16px rgba(43,125,224,.4); }
+.ekleme-ust b { display: block; font-size: 15px; }
+.ekleme-ust small { display: block; color: var(--yazi-soluk); font-size: 12.5px; margin-top: 2px; line-height: 1.35; }
+.ekleme-adimlar { margin: 0 0 12px; padding: 12px 12px 12px 30px; font-size: 13.5px; line-height: 1.6; background: rgba(255,255,255,.06); border: 1px solid var(--cizgi); border-radius: 14px; }
+.ekleme-simge { display: inline-grid; place-items: center; vertical-align: middle; width: 28px; height: 28px; border-radius: 8px; background: rgba(74,163,255,.25); color: #8cc4ff; }
+.ekleme-butonlar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ekleme-hic { display: block; width: auto; margin: 10px auto 0; padding: 4px 8px; background: none; font-size: 12px; font-weight: 600; color: var(--yazi-soluk); text-decoration: underline; }
+.uygulama-btn { margin-top: 10px; background: rgba(74,163,255,.16); border: 1px solid rgba(74,163,255,.4); }
+html[data-tema="acik"] .ekleme-karti { background: #fff; box-shadow: 0 20px 60px rgba(20,34,61,.3); }
+html[data-tema="acik"] .ekleme-simge { color: #1b5fb8; }
+html[data-tema="acik"] .uygulama-btn { color: var(--yazi); }
+@media (prefers-reduced-motion: reduce) { .ekleme-karti { animation: none; } }
+@media (display-mode: standalone) { .uygulama-btn { display: none; } }
