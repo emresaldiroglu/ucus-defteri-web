@@ -169,9 +169,10 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 2;
+const YENILIK_SURUMU = 3;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
+        '📖 Yeni Kılavuz: sağ üstteki ❓ düğmesiyle (ya da Profil → Kılavuz) her özelliğin nasıl kullanıldığını okuyabilir, kelime yazarak arayabilirsin.',
         '📊 İstatistik artık dönem dönem incelenebiliyor: güncel dönem, geçmiş dönemler ve "Tümü" (dönemleri karşılaştırma grafiğiyle).',
         '✅ Muayene, Alet Kart ve Standardizasyon kartlarına dokununca çıkan pencerede "Bugün yenilendi" düğmesi var: tek dokunuşla bugünün tarihi kaydedilir, yanlışlıkla basarsan "Geri al" ile eski tarihe dönersin.',
         '🟢 NVG (gece görüş) teması geldi: sağ üstteki tema düğmesine bastıkça koyu → açık → NVG sırasıyla geçer, seçimin hatırlanır.'
@@ -195,6 +196,55 @@ const YENILIKLER = [
         '"Beni hatırla" ile 30 gün oturum açık kalır; seçmezsen 15 dakika işlem yapılmazsa oturum kapanır.',
         'Tema düğmesiyle koyu, açık ve yeşil NVG (gece görüş) temaları arasında geçiş yapabilirsin. Giriş ve uçuş paneli yeni gece gökyüzü tasarımına kavuştu.',
         'Telefonda 📲 "Ana ekrana ekle" ile Logbook\'u uygulama gibi kullanabilirsin (Profil menüsünden de ulaşırsın).'
+    ]}
+];
+// "Kılavuz": her özelliğin kullanımını anlatan kalıcı yardım listesi. y: true → "yeni" etiketi gösterilir.
+// Yeni bir özellik eklendiğinde buraya maddesi de eklenir.
+const KILAVUZ = [
+    { baslik: '✈️ Uçuş ekleme', maddeler: [
+        { b: 'Yeni uçuş nasıl eklenir?', m: 'Ana ekrandaki "✈️ Yeni Uçuş Saati Girmek İçin Tıkla" şeridine dokun, form açılır. Tarihi, hava aracını, eğitim sınıflandırmasını (GGG, GŞ ya da AU(SİM)) ve süreyi seç, istersen görev açıklaması yaz, sonra "✈️ Uçuşu Ekle"ye bas. Kaydetmeden önce onay sorulur. Tarih kutusu her zaman bugünle açılır.' },
+        { b: 'Süre nasıl girilir? (⏱️)', m: 'Süre kutusuna dokununca iPhone tarzı bir tekerlek açılır. Saati ve dakikayı parmağınla kaydırarak seç, "Tamam"a bas. Tek bir uçuş en fazla 24 saat olabilir.' },
+        { b: '24 saati aşan toplu süre', y: true, m: 'Eski bir dönemden devreden toplam saati girmek istiyorsan süre kutusunun altındaki "24 saati aşan eskiye dönük toplu süre giriyorum" kutucuğunu işaretle. Tekerlek yerine saat ve dakika kutuları açılır (en fazla 1000 saat).\nBöyle kayıtlar listede "toplu" etiketiyle görünür, toplam saate ve dönem saatine dahil olur. İstatistikte uçuş sayısına ve ortalamaya katılmaz, şablon olarak kaydedilemez.' },
+        { b: 'Son uçuşu kopyala (📋)', m: 'Form açıldığında en üstte listedeki son uçuşunun özeti ve "Son uçuşu kopyala" düğmesi durur. Basınca hava aracı, eğitim, süre ve açıklama forma yazılır. Tarihi ve süreyi kontrol edip uçuşu eklersin. Aynı tür uçuşları art arda girerken zaman kazandırır.' },
+        { b: 'Şablonlar (⭐)', m: 'Sık yaptığın bir uçuşu bir kere forma doldurup "➕ Formdaki bilgileri şablon olarak kaydet"e bas ve ona bir ad ver (en fazla 30 karakter). Şablon, form alanında bir düğme olarak görünür. Dokununca araç, eğitim, süre ve açıklama forma yazılır (tarih bugün kalır). Şablonun yanındaki ✕ ile silinir. En fazla 10 şablon kaydedebilirsin.' }
+    ]},
+    { baslik: '📋 Uçuş listesi', maddeler: [
+        { b: 'Uçuşun tam açıklaması', m: 'Listede görev açıklaması kısaltılır. Bir uçuş satırına dokunursan altında tam açıklama açılır, tekrar dokununca kapanır.' },
+        { b: '✏️ Uçuşu düzenleme', m: 'Satırdaki "✏️ Düzenle" düğmesi tarihi, hava aracını, eğitimi, süreyi ve açıklamayı değiştirmeni sağlar. "Kaydet"e basınca liste, dönem saati ve sayaçlar yeniden hesaplanır.' },
+        { b: '🗑️ Silme ve geri alma', m: 'Silmeden önce onay sorulur. Silince bildirimde "Geri al" düğmesi çıkar, hemen basarsan uçuş yerine döner. Basmasan bile uçuş 30 gün boyunca "🗑️ Silinenler"de bekler, oradan geri getirebilirsin.' },
+        { b: '🌙 GGG ve ☀️ GŞ renkleri', m: 'GGG (gece görüş gözlüğü) uçuşları gece renginde ve 🌙 simgesiyle, GŞ (gündüz) uçuşları güneş renginde ve ☀️ simgesiyle listelenir. AU(SİM) uçuşları sade görünür. Böylece uçuş türlerini bir bakışta ayırt edersin.' },
+        { b: 'Sayfalar', m: 'Liste her sayfada 10 uçuş gösterir. Listenin altındaki sayı düğmeleriyle diğer sayfalara geçersin.' }
+    ]},
+    { baslik: '🔍 Arama ve raporlar', maddeler: [
+        { b: '🔍 Ara (filtre)', m: 'Araç çubuğundaki "🔍 Ara" bir kutu açar. Yıl (1 Eylül dönemine göre), ay, hava aracı ve uçuş türüne göre listeyi süzersin, "Filtreyi Uygula"ya basarsın. Altta "Filtrelenen Süre" toplamı görünür. "Temizle" bütün seçimleri sıfırlar.' },
+        { b: '📊 İstatistik ve dönem seçici', y: true, m: 'Üstte dönem düğmeleri bulunur: güncel dönem, geçmiş dönemler ve "Tümü". Seçilen dönem için toplam saat, uçuş sayısı, ortalama süre, aylık grafik (Eylül\'den Ağustos\'a), GGG/GŞ/Sim dağılımı ve hava aracına göre dağılım gösterilir. "Tümü" seçilince dönemleri yan yana karşılaştıran bir grafik çıkar.' },
+        { b: '📅 Takvim', m: 'Ay ay gezilen bir takvimdir, uçuş yapılan günler işaretlidir. Bir güne dokununca o günün uçuşları alta listelenir. "➕ Bu güne uçuş ekle" düğmesi tarihi forma yazar, diğer bilgileri sen doldurursun. "Bugün" düğmesi bugünün ayına döner.' },
+        { b: '🗑️ Silinenler', m: 'Sildiğin uçuşlar 30 gün saklanır. Her satırda kalıcı silinmeye kaç gün kaldığı yazar. "Geri yükle" uçuşu listeye döndürür, "Kalıcı sil" onay sorduktan sonra tamamen siler. 30 gün dolunca kayıt kendiliğinden silinir.' },
+        { b: '⬇ CSV ve ⬇ PDF', m: 'CSV, uçuşlarını Excel gibi programlarda açabileceğin bir dosya olarak indirir. PDF, yazdırma penceresini açar, orada "PDF olarak kaydet"i seçersin. İkisi de ekranda o an süzülen listeyi (filtre uyguladıysan yalnızca onu) kapsar.' },
+        { b: '📟 KDU', m: 'KDU sayfasını yeni bir sekmede açar.' }
+    ]},
+    { baslik: '⏳ Dönem ve hedef', maddeler: [
+        { b: 'Toplam saat ve dönem saati', m: 'Mavi kartta solda tüm zamanların toplam uçuş saatin, sağda güncel dönemin (1 Eylül - 31 Ağustos) saati yazar. Parantez içindeki süre hedefe kalan saattir. Dönem etiketindeki 🔍\'ye dokunursan o dönemdeki uçuşlar listelenir.' },
+        { b: 'Hedef ve ilerleme çubuğu', m: 'Çubuk, dönem hedefinin yüzde kaçını tamamladığını gösterir. Altındaki not dönemin bitmesine kaç gün/hafta kaldığını ve hedefi tutturmak için haftada ve günde ortalama ne kadar uçman gerektiğini söyler. Hedef tamamlanınca tebrik mesajı çıkar.' },
+        { b: 'Hedefi değiştirme', m: 'Profil penceresindeki "Dönem Hedefi (saat)" alanına kendi hedefini yazabilirsin (10 ile 1000 saat arası). Boş bırakırsan varsayılan 140 saat kullanılır.' }
+    ]},
+    { baslik: '📆 Sayaçlar ve süreler', maddeler: [
+        { b: '🌙 GGG sayacı (60 gün)', m: 'Son gerçek GGG uçuşundan sonra 60 gün geçerlilik sayar (simülatör uçuşları sayılmaz). Kalan gün yeşilse 30\'dan fazla, turuncuysa 16-30, kırmızıysa 15 ve altıdır. Karta dokunursan tüm hava araçlarının durumu ayrı ayrı görünür.' },
+        { b: '☀️ Son uçuş sayacı (60 gün)', m: 'Son gerçek uçuşundan sonra 60 gün sayar, renkleri GGG sayacıyla aynıdır. Karta dokununca her hava aracı için ayrı durumu görürsün.' },
+        { b: 'Muayene, Alet Kart ve Standardizasyon', m: 'Kartlara dokununca son yapıldığı tarihi girebilirsin. 1 Yıllık Muayene, Alet Kart ve Standardizasyon için 1 yıl, 4 Yıllık Muayene için 4 yıl sonrası hesaplanır. Kartta kalan gün ve "Son Tarih" yazar. Kalan süre 90 günün altına inince kart kırmızıya döner.' },
+        { b: '✅ Bugün yenilendi', y: true, m: 'Muayene, Alet Kart ya da Standardizasyon kartına dokununca açılan pencerede "✅ Bugün yenilendi" düğmesi vardır. Basınca bugünün tarihi tek dokunuşla kaydedilir. Yanlışlıkla bastıysan çıkan bildirimdeki "Geri al" önceki tarihi geri getirir. Tarihi kendin seçmek istersen aynı pencerede tarih kutusu da durur.' },
+        { b: 'Uyarı bandı', m: 'Panelin üstünde, son tarihine 30 günden az kalan muayene, alet kart, standardizasyon ve 60 günlük sayaçlar için bir uyarı bandı çıkar. 15 gün ve altı kırmızı, diğerleri turuncudur. İlk uyarı görünür, "daha fazla uyarı" bağlantısı diğerlerini açar.' }
+    ]},
+    { baslik: '👤 Hesap', maddeler: [
+        { b: '👤 Profil', m: 'Mavi kartın altındaki adına (ad girmediysen e-postana) dokun. Ad soyad, boy, kilo, doğum tarihi, kan grubu ve dönem hedefini girip "Kaydet"e basarsın. Bu bilgiler isteğe bağlıdır ve yalnızca sen görürsün.' },
+        { b: '🔐 Şifre değiştirme', m: 'Profil penceresindeki "🔐 Şifre" sekmesinde mevcut şifreni ve yeni şifreni (en az 8 karakter, 1 büyük harf, 1 rakam) iki kez yazarsın, "Güncelle"ye basarsın.' },
+        { b: 'Oturum ve "Beni hatırla"', m: 'Giriş ekranında "Beni hatırla"yı işaretlersen oturumun 30 gün açık kalır. İşaretlemezsen 15 dakika işlem yapmazsan güvenlik için oturum kapanır. Kendi isteğinle çıkmak için mavi karttaki "Çıkış"a bas.' }
+    ]},
+    { baslik: '🎨 Görünüm ve telefon', maddeler: [
+        { b: 'Temalar: koyu, açık, NVG', y: true, m: 'Sağ üstteki tema düğmesine her basışta sırayla 🌙 koyu, ☀️ açık ve yeşil NVG (gece görüş) teması gelir. Seçtiğin tema bu cihazda hatırlanır.' },
+        { b: '📲 Ana ekrana ekleme', m: 'Android\'de telefon uygun olduğunda bir ekleme kartı çıkar, "Ekle"ye basman yeter. iPhone\'da Safari\'de alttaki Paylaş düğmesine dokun, "Ana Ekrana Ekle"yi seç. Daha sonra tekrar görmek için Profil penceresindeki "📲 Uygulamayı ana ekrana ekle" düğmesine bas. Uygulama gibi tam ekran açılır.' },
+        { b: '✨ Yenilikler', m: 'Güncellemelerde eklenen özelliklerin listesidir. İlk girişte kendiliğinden çıkar, istediğin zaman buradan ya da Profil penceresinden tekrar açabilirsin.', d: { e: 'yenilik-ac', t: '✨ Yenilikleri göster' } },
+        { b: '📖 Bu kılavuz', y: true, m: 'Sağ üstteki ❓ düğmesi ya da Profil penceresindeki "📖 Kılavuz" bu listeyi açar. Bir başlığa dokununca açıklaması açılır. Üstteki kutuya bir kelime yazarsan (örneğin "geri al", "pdf", "tema") ilgili maddeler süzülür.' }
     ]}
 ];
 const DeletedFlightSchema = new mongoose.Schema({
@@ -617,6 +667,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
             <div class="marka">
                 <span class="marka-ikon" aria-hidden="true">✈</span>
                 <span class="marka-ad">Uçuş <b>Logbook</b></span>
+                <button type="button" class="tema-btn kilavuz-btn" data-eylem="kilavuz-ac" aria-label="Kılavuz: her özelliğin kullanımı" title="Kılavuz"><span aria-hidden="true">❓</span></button>
                 <button type="button" class="tema-btn" data-eylem="tema-degistir" aria-label="Tema: koyu / açık / NVG">
                     <span class="tb-koyu" aria-hidden="true">🌙</span><span class="tb-acik" aria-hidden="true">☀️</span><span class="tb-nvg" aria-hidden="true">NVG</span>
                 </button>
@@ -755,6 +806,24 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
             </div>
         </div>
 
+        <!-- KILAVUZ -->
+        <div id="kilavuzModal" class="modal-arka" role="dialog" aria-modal="true" aria-labelledby="kilavuzBaslik">
+            <div class="modal-kutu kilavuz-kutu">
+                <h3 class="modal-baslik" id="kilavuzBaslik">📖 Kılavuz</h3>
+                <input type="search" id="kvAra" class="kv-ara" placeholder="Ara: geri al, pdf, tema…" autocomplete="off" aria-label="Kılavuzda ara">
+                <div class="kv-govde" id="kvGovde">
+                    ${KILAVUZ.map(g => `<section class="kv-grup"><h4>${esc(g.baslik)}</h4>${g.maddeler.map(m => `<div class="kv-madde">
+                        <button type="button" class="kv-baslik" data-eylem="kilavuz-madde" aria-expanded="false"><span>${esc(m.b)}${m.y ? '<em class="kv-yeni">yeni</em>' : ''}</span><i aria-hidden="true">▾</i></button>
+                        <div class="kv-metin" hidden>${esc(m.m).split('\n').map(p => `<p>${p}</p>`).join('')}${m.d ? `<button type="button" class="kv-git" data-eylem="${esc(m.d.e)}">${esc(m.d.t)}</button>` : ''}</div>
+                    </div>`).join('')}</section>`).join('')}
+                    <div id="kvBos" class="bos-mesaj" hidden>Aramana uyan madde bulunamadı.</div>
+                </div>
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="modal-kapat" data-modal="kilavuzModal">Kapat</button>
+                </div>
+            </div>
+        </div>
+
         <!-- YENİLİKLER PENCERESİ -->
         <div id="yenilikModal" class="modal-arka" role="dialog" aria-modal="true" aria-labelledby="yenilikBaslik">
             <div class="modal-kutu yenilik-kutu">
@@ -793,6 +862,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                         <p class="profil-not">Bu bilgiler yalnızca sana aittir, başka kullanıcılar göremez.</p>
                         <button type="button" class="uygulama-btn" data-eylem="ekle-goster">📲 Uygulamayı ana ekrana ekle</button>
                         <button type="button" class="uygulama-btn" data-eylem="yenilik-ac">✨ Yenilikler</button>
+                        <button type="button" class="uygulama-btn" data-eylem="kilavuz-ac">📖 Kılavuz</button>
                         <div class="modal-butonlar">
                             <button type="button" class="btn-tamam" data-eylem="profil-kaydet">Kaydet</button>
                             <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>

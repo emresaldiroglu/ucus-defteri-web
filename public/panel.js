@@ -243,6 +243,67 @@
         }
     }
 
+    /* ---------- KILAVUZ ---------- */
+
+    // Aramada Türkçe karakterler ve büyük/küçük harf farkı önemsenmez
+    function aramaMetni(s) {
+        return String(s || '').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase()
+            .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c');
+    }
+
+    function kilavuzMaddeKapat(madde) {
+        madde.querySelector('.kv-baslik').setAttribute('aria-expanded', 'false');
+        madde.querySelector('.kv-metin').hidden = true;
+        madde.classList.remove('acik');
+    }
+
+    function kilavuzMaddeAc(madde) {
+        madde.querySelector('.kv-baslik').setAttribute('aria-expanded', 'true');
+        madde.querySelector('.kv-metin').hidden = false;
+        madde.classList.add('acik');
+    }
+
+    // Bir başlığa dokununca açılır; diğer açık madde kapanır (liste dağılmasın)
+    function kilavuzMaddeDegis(dugme) {
+        var madde = dugme.closest('.kv-madde');
+        var acikti = madde.classList.contains('acik');
+        document.querySelectorAll('#kilavuzModal .kv-madde.acik').forEach(kilavuzMaddeKapat);
+        if (!acikti) {
+            kilavuzMaddeAc(madde);
+            if (madde.scrollIntoView) madde.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    function kilavuzFiltrele() {
+        var q = aramaMetni($('kvAra').value).trim();
+        var maddeler = document.querySelectorAll('#kilavuzModal .kv-madde');
+        var bulunan = [];
+        maddeler.forEach(function (m) {
+            var uygun = !q || aramaMetni(m.textContent).indexOf(q) !== -1;
+            m.hidden = !uygun;
+            if (uygun) bulunan.push(m);
+            if (!uygun) kilavuzMaddeKapat(m);
+        });
+        document.querySelectorAll('#kilavuzModal .kv-grup').forEach(function (g) {
+            g.hidden = !g.querySelector('.kv-madde:not([hidden])');
+        });
+        $('kvBos').hidden = bulunan.length > 0;
+        // Az sonuç varsa doğrudan açıklamaları gösterilir
+        document.querySelectorAll('#kilavuzModal .kv-madde.acik').forEach(kilavuzMaddeKapat);
+        if (q && bulunan.length > 0 && bulunan.length <= 2) bulunan.forEach(kilavuzMaddeAc);
+    }
+
+    function kilavuzAc() {
+        $('kvAra').value = '';
+        kilavuzFiltrele();
+        modalAc('kilavuzModal');
+        $('kvGovde').scrollTop = 0;
+    }
+
+    document.addEventListener('input', function (e) {
+        if (e.target && e.target.id === 'kvAra') kilavuzFiltrele();
+    });
+
     /* ---------- YENİLİKLER PENCERESİ ---------- */
 
     function yenilikAc(otomatik) {
@@ -1434,7 +1495,9 @@
             case 'duzenle-kaydet': duzenleKaydet(hedef); break;
             case 'son-kopyala': sonUcusuKopyala(); break;
             case 'toplu-degis': topluDegis(d.onek); break;
-            case 'yenilik-ac': modalKapat('profilModal'); yenilikAc(false); break;
+            case 'yenilik-ac': modalKapat('profilModal'); modalKapat('kilavuzModal'); yenilikAc(false); break;
+            case 'kilavuz-ac': modalKapat('profilModal'); kilavuzAc(); break;
+            case 'kilavuz-madde': kilavuzMaddeDegis(hedef); break;
             case 'istatistik-ac': istatistikAc(); break;
             case 'ist-donem': ist.secili = d.donem; istatistikCiz(); break;
             case 'csv-indir': csvIndir(); break;

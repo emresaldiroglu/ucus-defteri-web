@@ -842,3 +842,35 @@ html[data-tema="nvg"] .tema-btn .tb-nvg { display: inline; }
 .yenilendi-btn { width: 100%; margin: 4px 0 2px; }
 .modal-ayrac { display: flex; align-items: center; gap: 10px; margin: 12px 0 10px; font-size: 11.5px; color: var(--yazi-soluk); }
 .modal-ayrac::before, .modal-ayrac::after { content: ""; flex: 1; height: 1px; background: var(--cizgi); }
+
+/* ---------- Kılavuz ---------- */
+.tema-btn.kilavuz-btn { margin-left: auto; }
+.tema-btn.kilavuz-btn + .tema-btn { margin-left: 0; }
+.kilavuz-kutu { max-width: 460px; max-height: 90vh; }
+.kv-ara { margin: 2px 0 10px; }
+.kv-govde { overflow-y: auto; flex: 1; padding-right: 4px; margin-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.kv-govde > * { flex-shrink: 0; }
+.kv-grup h4 { margin: 14px 0 6px; font-size: 13px; letter-spacing: .2px; color: var(--yazi-soluk); }
+.kv-grup:first-child h4 { margin-top: 2px; }
+.kv-madde { border: 1px solid var(--cizgi); border-radius: 12px; background: var(--cam); margin-bottom: 6px; overflow: hidden; }
+.kv-madde.acik { border-color: rgba(74,163,255,.5); }
+.kv-baslik {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: auto; padding: 11px 13px;
+    background: transparent; border: 0; border-radius: 0; text-align: left; font-size: 14px; font-weight: 700; color: var(--yazi); cursor: pointer;
+}
+.kv-baslik i { font-style: normal; transition: transform .2s; color: var(--yazi-soluk); }
+.kv-madde.acik .kv-baslik i { transform: rotate(180deg); }
+.kv-yeni {
+    margin-left: 8px; padding: 1px 7px; border-radius: 99px; font-size: 10px; font-weight: 800; font-style: normal; letter-spacing: .3px;
+    text-transform: uppercase; color: #04281d; background: var(--yesil); vertical-align: middle;
+}
+.kv-metin { padding: 0 13px 12px; }
+.kv-metin p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.55; color: var(--yazi-soluk); }
+.kv-git { margin-top: 4px; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; background: rgba(74,163,255,.16); border: 1px solid rgba(74,163,255,.4); color: var(--yazi); width: auto; height: auto; }
+html[data-tema="acik"] .kv-metin p { color: #44526e; }
+html[data-tema="acik"] .kv-madde { background: rgba(20,34,61,.04); }
+html[data-tema="nvg"] .kv-madde.acik { border-color: rgba(70,255,122,.55); }
+html[data-tema="nvg"] .kv-metin p { color: #8fd9a6; }
+html[data-tema="nvg"] .kv-git { background: rgba(70,255,122,.14); border-color: rgba(70,255,122,.4); }
+html[data-tema="nvg"] .kv-yeni { background: #b8ff46; }
+.kilavuz-kutu .modal-butonlar { grid-template-columns: 1fr; margin-top: 8px; }
