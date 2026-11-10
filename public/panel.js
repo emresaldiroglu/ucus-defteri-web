@@ -748,6 +748,15 @@
     }
 
 
+    function uyariAcKapat(dugme) {
+        var kutu = document.querySelector('.uyari-gizli');
+        if (!kutu) return;
+        var acildi = kutu.hidden;
+        kutu.hidden = !acildi;
+        dugme.setAttribute('aria-expanded', acildi ? 'true' : 'false');
+        dugme.textContent = acildi ? '▲ Gizle' : '▼ ' + kutu.children.length + ' uyarı daha';
+    }
+
     /* ---------- ÇÖP KUTUSU ---------- */
 
     async function copGeriAl(id) {
@@ -1207,6 +1216,7 @@
             case 'sayac-modal': sayacModalAc(d.tip); break;
             case 'profil-modal': profilModalAc('bilgi'); break;
             case 'ekle-goster': modalKapat('profilModal'); eklemeKartiAc(); break;
+            case 'uyari-ac': uyariAcKapat(hedef); break;
             case 'cop-ac': copAc(); break;
             case 'cop-geri': copGeriAl(d.id); break;
             case 'cop-sil': copKaliciSil(d.id); break;

@@ -599,3 +599,58 @@ html[data-tema="acik"] .tk-gun-btn.secili { color: #fff; }
 html[data-tema="acik"] .sablon-baslik, html[data-tema="acik"] .sablon-kaydet-btn { color: #8a5200; }
 html[data-tema="acik"] .toast-eylem { color: #fff; }
 @media (max-width: 420px) { .tk-sure { display: none; } .tk-gun-btn { aspect-ratio: 1 / 1; } }
+
+/* ===================== SADELEŞTİRME ===================== */
+
+/* Uyarılar: en acil olan görünür, gerisi açılır */
+.uyari-alani { gap: 6px; margin-bottom: 12px; }
+.uyari-satiri { padding: 9px 12px; }
+.uyari-daha { width: auto; align-self: flex-start; padding: 2px 8px; font-size: 12px; font-weight: 600; background: none; color: var(--yazi-soluk); text-decoration: underline; text-underline-offset: 3px; }
+.uyari-daha:hover { filter: none; color: var(--yazi); }
+.uyari-gizli { display: flex; flex-direction: column; gap: 6px; }
+
+/* Dönem ilerlemesi: üstteki mavi kartın içinde */
+.ozet-kart .ilerleme-kart { position: relative; z-index: 1; background: none; border: none; padding: 0; margin: 10px 0 2px; }
+.ozet-kart .ilerleme-ust { margin-bottom: 5px; }
+.ozet-kart .ilerleme-hedef, .ozet-kart .ilerleme-yuzde { font-size: 11px; font-weight: 700; color: #fff; opacity: .92; }
+.ozet-kart .ilerleme-cubuk { height: 10px; background: rgba(0,0,0,.3); border-color: rgba(255,255,255,.25); }
+.ozet-kart .ilerleme-not { margin-top: 8px; padding: 6px 8px; font-size: 11px; line-height: 1.4; color: #fff; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.2); }
+
+/* Sayaçlar: daha sıkı */
+.sayac { padding: 10px 8px; }
+.sayac-bos { padding: 8px 6px; line-height: 1.3; }
+.sayac-bos .uyari { margin-top: 2px; }
+.tarih-etiket { margin-top: 2px; }
+
+/* Araç çubuğu: tek satır, yana kaydırılabilir */
+.arac-cubugu { flex-wrap: nowrap; overflow-x: auto; gap: 8px; margin: 12px 0 0; padding: 2px 2px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.arac-cubugu::-webkit-scrollbar { display: none; }
+.arac-cubugu .arac-btn { flex: none; min-width: 0; width: auto; display: inline-flex; align-items: center; justify-content: center; padding: 9px 14px; font-size: 13px; font-weight: 700; border-radius: 999px; white-space: nowrap; text-decoration: none; color: #fff; }
+.arac-cubugu .arac-btn[aria-expanded="true"] { background: linear-gradient(135deg, var(--mavi), var(--mavi-koyu)); border-color: transparent; }
+html[data-tema="acik"] .arac-cubugu .arac-btn { color: #14223d; }
+html[data-tema="acik"] .arac-cubugu .arac-btn[aria-expanded="true"] { color: #fff; }
+
+/* Filtre: ayrı kutu yok, açılınca araç çubuğunun altında belirir */
+.filtre-kutu { background: none; border: none; border-radius: 0; margin: 0; overflow: visible; }
+.filtre-kutu .akordeon-icerik.acik { margin-top: 10px; padding: 14px; background: var(--cam); border: 1px solid var(--cizgi); border-radius: 16px; }
+
+.ekle-toggle-stil { margin-bottom: 0; }
+.tablo-sarmal { margin-top: 8px; }
+
+@media (min-width: 768px) {
+    .arac-cubugu { flex-wrap: wrap; overflow-x: visible; }
+}
+
+@media (max-width: 767px) {
+    tr.ucus-satiri {
+        grid-template-areas:
+            "tarih sure"
+            "arac egitim"
+            "aciklama islem";
+        align-items: center;
+        gap: 4px 10px;
+    }
+    .c-aciklama { min-width: 0; align-self: center; }
+    .b-yazi { display: none; }
+    .duz-btn, .sil-btn { width: 38px; height: 36px; padding: 0; margin: 0 0 0 6px; font-size: 15px; display: inline-grid; place-items: center; vertical-align: middle; }
+}

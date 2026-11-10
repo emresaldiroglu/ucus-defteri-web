@@ -486,10 +486,12 @@ function sablonListesiHazirla(sablonlar) {
 
 function uyariBandiHtml(uyarilar) {
     if (!uyarilar.length) return '';
-    return `<div class="uyari-alani" role="status">${uyarilar.map(u => {
+    const satir = (u) => {
         const sag = u.kalan < 0 ? 'Süresi doldu' : (u.kalan === 0 ? 'Bugün doluyor' : `${u.kalan} gün kaldı`);
         return `<div class="uyari-satiri uy-${u.seviye}"><span aria-hidden="true">${u.simge}</span><span>${esc(u.metin)}</span><b>${esc(sag)}</b></div>`;
-    }).join('')}</div>`;
+    };
+    const geri = uyarilar.slice(1);
+    return `<div class="uyari-alani" role="status">${satir(uyarilar[0])}${geri.length ? `<button type="button" class="uyari-daha" data-eylem="uyari-ac" aria-expanded="false">▼ ${geri.length} uyarı daha</button><div class="uyari-gizli" hidden>${geri.map(satir).join('')}</div>` : ''}</div>`;
 }
 
 
@@ -530,7 +532,7 @@ function ucusSatiriHtml(f) {
             <td class="c-egitim">${tema.ikon}${esc(f.egitimTipi)}</td>
             <td class="c-sure">${esc(f.sure)}</td>
             <td class="c-aciklama" title="${esc(aciklama)}">${esc(kisa)}</td>
-            <td class="c-islem"><button type="button" class="duz-btn" data-eylem="ucus-duzenle" data-id="${id}" aria-label="Uçuşu düzenle">Düzenle</button><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}">Sil</button></td>
+            <td class="c-islem"><button type="button" class="duz-btn" data-eylem="ucus-duzenle" data-id="${id}" aria-label="Uçuşu düzenle" title="Düzenle"><span aria-hidden="true">✏️</span><span class="b-yazi"> Düzenle</span></button><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}" aria-label="Uçuşu sil" title="Sil"><span aria-hidden="true">🗑️</span><span class="b-yazi"> Sil</span></button></td>
         </tr>
         <tr id="detay-${id}" class="detay-satiri">
             <td colspan="6">
@@ -594,6 +596,14 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                             <h2 id="donemSaatGosterge">${esc(aktifDonem.sure)}<span class="kalan-saat" title="${hedefSaat} saatten kalan">(${esc(aktifDonem.kalan)})</span></h2>
                         </div>
                     </div>
+                    <div class="ilerleme-kart">
+                        <div class="ilerleme-ust">
+                            <span class="ilerleme-hedef">Hedef ${hedefSaat}:00</span>
+                            <span class="ilerleme-yuzde">%${esc(aktifDonem.yuzde)}</span>
+                        </div>
+                        <div class="ilerleme-cubuk" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(aktifDonem.yuzde)}" aria-label="${esc(aktifDonem.yil)} dönemi hedef ilerlemesi"><i style="width:${esc(aktifDonem.yuzde)}%"></i></div>
+                        ${aktifDonem.tempo ? `<div class="ilerleme-not">📈 ${esc(aktifDonem.tempo)}</div>` : ''}
+                    </div>
                     <div class="ozet-alt">
                         <button type="button" class="profil-btn" data-eylem="profil-modal" title="Profil ve şifre ayarları">👤 ${esc(profil.adSoyad || email)}</button>
                         ${yonetici ? '<a class="cikis-link" href="/admin">Yönetim</a>' : ''}
@@ -616,34 +626,6 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                     ${tarihSayaciHtml(tarihBul('standTarih'), 1, 'Standardizasyon', 'standTarih')}
                 </div>
             </div>
-
-            <div class="ilerleme-kart">
-                <div class="ilerleme-ust">
-                    <span class="ilerleme-saat">${esc(aktifDonem.sure)} <small>/ ${hedefSaat}:00</small></span>
-                    <span class="ilerleme-yuzde">%${esc(aktifDonem.yuzde)}</span>
-                </div>
-                <div class="ilerleme-cubuk" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(aktifDonem.yuzde)}" aria-label="${esc(aktifDonem.yil)} dönemi hedef ilerlemesi"><i style="width:${esc(aktifDonem.yuzde)}%"></i></div>
-                ${aktifDonem.tempo ? `<div class="ilerleme-not">📈 ${esc(aktifDonem.tempo)}</div>` : ''}
-            </div>
-
-            <div class="akordeon-container">
-                <button type="button" class="akordeon-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="filtreIcerikKutusu" data-ok="filtreOkIkon">
-                    <span>🔍 Geçmiş Uçuş Aramak İçin Tıkla</span>
-                    <span id="filtreOkIkon">▼</span>
-                </button>
-                <div id="filtreIcerikKutusu" class="akordeon-icerik">
-                    <div class="filtre-alan"><label for="filtreYil">📋 Yıl Seçimi (1 Eylül Dönemi):</label><select id="filtreYil"><option value="">Yıl Seçin</option>${staticYears.map(y => `<option value="${y}">${y}</option>`).join('')}</select></div>
-                    <div class="filtre-alan"><label for="filtreAy">Ay:</label><select id="filtreAy"><option value="">Ay Seçin</option>${AY_SECENEKLERI}</select></div>
-                    <div class="filtre-alan"><label for="filtreHavaAraci">Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option>${ARAC_SECENEKLERI}</select></div>
-                    <div class="filtre-alan"><label for="filtreUcusTipi">Uçuş Tipi:</label><select id="filtreUcusTipi"><option value="">Uçuş Tipi</option>${EGITIM_SECENEKLERI}</select></div>
-                    <div class="filtre-butonlar"><button type="button" class="btn-filtre" data-eylem="filtre-uygula">Uygula</button><button type="button" class="btn-temizle" data-eylem="filtre-temizle">Temizle</button></div>
-                    <div id="filtreSaatKutusu" class="filtre-saat-kutusu" hidden>⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
-                </div>
-            </div>
-
-            <a href="/kdu.html" target="_blank" rel="noopener" class="kdu-link-btn">
-                📟 KDU (Keyboard Display Unit) Aç
-            </a>
 
             <div class="akordeon-container ekle-toggle-stil">
                 <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="ekleIcerikKutusu" data-ok="ekleOkIkon">
@@ -674,12 +656,26 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                 </div>
             </div>
 
-            <div class="arac-cubugu">
+            <div class="arac-cubugu" role="toolbar" aria-label="Araçlar">
+                <button type="button" class="arac-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="filtreIcerikKutusu" data-ok="filtreOkIkon">🔍 Ara</button>
                 <button type="button" class="arac-btn" data-eylem="istatistik-ac">📊 İstatistik</button>
                 <button type="button" class="arac-btn" data-eylem="takvim-ac">📅 Takvim</button>
                 <button type="button" class="arac-btn" data-eylem="cop-ac">🗑️ Silinenler</button>
                 <button type="button" class="arac-btn" data-eylem="csv-indir">⬇ CSV</button>
                 <button type="button" class="arac-btn" data-eylem="pdf-indir">⬇ PDF</button>
+                <a href="/kdu.html" target="_blank" rel="noopener" class="arac-btn">📟 KDU</a>
+            </div>
+
+            <div class="akordeon-container filtre-kutu">
+                <span id="filtreOkIkon" hidden>▼</span>
+                <div id="filtreIcerikKutusu" class="akordeon-icerik">
+                    <div class="filtre-alan"><label for="filtreYil">📋 Yıl Seçimi (1 Eylül Dönemi):</label><select id="filtreYil"><option value="">Yıl Seçin</option>${staticYears.map(y => `<option value="${y}">${y}</option>`).join('')}</select></div>
+                    <div class="filtre-alan"><label for="filtreAy">Ay:</label><select id="filtreAy"><option value="">Ay Seçin</option>${AY_SECENEKLERI}</select></div>
+                    <div class="filtre-alan"><label for="filtreHavaAraci">Hava Aracı:</label><select id="filtreHavaAraci"><option value="">Hava Aracı</option>${ARAC_SECENEKLERI}</select></div>
+                    <div class="filtre-alan"><label for="filtreUcusTipi">Uçuş Tipi:</label><select id="filtreUcusTipi"><option value="">Uçuş Tipi</option>${EGITIM_SECENEKLERI}</select></div>
+                    <div class="filtre-butonlar"><button type="button" class="btn-filtre" data-eylem="filtre-uygula">Uygula</button><button type="button" class="btn-temizle" data-eylem="filtre-temizle">Temizle</button></div>
+                    <div id="filtreSaatKutusu" class="filtre-saat-kutusu" hidden>⏱️ Filtrelenen Süre: <span id="filtreliSaatGosterge">00:00</span></div>
+                </div>
             </div>
 
             <div class="tablo-sarmal">
