@@ -312,11 +312,13 @@ function hesaplaAktifDonemSaati(flights, hedefSaat) {
     if (kalanDakika === 0) {
         tempo = 'Dönem hedefi tamamlandı. 🎉';
     } else if (kalanGun > 0) {
+        const sureMetni = (dk) => dk >= 60
+            ? `${Math.floor(dk / 60)} sa ${dk % 60} dk`
+            : `${dk} dk`;
+        const kalanHafta = Math.max(1, Math.ceil(kalanGun / 7));
+        const haftalikDk = Math.ceil(kalanDakika / Math.max(1, kalanGun / 7));
         const gunlukDk = Math.ceil(kalanDakika / kalanGun);
-        const gunlukMetin = gunlukDk >= 60
-            ? `${Math.floor(gunlukDk / 60)} sa ${gunlukDk % 60} dk`
-            : `${gunlukDk} dk`;
-        tempo = `Dönem bitimine ${kalanGun} gün var. Hedef için günde ortalama ~${gunlukMetin} yeterli.`;
+        tempo = `Dönem bitimine ${kalanGun} gün (${kalanHafta} hafta) var. Hedef için haftada ortalama ~${sureMetni(haftalikDk)} (günde ~${sureMetni(gunlukDk)}) yeterli.`;
     }
 
     return {
