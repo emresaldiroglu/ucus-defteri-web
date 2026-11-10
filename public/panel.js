@@ -243,6 +243,16 @@
         }
     }
 
+    /* ---------- YENİLİKLER PENCERESİ ---------- */
+
+    function yenilikAc(otomatik) {
+        modalAc('yenilikModal');
+        var g = document.querySelector('#yenilikModal .yenilik-govde');
+        if (g) g.scrollTop = 0;
+        // İlk gösterimde sunucuya "görüldü" bilgisi yazılır; pencere bir daha kendiliğinden açılmaz
+        if (otomatik) apiCagir('/api/yenilik-goruldu', 'POST', {});
+    }
+
     function sureModalAc(hedefId, metinId) {
         sureHedef = { alan: hedefId || 'sureAlani', metin: metinId || 'sureAlaniMetin' };
         var alan = $(sureHedef.alan);
@@ -1306,6 +1316,7 @@
             case 'duzenle-kaydet': duzenleKaydet(hedef); break;
             case 'son-kopyala': sonUcusuKopyala(); break;
             case 'toplu-degis': topluDegis(d.onek); break;
+            case 'yenilik-ac': modalKapat('profilModal'); yenilikAc(false); break;
             case 'istatistik-ac': istatistikAc(); break;
             case 'csv-indir': csvIndir(); break;
             case 'pdf-indir': pdfIndir(); break;
@@ -1348,6 +1359,7 @@
     filtreleUcuslari();
     sonKopyaGuncelle();
     sablonlariCiz();
+    if (panelVeri.yenilik) setTimeout(function () { yenilikAc(true); }, 500);
     eklemeKartiniBelirle();
     if (uygulamaModundaMi()) document.querySelectorAll('[data-eylem="ekle-goster"]').forEach(function (b) { b.hidden = true; });
 })();

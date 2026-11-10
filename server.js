@@ -123,6 +123,8 @@ mongoose.connect(mongoURI, { dbName: 'ucusDB' })
 const UserSchema = new mongoose.Schema({
     email: String,
     password: String,
+    // Kullanıcının en son okuduğu "Yenilikler" sürümü (0 = hiç görmedi)
+    gorulenSurum: { type: Number, default: 0 },
     // Kişisel bilgiler (hepsi isteğe bağlı; yalnızca kullanıcının kendisi görür/değiştirir)
     profil: {
         adSoyad: String,
@@ -164,6 +166,32 @@ const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 // Silinen uçuşların çöp kutusu: 30 gün sonra MongoDB kendiliğinden kalıcı olarak siler
 const SILINEN_SAKLAMA_GUN = 30;
 const TOPLU_SURE_LIMITI_SAAT = 1000;
+
+// "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
+// kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
+const YENILIK_SURUMU = 1;
+const YENILIKLER = [
+    { baslik: '✈️ Uçuş kaydı', maddeler: [
+        'Süreyi iPhone tarzı tekerlekle seçersin. 24 saati aşan eskiye dönük süreler için "toplu süre" kutucuğu var, listede "toplu" etiketiyle görünür.',
+        'Kayıtlı uçuşları ✏️ Düzenle ile değiştirebilirsin.',
+        'Sildiğin uçuş 30 gün boyunca 🗑️ Silinenler\'de bekler; "Geri al" ile ya da Silinenler\'den geri getirebilirsin.',
+        'Son uçuşunu tek dokunuşla forma kopyalayabilir, sık yaptığın uçuşları şablon olarak (en fazla 10) kaydedebilirsin.'
+    ]},
+    { baslik: '📊 Takip ve raporlar', maddeler: [
+        'Dönem hedefine kalan saat, ilerleme çubuğu ve hedef için haftalık/günlük ortalama süre gösterilir. Hedefi profilinden kendin belirleyebilirsin.',
+        'Süresi yaklaşan sayaçlar ve muayeneler için uyarı bandı çıkar.',
+        'GGG uçuşları 🌙 ay, GŞ uçuşları ☀️ güneş renginde listelenir.',
+        '🔍 Ara ile yıl, ay, araç ve türe göre filtreleyebilirsin.',
+        '📊 İstatistik ve 📅 Takvim görünümleri eklendi.',
+        '⬇ CSV ve ⬇ PDF ile uçuşlarını dışa aktarabilirsin.'
+    ]},
+    { baslik: '👤 Hesap ve görünüm', maddeler: [
+        'Profil: ad soyad, boy, kilo, doğum tarihi, kan grubu ve şifre değiştirme tek yerde. Bilgileri yalnızca sen görürsün.',
+        '"Beni hatırla" ile 30 gün oturum açık kalır; seçmezsen 15 dakika işlem yapılmazsa oturum kapanır.',
+        '🌙/☀️ düğmesiyle koyu ve açık tema arasında geçiş yapabilirsin. Giriş ve uçuş paneli yeni gece gökyüzü tasarımına kavuştu.',
+        'Telefonda 📲 "Ana ekrana ekle" ile Logbook\'u uygulama gibi kullanabilirsin (Profil menüsünden de ulaşırsın).'
+    ]}
+];
 const DeletedFlightSchema = new mongoose.Schema({
     userEmail: String,
     tarih: String,
@@ -547,7 +575,7 @@ function ucusSatiriHtml(f) {
         </tr>`;
 }
 
-function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar) {
+function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar, yenilikGoster) {
     profil = profil || {};
     const hedefSaat = profil.donemHedefSaat || DONEM_HEDEF_SAAT;
     const sablonListesi = sablonListesiHazirla(sablonlar);
@@ -566,6 +594,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
     };
 
     const panelVeri = {
+        yenilik: yenilikGoster === true,
         aracBazli: aracBazliDurum,
         sablonlar: sablonListesi,
         donemUcuslari: aktifDonem.donemUcuslari.map(f => ({
@@ -720,6 +749,20 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
             </div>
         </div>
 
+        <!-- YENİLİKLER PENCERESİ -->
+        <div id="yenilikModal" class="modal-arka" role="dialog" aria-modal="true" aria-labelledby="yenilikBaslik">
+            <div class="modal-kutu yenilik-kutu">
+                <h3 class="modal-baslik" id="yenilikBaslik">✨ Yenilikler</h3>
+                <p class="yenilik-giris">Logbook'a bugüne kadar eklenenler:</p>
+                <div class="yenilik-govde">
+                    ${YENILIKLER.map(g => `<h4>${esc(g.baslik)}</h4><ul>${g.maddeler.map(m => `<li>${esc(m)}</li>`).join('')}</ul>`).join('')}
+                </div>
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="modal-kapat" data-modal="yenilikModal">Anladım</button>
+                </div>
+            </div>
+        </div>
+
         <!-- PROFİL VE ŞİFRE MODALI -->
         <div id="profilModal" class="modal-arka" role="dialog" aria-modal="true">
             <div class="modal-kutu profil-kutu">
@@ -743,6 +786,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                         <div id="profilHesap" class="profil-hesap" hidden></div>
                         <p class="profil-not">Bu bilgiler yalnızca sana aittir, başka kullanıcılar göremez.</p>
                         <button type="button" class="uygulama-btn" data-eylem="ekle-goster">📲 Uygulamayı ana ekrana ekle</button>
+                        <button type="button" class="uygulama-btn" data-eylem="yenilik-ac">✨ Yenilikler</button>
                         <div class="modal-butonlar">
                             <button type="button" class="btn-tamam" data-eylem="profil-kaydet">Kaydet</button>
                             <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>
@@ -1053,7 +1097,7 @@ const loginHandler = async (req, res) => {
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
 
         res.set('Cache-Control', 'no-store');
-        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar));
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar, (user.gorulenSurum || 0) < YENILIK_SURUMU));
     } catch (error) {
         console.error(error);
         if (cerezle) return res.status(500).send("Sunucu hatası.");
@@ -1084,7 +1128,7 @@ app.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newUser = new User({ email, password: hashedPassword });
+        const newUser = new User({ email, password: hashedPassword, gorulenSurum: YENILIK_SURUMU });
         await newUser.save();
 
         return girisSayfasinaDon(res, 'basari', 'kayit', 'login');
@@ -1284,6 +1328,13 @@ app.post('/api/purge-flight', oturumGerekli, async (req, res) => {
 // --- UÇUŞ ŞABLONLARI ---
 
 const SABLON_LIMITI = 10;
+
+app.post('/api/yenilik-goruldu', oturumGerekli, async (req, res) => {
+    try {
+        await User.updateOne({ email: req.oturumEmail }, { $set: { gorulenSurum: YENILIK_SURUMU } });
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
 
 app.post('/api/add-template', oturumGerekli, async (req, res) => {
     const g = req.body || {};

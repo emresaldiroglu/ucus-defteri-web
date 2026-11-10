@@ -675,3 +675,14 @@ html[data-tema="acik"] .arac-cubugu .arac-btn[aria-expanded="true"] { color: #ff
     color: var(--yazi-soluk); background: rgba(255,255,255,.1); border: 1px solid var(--cizgi);
 }
 html[data-tema="acik"] .toplu-etiket { background: rgba(0,0,0,.06); }
+
+/* ---------- Yenilikler penceresi ---------- */
+.yenilik-kutu { max-width: 440px; max-height: 88vh; }
+.yenilik-giris { margin: 2px 0 10px; font-size: 13px; color: var(--yazi-soluk); }
+.yenilik-govde { overflow-y: auto; padding-right: 4px; margin-bottom: 14px; -webkit-overflow-scrolling: touch; }
+.yenilik-govde h4 { margin: 14px 0 6px; font-size: 14px; color: var(--yazi); }
+.yenilik-govde h4:first-child { margin-top: 0; }
+.yenilik-govde ul { margin: 0; padding-left: 18px; }
+.yenilik-govde li { font-size: 13.5px; line-height: 1.5; color: var(--yazi-soluk); margin-bottom: 6px; }
+html[data-tema="acik"] .yenilik-govde li { color: #44526e; }
+.yenilik-kutu .modal-butonlar { grid-template-columns: 1fr; margin-top: 4px; }
