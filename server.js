@@ -843,6 +843,10 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
             <div class="modal-kutu profil-kutu">
                 <h3 class="modal-baslik">👤 Profilim</h3>
                 <div class="profil-mail">${esc(email)}</div>
+                <div class="profil-yardim">
+                    <button type="button" class="profil-yardim-btn" data-eylem="kilavuz-ac">📖 Kılavuz</button>
+                    <button type="button" class="profil-yardim-btn" data-eylem="yenilik-ac">✨ Yenilikler</button>
+                </div>
                 <div class="sekme-cubugu" role="tablist">
                     <button type="button" class="sekme aktif" role="tab" data-eylem="profil-sekme" data-sekme="bilgi">Bilgilerim</button>
                     <button type="button" class="sekme" role="tab" data-eylem="profil-sekme" data-sekme="sifre">🔐 Şifre</button>
@@ -861,8 +865,6 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                         <div id="profilHesap" class="profil-hesap" hidden></div>
                         <p class="profil-not">Bu bilgiler yalnızca sana aittir, başka kullanıcılar göremez.</p>
                         <button type="button" class="uygulama-btn" data-eylem="ekle-goster">📲 Uygulamayı ana ekrana ekle</button>
-                        <button type="button" class="uygulama-btn" data-eylem="yenilik-ac">✨ Yenilikler</button>
-                        <button type="button" class="uygulama-btn" data-eylem="kilavuz-ac">📖 Kılavuz</button>
                         <div class="modal-butonlar">
                             <button type="button" class="btn-tamam" data-eylem="profil-kaydet">Kaydet</button>
                             <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>
