@@ -283,6 +283,10 @@
         $('modalBaslik').textContent = etiket + ' Başlangıç Tarihi';
         $('hedefAlan').value = alan;
         var dogru = /^\d{4}-\d{2}-\d{2}$/.test(hamTarih || '');
+        // "Yenilendi" ve "Geri al" için kartın önceki tarihi ve adı saklanır
+        $('hedefAlan').dataset.onceki = dogru ? hamTarih : '';
+        $('hedefAlan').dataset.etiket = etiket || '';
+        $('yenilendiBtn').textContent = '✅ Bugün yenilendi (' + trTarih(bugunDamga()) + ')';
         $('modalMevcutTarihText').textContent = dogru ? trTarih(hamTarih) : 'Girilmedi';
         $('yeniKategoriTarih').value = dogru ? hamTarih : '';
         modalAc('tarihModal');
@@ -328,6 +332,39 @@
             await paneliYenile();
         } else {
             bildir(sonuc.message || 'Tarih kaydedilemedi.', 'hata');
+        }
+    }
+
+    // Tek dokunuşla bugünün tarihi kaydedilir; "Geri al" önceki tarihi (yoksa boş) geri yükler
+    async function kategoriYenilendi(dugme) {
+        var alanKutu = $('hedefAlan');
+        var alan = alanKutu.value;
+        var onceki = alanKutu.dataset.onceki || '';
+        var etiket = alanKutu.dataset.etiket || 'Kayıt';
+        var bugun = bugunDamga();
+
+        dugme.disabled = true;
+        var sonuc = await apiCagir('/api/update-user-date', 'POST', { alan: alan, tarih: bugun });
+        dugme.disabled = false;
+        if (sonuc.oturumYok) return;
+        if (!sonuc.success) return bildir(sonuc.message || 'Tarih kaydedilemedi.', 'hata');
+
+        modalKapat('tarihModal');
+        bildir(etiket + ' bugün (' + trTarih(bugun) + ') yenilendi olarak kaydedildi.', 'basari', {
+            etiket: 'Geri al',
+            islem: function () { kategoriGeriAl(alan, onceki); }
+        });
+        await paneliYenile();
+    }
+
+    async function kategoriGeriAl(alan, onceki) {
+        var sonuc = await apiCagir('/api/update-user-date', 'POST', { alan: alan, tarih: onceki });
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) {
+            bildir('Önceki tarih geri yüklendi.', 'basari');
+            await paneliYenile();
+        } else {
+            bildir(sonuc.message || 'Geri alınamadı.', 'hata');
         }
     }
 
@@ -1407,6 +1444,7 @@
             case 'sifre-guncelle': sifreyiGuncelle(hedef); break;
             case 'tarih-modal': tarihModalAc(d.etiket, d.alan, d.tarih); break;
             case 'tarih-kaydet': kaydetKategoriTarihi(hedef); break;
+            case 'yenilendi': kategoriYenilendi(hedef); break;
             case 'modal-kapat': modalKapat(d.modal); break;
             case 'filtre-uygula': mevcutSayfa = 1; filtreleUcuslari(); break;
             case 'filtre-temizle': filtreleriTemizle(); break;

@@ -837,3 +837,8 @@ html[data-tema="nvg"] .tema-btn .tb-nvg { display: inline; }
 @media print {
     html[data-tema="nvg"], html[data-tema="nvg"] body { background: #fff !important; }
 }
+
+/* ---------- "Bugün yenilendi" düğmesi (muayene, alet kart, standardizasyon) ---------- */
+.yenilendi-btn { width: 100%; margin: 4px 0 2px; }
+.modal-ayrac { display: flex; align-items: center; gap: 10px; margin: 12px 0 10px; font-size: 11.5px; color: var(--yazi-soluk); }
+.modal-ayrac::before, .modal-ayrac::after { content: ""; flex: 1; height: 1px; background: var(--cizgi); }

@@ -173,6 +173,7 @@ const YENILIK_SURUMU = 2;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
         '📊 İstatistik artık dönem dönem incelenebiliyor: güncel dönem, geçmiş dönemler ve "Tümü" (dönemleri karşılaştırma grafiğiyle).',
+        '✅ Muayene, Alet Kart ve Standardizasyon kartlarına dokununca çıkan pencerede "Bugün yenilendi" düğmesi var: tek dokunuşla bugünün tarihi kaydedilir, yanlışlıkla basarsan "Geri al" ile eski tarihe dönersin.',
         '🟢 NVG (gece görüş) teması geldi: sağ üstteki tema düğmesine bastıkça koyu → açık → NVG sırasıyla geçer, seçimin hatırlanır.'
     ]},
     { baslik: '✈️ Uçuş kaydı', maddeler: [
@@ -918,6 +919,8 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                 <h3 id="modalBaslik" class="modal-baslik">Tarih Girin</h3>
                 <div class="modal-mevcut-tarih">Mevcut Kayıtlı Tarih: <span id="modalMevcutTarihText">-</span></div>
                 <input type="hidden" id="hedefAlan">
+                <button type="button" class="btn-tamam yenilendi-btn" id="yenilendiBtn" data-eylem="yenilendi">✅ Bugün yenilendi</button>
+                <div class="modal-ayrac"><span>veya tarihi kendin seç</span></div>
                 <input type="date" id="yeniKategoriTarih">
                 <div class="modal-butonlar">
                     <button type="button" class="btn-tamam" data-eylem="tarih-kaydet">Kaydet</button>
@@ -1239,6 +1242,13 @@ app.post('/api/update-password', oturumGerekli, async (req, res) => {
 
 app.post('/api/update-user-date', oturumGerekli, async (req, res) => {
     const { alan, tarih } = req.body || {};
+    // Boş tarih: kayıt temizlenir ("Yenilendi" işleminin geri alınması, önceden tarih girilmemişse)
+    if (IZINLI_TARIH_ALANLARI.includes(alan) && tarih === '') {
+        try {
+            await ReportDate.deleteMany({ userEmail: req.oturumEmail, alan: alan });
+            return res.json({ success: true });
+        } catch (error) { return res.json({ success: false }); }
+    }
     if (!IZINLI_TARIH_ALANLARI.includes(alan) || !metinMi(tarih) || !/^\d{4}-\d{2}-\d{2}$/.test(tarih) || isNaN(new Date(tarih).getTime())) {
         return res.json({ success: false, message: "Geçersiz tarih." });
     }
