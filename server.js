@@ -156,12 +156,14 @@ const FlightSchema = new mongoose.Schema({
     havaAraciTipi: String,
     egitimTipi: String,
     sure: String,
-    gorevAciklamasi: String
+    gorevAciklamasi: String,
+    toplu: { type: Boolean, default: false }
 });
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 // Silinen uçuşların çöp kutusu: 30 gün sonra MongoDB kendiliğinden kalıcı olarak siler
 const SILINEN_SAKLAMA_GUN = 30;
+const TOPLU_SURE_LIMITI_SAAT = 1000;
 const DeletedFlightSchema = new mongoose.Schema({
     userEmail: String,
     tarih: String,
@@ -169,6 +171,7 @@ const DeletedFlightSchema = new mongoose.Schema({
     egitimTipi: String,
     sure: String,
     gorevAciklamasi: String,
+    toplu: { type: Boolean, default: false },
     silinmeTarihi: { type: Date, default: Date.now, expires: 60 * 60 * 24 * SILINEN_SAKLAMA_GUN }
 });
 const DeletedFlight = mongoose.model('DeletedFlight', DeletedFlightSchema, 'silinen_ucuslar');
@@ -528,11 +531,11 @@ function ucusSatiriHtml(f) {
     const kisa = aciklama.length > 40 ? aciklama.substring(0, 40) + '...' : aciklama;
     const tema = ucusTemasi(f.egitimTipi);
     return `
-        <tr id="row-${id}" class="ucus-satiri${tema.sinif}" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}" data-aciklama="${esc(aciklama)}">
+        <tr id="row-${id}" class="ucus-satiri${tema.sinif}" data-eylem="detay" data-id="${id}" data-tarih="${esc(f.tarih)}" data-hava="${esc(f.havaAraciTipi)}" data-egitim="${esc(f.egitimTipi)}" data-sure="${esc(f.sure)}" data-toplu="${f.toplu === true ? '1' : ''}" data-aciklama="${esc(aciklama)}">
             <td class="c-tarih">${esc(f.tarih)}</td>
             <td class="c-arac">${esc(f.havaAraciTipi)}</td>
             <td class="c-egitim">${tema.ikon}${esc(f.egitimTipi)}</td>
-            <td class="c-sure">${esc(f.sure)}</td>
+            <td class="c-sure">${esc(f.sure)}${f.toplu === true ? '<span class="toplu-etiket" title="Eskiye dönük toplu giriş">toplu</span>' : ''}</td>
             <td class="c-aciklama" title="${esc(aciklama)}">${esc(kisa)}</td>
             <td class="c-islem"><button type="button" class="duz-btn" data-eylem="ucus-duzenle" data-id="${id}" aria-label="Uçuşu düzenle" title="Düzenle"><span aria-hidden="true">✏️</span><span class="b-yazi"> Düzenle</span></button><button type="button" class="sil-btn" data-eylem="ucus-sil" data-id="${id}" aria-label="Uçuşu sil" title="Sil"><span aria-hidden="true">🗑️</span><span class="b-yazi"> Sil</span></button></td>
         </tr>
@@ -651,6 +654,11 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                         <div>
                             <label for="sureAlani">Uçuş Süresi:</label>
                             <button type="button" id="sureAlani" class="sure-alani" data-eylem="sure-modal"><span id="sureAlaniMetin" class="yer-tutucu">Süre seçin</span><span aria-hidden="true">⏱️</span></button>
+                            <div id="topluGiris" class="toplu-giris" hidden>
+                                <input type="number" id="topluSaat" inputmode="numeric" min="0" max="${TOPLU_SURE_LIMITI_SAAT}" step="1" placeholder="0" aria-label="Toplam saat"><span>saat</span>
+                                <input type="number" id="topluDakika" inputmode="numeric" min="0" max="59" step="1" placeholder="0" aria-label="Dakika"><span>dk</span>
+                            </div>
+                            <label class="toplu-onay"><input type="checkbox" id="topluKutu" data-eylem="toplu-degis" data-onek=""> 24 saati aşan eskiye dönük toplu süre giriyorum</label>
                         </div>
                         <div class="span-2"><label for="gorevAciklamasi">Görev Açıklaması:</label><textarea id="gorevAciklamasi" maxlength="1000"></textarea></div>
                         <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">✈️ Uçuşu Ekle</button>
@@ -811,6 +819,11 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                     <div><label for="duzEgitim">Eğitim</label><select id="duzEgitim">${EGITIM_SECENEKLERI}</select></div>
                     <div><label for="duzSureAlani">Süre</label>
                         <button type="button" id="duzSureAlani" class="sure-alani" data-eylem="sure-modal" data-hedef="duzSureAlani" data-metin="duzSureMetin"><span id="duzSureMetin" class="yer-tutucu">Süre seçin</span><span aria-hidden="true">⏱️</span></button>
+                        <div id="duzTopluGiris" class="toplu-giris" hidden>
+                            <input type="number" id="duzTopluSaat" inputmode="numeric" min="0" max="${TOPLU_SURE_LIMITI_SAAT}" step="1" placeholder="0" aria-label="Toplam saat"><span>saat</span>
+                            <input type="number" id="duzTopluDakika" inputmode="numeric" min="0" max="59" step="1" placeholder="0" aria-label="Dakika"><span>dk</span>
+                        </div>
+                        <label class="toplu-onay"><input type="checkbox" id="duzTopluKutu" data-eylem="toplu-degis" data-onek="duz"> 24 saati aşan toplu süre</label>
                     </div>
                 </div>
                 <label for="duzAciklama">Görev Açıklaması</label>
@@ -1208,7 +1221,8 @@ app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
             havaAraciTipi: ucus.havaAraciTipi,
             egitimTipi: ucus.egitimTipi,
             sure: ucus.sure,
-            gorevAciklamasi: ucus.gorevAciklamasi
+            gorevAciklamasi: ucus.gorevAciklamasi,
+            toplu: ucus.toplu === true
         }).save();
         await Flight.deleteOne({ _id: id, userEmail: req.oturumEmail });
         res.json({ success: true, cop: String(cop._id) });
@@ -1230,6 +1244,7 @@ app.get('/api/trash', oturumGerekli, async (req, res) => {
                 havaAraciTipi: f.havaAraciTipi,
                 egitimTipi: f.egitimTipi,
                 sure: f.sure,
+                toplu: f.toplu === true,
                 gorevAciklamasi: f.gorevAciklamasi || '',
                 silinme: f.silinmeTarihi ? new Date(f.silinmeTarihi).toISOString() : null
             }))
@@ -1249,7 +1264,8 @@ app.post('/api/restore-flight', oturumGerekli, async (req, res) => {
             havaAraciTipi: cop.havaAraciTipi,
             egitimTipi: cop.egitimTipi,
             sure: cop.sure,
-            gorevAciklamasi: cop.gorevAciklamasi
+            gorevAciklamasi: cop.gorevAciklamasi,
+            toplu: cop.toplu === true
         }).save();
         await DeletedFlight.deleteOne({ _id: id, userEmail: req.oturumEmail });
         res.json({ success: true });
@@ -1372,8 +1388,13 @@ function ucusGovdesiniDogrula(g) {
     if (dakika === null || dakika <= 0) {
         return { hata: "Geçersiz uçuş süresi. Örnek: 2:10 veya 2.5" };
     }
-    if (dakika > 24 * 60) {
-        return { hata: "Uçuş süresi 24 saatten uzun olamaz." };
+    // 24 saati aşan süre yalnızca "toplu giriş" kutucuğu işaretliyse kabul edilir
+    const topluIstendi = g.toplu === true;
+    const ustSinir = topluIstendi ? TOPLU_SURE_LIMITI_SAAT * 60 : 24 * 60;
+    if (dakika > ustSinir) {
+        return { hata: topluIstendi
+            ? `Toplu süre ${TOPLU_SURE_LIMITI_SAAT} saatten uzun olamaz.`
+            : "Uçuş süresi 24 saatten uzun olamaz. Daha uzun eskiye dönük süre için \"toplu giriş\" kutucuğunu işaretleyin." };
     }
     return {
         veri: {
@@ -1381,6 +1402,7 @@ function ucusGovdesiniDogrula(g) {
             havaAraciTipi: g.havaAraciTipi,
             egitimTipi: g.egitimTipi,
             sure: dakikayiSaatMetnine(dakika),
+            toplu: dakika > 24 * 60,
             gorevAciklamasi: metinMi(g.gorevAciklamasi) ? g.gorevAciklamasi.trim().substring(0, 1000) : ''
         }
     };
@@ -1586,7 +1608,8 @@ app.delete('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
 
 app.post('/api/admin/ucus', adminApiGerekli, async (req, res) => {
     const email = epostaTemizle(req.body && req.body.email);
-    const d = ucusGovdesiniDogrula(req.body);
+    // Yönetici toplu (24 saati aşan) kayıt girebilir; "toplu" işareti süreye göre sunucuda belirlenir
+    const d = ucusGovdesiniDogrula({ ...(req.body || {}), toplu: true });
     if (d.hata) return res.json({ success: false, message: d.hata });
     try {
         const user = await User.findOne({ email }, 'email').lean();
@@ -1604,7 +1627,7 @@ app.post('/api/admin/ucus', adminApiGerekli, async (req, res) => {
 app.put('/api/admin/ucus', adminApiGerekli, async (req, res) => {
     const id = req.body && req.body.id;
     if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
-    const d = ucusGovdesiniDogrula(req.body);
+    const d = ucusGovdesiniDogrula({ ...(req.body || {}), toplu: true });
     if (d.hata) return res.json({ success: false, message: d.hata });
     try {
         const ucus = await Flight.findById(id);
@@ -1615,6 +1638,7 @@ app.put('/api/admin/ucus', adminApiGerekli, async (req, res) => {
         ucus.havaAraciTipi = d.veri.havaAraciTipi;
         ucus.egitimTipi = d.veri.egitimTipi;
         ucus.sure = d.veri.sure;
+        ucus.toplu = d.veri.toplu;
         ucus.gorevAciklamasi = d.veri.gorevAciklamasi;
         await ucus.save();
         await logYaz(req.adminEmail, 'Uçuş düzenlendi', String(ucus.userEmail || '').toLowerCase(), `Önce: ${eski} → Sonra: ${d.veri.tarih} ${d.veri.havaAraciTipi} ${d.veri.egitimTipi} ${d.veri.sure}`);

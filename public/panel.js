@@ -321,21 +321,92 @@
         }
     }
 
+    /* ---------- 24 SAATİ AŞAN TOPLU SÜRE ---------- */
+
+    function topluAlanlar(onek) {
+        var duz = onek === 'duz';
+        return {
+            kutu: $(duz ? 'duzTopluKutu' : 'topluKutu'),
+            giris: $(duz ? 'duzTopluGiris' : 'topluGiris'),
+            saat: $(duz ? 'duzTopluSaat' : 'topluSaat'),
+            dakika: $(duz ? 'duzTopluDakika' : 'topluDakika'),
+            alan: $(duz ? 'duzSureAlani' : 'sureAlani')
+        };
+    }
+
+    function topluDegis(onek) {
+        var a = topluAlanlar(onek || '');
+        if (!a.kutu) return;
+        var ac = a.kutu.checked;
+        a.giris.hidden = !ac;
+        a.alan.hidden = ac;
+        if (ac) a.saat.focus();
+    }
+
+    function topluUygula(onek, saat, dakika) {
+        var a = topluAlanlar(onek || '');
+        if (!a.kutu) return;
+        a.kutu.checked = true;
+        a.saat.value = String(parseInt(saat, 10) || 0);
+        a.dakika.value = String(parseInt(dakika, 10) || 0);
+        topluDegis(onek);
+    }
+
+    function topluKapat(onek) {
+        var a = topluAlanlar(onek || '');
+        if (!a.kutu) return;
+        a.kutu.checked = false;
+        a.saat.value = '';
+        a.dakika.value = '';
+        topluDegis(onek);
+    }
+
+    // Formdaki süreyi okur: tekerlek ya da (kutucuk işaretliyse) saat/dakika kutuları
+    function sureyiOku(onek) {
+        var a = topluAlanlar(onek || '');
+        if (a.kutu && a.kutu.checked) {
+            var s = parseInt(a.saat.value || '0', 10);
+            var dk = parseInt(a.dakika.value || '0', 10);
+            if (isNaN(s) || isNaN(dk) || s < 0 || dk < 0 || dk > 59) {
+                return { hata: 'Dakika 0-59 arasında olmalı; saat ve dakika sayı olmalı.' };
+            }
+            if (s > 1000 || (s === 1000 && dk > 0)) return { hata: 'Toplu süre 1000 saatten uzun olamaz.' };
+            if (s === 0 && dk === 0) return { hata: 'Lütfen toplu süreyi girin.' };
+            return { sure: String(s).padStart(2, '0') + ':' + String(dk).padStart(2, '0'), toplu: true };
+        }
+        var saat = a.alan.dataset.saat || '00';
+        var dakika = a.alan.dataset.dakika || '00';
+        if (saat === '00' && dakika === '00') return { hata: 'Lütfen uçuş süresini seçin.' };
+        return { sure: saat + ':' + dakika, toplu: false };
+    }
+
+    // Kayıtlı süreyi forma yazar; 23 saati aşıyorsa toplu kutularını kullanır
+    function sureyiFormaYaz(onek, sureMetni, toplu) {
+        var p = String(sureMetni || '00:00').split(':');
+        var saat = parseInt(p[0], 10) || 0;
+        var dakika = parseInt(p[1], 10) || 0;
+        var a = topluAlanlar(onek || '');
+        if (toplu || saat > 23) {
+            topluUygula(onek, saat, dakika);
+        } else {
+            topluKapat(onek);
+            var metinId = onek === 'duz' ? 'duzSureMetin' : 'sureAlaniMetin';
+            sureyiYaz(a.alan, $(metinId), String(saat).padStart(2, '0'), String(dakika).padStart(2, '0'));
+        }
+    }
+
     async function kaydetYeniUcus(dugme) {
         var tarih = $('tarih').value;
         var havaAraciTipi = $('havaAraciTipi').value;
         var egitimTipi = $('egitimTipi').value;
-        var sureSaat = $('sureAlani').dataset.saat || '00';
-        var sureDakika = $('sureAlani').dataset.dakika || '00';
-        var sure = sureSaat + ':' + sureDakika;
         var gorevAciklamasi = $('gorevAciklamasi').value;
 
         if (!tarih || !egitimTipi) {
             return bildir('Lütfen Tarih ve Eğitim Sınıflandırması alanlarını doldurun.', 'hata');
         }
-        if (sureSaat === '00' && sureDakika === '00') {
-            return bildir('Lütfen uçuş süresini seçin.', 'hata');
-        }
+        var su = sureyiOku('');
+        if (su.hata) return bildir(su.hata, 'hata');
+        var sure = su.sure;
         if (!(await onayIste('Yeni uçuş kaydını eklemek istiyor musunuz?'))) return;
 
         dugme.disabled = true;
@@ -344,6 +415,7 @@
             havaAraciTipi: havaAraciTipi,
             egitimTipi: egitimTipi,
             sure: sure,
+            toplu: su.toplu,
             gorevAciklamasi: gorevAciklamasi
         });
         dugme.disabled = false;
@@ -384,17 +456,14 @@
         $('duzArac').value = d.hava || '';
         $('duzEgitim').value = d.egitim || '';
         $('duzAciklama').value = d.aciklama || '';
-        var p = String(d.sure || '00:00').split(':');
-        sureyiYaz($('duzSureAlani'), $('duzSureMetin'), String(p[0] || '0').padStart(2, '0'), String(p[1] || '0').padStart(2, '0'));
+        sureyiFormaYaz('duz', d.sure, d.toplu === '1');
         modalAc('duzenleModal');
     }
 
     async function duzenleKaydet(dugme) {
-        var alan = $('duzSureAlani');
-        var saat = alan.dataset.saat || '00';
-        var dakika = alan.dataset.dakika || '00';
         if (!$('duzTarih').value) return bildir('Lütfen tarih seçin.', 'hata');
-        if (saat === '00' && dakika === '00') return bildir('Lütfen uçuş süresini seçin.', 'hata');
+        var su = sureyiOku('duz');
+        if (su.hata) return bildir(su.hata, 'hata');
 
         dugme.disabled = true;
         var sonuc = await apiCagir('/api/update-flight', 'POST', {
@@ -402,7 +471,8 @@
             tarih: $('duzTarih').value,
             havaAraciTipi: $('duzArac').value,
             egitimTipi: $('duzEgitim').value,
-            sure: saat + ':' + dakika,
+            sure: su.sure,
+            toplu: su.toplu,
             gorevAciklamasi: $('duzAciklama').value
         });
         dugme.disabled = false;
@@ -439,8 +509,7 @@
         $('havaAraciTipi').value = d.hava || $('havaAraciTipi').value;
         $('egitimTipi').value = d.egitim || '';
         $('gorevAciklamasi').value = d.aciklama || '';
-        var p = String(d.sure || '00:00').split(':');
-        sureyiYaz($('sureAlani'), $('sureAlaniMetin'), String(p[0] || '0').padStart(2, '0'), String(p[1] || '0').padStart(2, '0'));
+        sureyiFormaYaz('', d.sure, d.toplu === '1');
         bildir('Son uçuş bilgileri forma kopyalandı. Tarihi ve süreyi kontrol edin.', 'basari');
     }
 
@@ -860,12 +929,12 @@
         $('havaAraciTipi').value = t.havaAraciTipi;
         $('egitimTipi').value = t.egitimTipi;
         $('gorevAciklamasi').value = t.gorevAciklamasi || '';
-        var p = String(t.sure || '00:00').split(':');
-        sureyiYaz($('sureAlani'), $('sureAlaniMetin'), String(p[0] || '0').padStart(2, '0'), String(p[1] || '0').padStart(2, '0'));
+        sureyiFormaYaz('', t.sure, false);
         bildir('"' + t.ad + '" şablonu forma uygulandı. Tarihi kontrol edin.', 'basari');
     }
 
     function sablonKaydetAc() {
+        if ($('topluKutu') && $('topluKutu').checked) return bildir('Toplu süre şablon olarak kaydedilemez. Önce toplu kutucuğunu kapatın.', 'hata');
         var egitim = $('egitimTipi').value;
         var saat = $('sureAlani').dataset.saat || '00';
         var dakika = $('sureAlani').dataset.dakika || '00';
@@ -1236,6 +1305,7 @@
             case 'ucus-duzenle': e.stopPropagation(); duzenleModalAc(d.id); break;
             case 'duzenle-kaydet': duzenleKaydet(hedef); break;
             case 'son-kopyala': sonUcusuKopyala(); break;
+            case 'toplu-degis': topluDegis(d.onek); break;
             case 'istatistik-ac': istatistikAc(); break;
             case 'csv-indir': csvIndir(); break;
             case 'pdf-indir': pdfIndir(); break;

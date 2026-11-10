@@ -654,3 +654,24 @@ html[data-tema="acik"] .arac-cubugu .arac-btn[aria-expanded="true"] { color: #ff
     .b-yazi { display: none; }
     .duz-btn, .sil-btn { width: 38px; height: 36px; padding: 0; margin: 0 0 0 6px; font-size: 15px; display: inline-grid; place-items: center; vertical-align: middle; }
 }
+
+/* ---------- 24 saati aşan toplu süre girişi ---------- */
+.toplu-onay {
+    display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 12.5px; font-weight: 600;
+    color: var(--yazi-soluk); cursor: pointer; letter-spacing: 0; line-height: 1.35;
+}
+.toplu-onay input[type="checkbox"] {
+    width: 18px; height: 18px; min-width: 18px; margin: 0; padding: 0; accent-color: var(--mavi); cursor: pointer;
+}
+.toplu-giris { display: flex; align-items: center; gap: 8px; }
+.toplu-giris[hidden], .sure-alani[hidden] { display: none; }
+.toplu-giris input {
+    width: 90px; height: 46px; padding: 0 12px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.toplu-giris span { color: var(--yazi-soluk); font-size: 14px; font-weight: 600; }
+.toplu-etiket {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; vertical-align: middle;
+    font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase;
+    color: var(--yazi-soluk); background: rgba(255,255,255,.1); border: 1px solid var(--cizgi);
+}
+html[data-tema="acik"] .toplu-etiket { background: rgba(0,0,0,.06); }
