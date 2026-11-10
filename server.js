@@ -129,8 +129,17 @@ const UserSchema = new mongoose.Schema({
         boy: Number,
         kilo: Number,
         dogumTarihi: String,
-        kanGrubu: String
-    }
+        kanGrubu: String,
+        donemHedefSaat: Number   // boşsa varsayılan hedef (140 saat) kullanılır
+    },
+    // Kayıtlı uçuş şablonları (kullanıcı başına en fazla 10)
+    sablonlar: [{
+        ad: String,
+        havaAraciTipi: String,
+        egitimTipi: String,
+        sure: String,
+        gorevAciklamasi: String
+    }]
 });
 const User = mongoose.model('User', UserSchema, 'users');
 
@@ -150,6 +159,19 @@ const FlightSchema = new mongoose.Schema({
     gorevAciklamasi: String
 });
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
+
+// Silinen uçuşların çöp kutusu: 30 gün sonra MongoDB kendiliğinden kalıcı olarak siler
+const SILINEN_SAKLAMA_GUN = 30;
+const DeletedFlightSchema = new mongoose.Schema({
+    userEmail: String,
+    tarih: String,
+    havaAraciTipi: String,
+    egitimTipi: String,
+    sure: String,
+    gorevAciklamasi: String,
+    silinmeTarihi: { type: Date, default: Date.now, expires: 60 * 60 * 24 * SILINEN_SAKLAMA_GUN }
+});
+const DeletedFlight = mongoose.model('DeletedFlight', DeletedFlightSchema, 'silinen_ucuslar');
 
 // Yönetici işlemlerinin kaydı (kim, ne zaman, neyi değiştirdi)
 const AdminLogSchema = new mongoose.Schema({
@@ -253,7 +275,8 @@ function hesaplaToplamSaat(flights) {
     return dakikayiSaatMetnine(toplamDakika);
 }
 
-function hesaplaAktifDonemSaati(flights) {
+function hesaplaAktifDonemSaati(flights, hedefSaat) {
+    hedefSaat = hedefSaat || DONEM_HEDEF_SAAT;
     const simdi = new Date();
     const buYil = simdi.getFullYear();
     const eylulSiniri = new Date(buYil, 8, 1);
@@ -280,10 +303,10 @@ function hesaplaAktifDonemSaati(flights) {
     });
 
     // Dönem hedefi: 140 saat. Güncel dönem saati düşülerek kalan süre bulunur.
-    const kalanDakika = Math.max(0, (DONEM_HEDEF_SAAT * 60) - toplamDakika);
+    const kalanDakika = Math.max(0, (hedefSaat * 60) - toplamDakika);
 
     // İlerleme çubuğu ve tempo bilgisi
-    const yuzde = Math.min(100, Math.floor((toplamDakika / (DONEM_HEDEF_SAAT * 60)) * 100));
+    const yuzde = Math.min(100, Math.floor((toplamDakika / (hedefSaat * 60)) * 100));
     const kalanGun = Math.max(0, Math.ceil((bitisTarihi.getTime() - simdi.getTime()) / (1000 * 3600 * 24)));
     let tempo = '';
     if (kalanDakika === 0) {
@@ -302,7 +325,8 @@ function hesaplaAktifDonemSaati(flights) {
         kalan: dakikayiSaatMetnine(kalanDakika),
         donemUcuslari: donemUcuslari,
         yuzde: yuzde,
-        tempo: tempo
+        tempo: tempo,
+        hedef: hedefSaat
     };
 }
 
@@ -449,6 +473,17 @@ function hesaplaUyarilar(flights, kayitliTarihler) {
     return liste.slice(0, 6);
 }
 
+function sablonListesiHazirla(sablonlar) {
+    return (sablonlar || []).map(t => ({
+        id: String(t._id),
+        ad: t.ad || '',
+        havaAraciTipi: t.havaAraciTipi || '',
+        egitimTipi: t.egitimTipi || '',
+        sure: t.sure || '',
+        gorevAciklamasi: t.gorevAciklamasi || ''
+    }));
+}
+
 function uyariBandiHtml(uyarilar) {
     if (!uyarilar.length) return '';
     return `<div class="uyari-alani" role="status">${uyarilar.map(u => {
@@ -505,10 +540,12 @@ function ucusSatiriHtml(f) {
         </tr>`;
 }
 
-function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
+function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar) {
     profil = profil || {};
+    const hedefSaat = profil.donemHedefSaat || DONEM_HEDEF_SAAT;
+    const sablonListesi = sablonListesiHazirla(sablonlar);
     const toplamUcusSuresi = hesaplaToplamSaat(flights);
-    const aktifDonem = hesaplaAktifDonemSaati(flights);
+    const aktifDonem = hesaplaAktifDonemSaati(flights, hedefSaat);
     const gggDurum = hesaplaGggVeSonUcusDurumu(flights);
     const aracBazliDurum = hesaplaAracaGoreDetayliDurum(flights);
     const uyarilar = hesaplaUyarilar(flights, kayitliTarihler);
@@ -523,6 +560,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
 
     const panelVeri = {
         aracBazli: aracBazliDurum,
+        sablonlar: sablonListesi,
         donemUcuslari: aktifDonem.donemUcuslari.map(f => ({
             tarih: f.tarih,
             havaAraciTipi: f.havaAraciTipi,
@@ -553,7 +591,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
                         </div>
                         <div class="donem-alani" data-eylem="donem-modal" title="Dönem Uçuşlarını Görmek İçin Tıkla">
                             <span class="mini-etiket">${esc(aktifDonem.yil)} DÖNEMİ 🔍</span>
-                            <h2 id="donemSaatGosterge">${esc(aktifDonem.sure)}<span class="kalan-saat" title="${DONEM_HEDEF_SAAT} saatten kalan">(${esc(aktifDonem.kalan)})</span></h2>
+                            <h2 id="donemSaatGosterge">${esc(aktifDonem.sure)}<span class="kalan-saat" title="${hedefSaat} saatten kalan">(${esc(aktifDonem.kalan)})</span></h2>
                         </div>
                     </div>
                     <div class="ozet-alt">
@@ -581,7 +619,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
 
             <div class="ilerleme-kart">
                 <div class="ilerleme-ust">
-                    <span class="ilerleme-saat">${esc(aktifDonem.sure)} <small>/ ${DONEM_HEDEF_SAAT}:00</small></span>
+                    <span class="ilerleme-saat">${esc(aktifDonem.sure)} <small>/ ${hedefSaat}:00</small></span>
                     <span class="ilerleme-yuzde">%${esc(aktifDonem.yuzde)}</span>
                 </div>
                 <div class="ilerleme-cubuk" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(aktifDonem.yuzde)}" aria-label="${esc(aktifDonem.yil)} dönemi hedef ilerlemesi"><i style="width:${esc(aktifDonem.yuzde)}%"></i></div>
@@ -617,6 +655,11 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
                         <span aria-hidden="true">📋</span>
                         <span><b>Son uçuşu kopyala</b><small id="sonKopyaOzet"></small></span>
                     </button>
+                    <div class="sablon-alani">
+                        <div class="sablon-baslik">⭐ Şablonlar</div>
+                        <div id="sablonListe" class="sablon-liste"></div>
+                        <button type="button" class="sablon-kaydet-btn" data-eylem="sablon-kaydet-ac">➕ Formdaki bilgileri şablon olarak kaydet</button>
+                    </div>
                     <form id="ucusFormu" class="form-grid">
                         <div><label for="tarih">Tarih:</label><input type="date" id="tarih" value="${esc(bugunTarihStr)}"></div>
                         <div><label for="havaAraciTipi">Hava Aracı Tipi:</label><select id="havaAraciTipi">${ARAC_SECENEKLERI}</select></div>
@@ -633,7 +676,9 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
 
             <div class="arac-cubugu">
                 <button type="button" class="arac-btn" data-eylem="istatistik-ac">📊 İstatistik</button>
-                <button type="button" class="arac-btn" data-eylem="csv-indir">⬇ Excel (CSV)</button>
+                <button type="button" class="arac-btn" data-eylem="takvim-ac">📅 Takvim</button>
+                <button type="button" class="arac-btn" data-eylem="cop-ac">🗑️ Silinenler</button>
+                <button type="button" class="arac-btn" data-eylem="csv-indir">⬇ CSV</button>
                 <button type="button" class="arac-btn" data-eylem="pdf-indir">⬇ PDF</button>
             </div>
 
@@ -686,6 +731,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
                             <div><label for="profilBoy">Boy (cm)</label><input type="number" id="profilBoy" inputmode="numeric" min="100" max="250" step="1" value="${esc(profil.boy || '')}" placeholder="175"></div>
                             <div><label for="profilKilo">Kilo (kg)</label><input type="number" id="profilKilo" inputmode="decimal" min="30" max="300" step="0.1" value="${esc(profil.kilo || '')}" placeholder="75"></div>
                             <div><label for="profilDogum">Doğum Tarihi</label><input type="date" id="profilDogum" value="${esc(profil.dogumTarihi || '')}"></div>
+                            <div class="tam"><label for="profilHedef">Dönem Hedefi (saat)</label><input type="number" id="profilHedef" inputmode="numeric" min="10" max="1000" step="1" value="${esc(profil.donemHedefSaat || '')}" placeholder="${DONEM_HEDEF_SAAT} (varsayılan)"></div>
                             <div><label for="profilKan">Kan Grubu</label><select id="profilKan"><option value="">Seçin</option>${KAN_GRUPLARI.map(k => `<option value="${esc(k)}"${profil.kanGrubu === k ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
                         </div>
                         <div id="profilHesap" class="profil-hesap" hidden></div>
@@ -708,6 +754,50 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil) {
                             <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="profilModal">Kapat</button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAKVİM MODALI -->
+        <div id="takvimModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu genis">
+                <h3 class="modal-baslik">📅 Uçuş Takvimi</h3>
+                <div class="tk-ust">
+                    <button type="button" class="tk-ok" data-eylem="takvim-onceki" aria-label="Önceki ay">‹</button>
+                    <div class="tk-baslik"><b id="tkBaslik"></b><small id="tkOzet"></small></div>
+                    <button type="button" class="tk-ok" data-eylem="takvim-sonraki" aria-label="Sonraki ay">›</button>
+                </div>
+                <div class="tk-icerik">
+                    <div id="tkGrid" class="tk-grid"></div>
+                    <div id="tkGun" class="tk-gun"></div>
+                </div>
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-filtre" data-eylem="takvim-bugun">Bugün</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="takvimModal">Kapat</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ÇÖP KUTUSU MODALI -->
+        <div id="copModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu genis">
+                <h3 class="modal-baslik">🗑️ Silinen Uçuşlar</h3>
+                <p class="cop-not">Silinen uçuşlar ${SILINEN_SAKLAMA_GUN} gün boyunca burada saklanır, sonra kalıcı olarak silinir.</p>
+                <div id="copIcerik" class="modal-liste"></div>
+                <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="copModal">Kapat</button>
+            </div>
+        </div>
+
+        <!-- ŞABLON KAYDETME MODALI -->
+        <div id="sablonModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu kucuk">
+                <h3 class="modal-baslik">⭐ Şablon Olarak Kaydet</h3>
+                <div id="sablonOnizleme" class="modal-mevcut-tarih"></div>
+                <label for="sablonAd">Şablon adı</label>
+                <input type="text" id="sablonAd" maxlength="30" autocomplete="off">
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="sablon-kaydet">Kaydet</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="sablonModal">İptal</button>
                 </div>
             </div>
         </div>
@@ -952,7 +1042,7 @@ const loginHandler = async (req, res) => {
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
 
         res.set('Cache-Control', 'no-store');
-        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil));
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar));
     } catch (error) {
         console.error(error);
         if (cerezle) return res.status(500).send("Sunucu hatası.");
@@ -1022,6 +1112,9 @@ function profilDogrula(g) {
         dogumTarihi = g.dogumTarihi;
     }
 
+    const hedef = sayiOku(g.donemHedefSaat);
+    if (hedef.hata || (!hedef.bos && (hedef.n < 10 || hedef.n > 1000))) return { hata: 'Dönem hedefi 10 ile 1000 saat arasında olmalıdır.' };
+
     const kanGrubu = metinMi(g.kanGrubu) ? g.kanGrubu : '';
     if (kanGrubu && !KAN_GRUPLARI.includes(kanGrubu)) return { hata: 'Geçersiz kan grubu.' };
 
@@ -1031,7 +1124,8 @@ function profilDogrula(g) {
             boy: boy.bos ? null : Math.round(boy.n),
             kilo: kilo.bos ? null : Math.round(kilo.n * 10) / 10,
             dogumTarihi,
-            kanGrubu
+            kanGrubu,
+            donemHedefSaat: hedef.bos ? null : Math.round(hedef.n)
         }
     };
 }
@@ -1106,9 +1200,106 @@ app.delete('/api/delete-flight', oturumGerekli, async (req, res) => {
         return res.json({ success: false, message: "Geçersiz kayıt." });
     }
     try {
-        // Sadece oturumdaki kullanıcının kendi kaydı silinebilir
-        await Flight.findOneAndDelete({ _id: id, userEmail: req.oturumEmail });
+        // Sadece oturumdaki kullanıcının kendi kaydı silinebilir.
+        // Önce çöp kutusuna kopyalanır, sonra asıl kayıt silinir (hata olursa veri kaybolmaz).
+        const ucus = await Flight.findOne({ _id: id, userEmail: req.oturumEmail });
+        if (!ucus) return res.json({ success: true });
+        const cop = await new DeletedFlight({
+            userEmail: req.oturumEmail,
+            tarih: ucus.tarih,
+            havaAraciTipi: ucus.havaAraciTipi,
+            egitimTipi: ucus.egitimTipi,
+            sure: ucus.sure,
+            gorevAciklamasi: ucus.gorevAciklamasi
+        }).save();
+        await Flight.deleteOne({ _id: id, userEmail: req.oturumEmail });
+        res.json({ success: true, cop: String(cop._id) });
+    } catch (e) { res.json({ success: false }); }
+});
+
+// --- ÇÖP KUTUSU ---
+
+app.get('/api/trash', oturumGerekli, async (req, res) => {
+    try {
+        const liste = await DeletedFlight.find({ userEmail: req.oturumEmail }).sort({ silinmeTarihi: -1 }).limit(200).lean();
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            success: true,
+            gun: SILINEN_SAKLAMA_GUN,
+            liste: liste.map(f => ({
+                id: String(f._id),
+                tarih: f.tarih,
+                havaAraciTipi: f.havaAraciTipi,
+                egitimTipi: f.egitimTipi,
+                sure: f.sure,
+                gorevAciklamasi: f.gorevAciklamasi || '',
+                silinme: f.silinmeTarihi ? new Date(f.silinmeTarihi).toISOString() : null
+            }))
+        });
+    } catch (e) { res.json({ success: false, message: 'Silinenler alınamadı.' }); }
+});
+
+app.post('/api/restore-flight', oturumGerekli, async (req, res) => {
+    const { id } = req.body || {};
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
+    try {
+        const cop = await DeletedFlight.findOne({ _id: id, userEmail: req.oturumEmail });
+        if (!cop) return res.json({ success: false, message: 'Kayıt bulunamadı (süresi dolmuş olabilir).' });
+        await new Flight({
+            userEmail: req.oturumEmail,
+            tarih: cop.tarih,
+            havaAraciTipi: cop.havaAraciTipi,
+            egitimTipi: cop.egitimTipi,
+            sure: cop.sure,
+            gorevAciklamasi: cop.gorevAciklamasi
+        }).save();
+        await DeletedFlight.deleteOne({ _id: id, userEmail: req.oturumEmail });
         res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
+
+app.post('/api/purge-flight', oturumGerekli, async (req, res) => {
+    const { id } = req.body || {};
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
+    try {
+        await DeletedFlight.deleteOne({ _id: id, userEmail: req.oturumEmail });
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
+
+// --- UÇUŞ ŞABLONLARI ---
+
+const SABLON_LIMITI = 10;
+
+app.post('/api/add-template', oturumGerekli, async (req, res) => {
+    const g = req.body || {};
+    const ad = metinMi(g.ad) ? g.ad.replace(/[\u0000-\u001f\u007f]/g, '').trim() : '';
+    if (!ad) return res.json({ success: false, message: 'Şablon adı gerekli.' });
+    if (ad.length > 30) return res.json({ success: false, message: 'Şablon adı en fazla 30 karakter olabilir.' });
+
+    // Uçuş alanları normal uçuşla aynı kurallarla doğrulanır (tarih şablonda tutulmaz)
+    const d = ucusGovdesiniDogrula({ ...g, tarih: new Date().toISOString().slice(0, 10) });
+    if (d.hata) return res.json({ success: false, message: d.hata });
+
+    try {
+        const sonuc = await User.updateOne(
+            { email: req.oturumEmail, [`sablonlar.${SABLON_LIMITI - 1}`]: { $exists: false } },
+            { $push: { sablonlar: { ad, havaAraciTipi: d.veri.havaAraciTipi, egitimTipi: d.veri.egitimTipi, sure: d.veri.sure, gorevAciklamasi: d.veri.gorevAciklamasi } } }
+        );
+        const degisen = (sonuc && (sonuc.modifiedCount !== undefined ? sonuc.modifiedCount : sonuc.nModified)) || 0;
+        if (!degisen) return res.json({ success: false, message: `En fazla ${SABLON_LIMITI} şablon kaydedebilirsiniz. Önce birini silin.` });
+        const user = await User.findOne({ email: req.oturumEmail }, 'sablonlar').lean();
+        res.json({ success: true, sablonlar: sablonListesiHazirla(user && user.sablonlar) });
+    } catch (e) { res.json({ success: false }); }
+});
+
+app.post('/api/delete-template', oturumGerekli, async (req, res) => {
+    const { id } = req.body || {};
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz şablon.' });
+    try {
+        await User.updateOne({ email: req.oturumEmail }, { $pull: { sablonlar: { _id: id } } });
+        const user = await User.findOne({ email: req.oturumEmail }, 'sablonlar').lean();
+        res.json({ success: true, sablonlar: sablonListesiHazirla(user && user.sablonlar) });
     } catch (e) { res.json({ success: false }); }
 });
 
@@ -1263,7 +1454,7 @@ Object.keys(ADMIN_DOSYALARI).forEach(url => {
 // Tüm kullanıcılar için uçuş sayısı, toplam saat, dönem saati ve son uçuş tarihi
 async function kullaniciOzetleriniHesapla() {
     const [kullanicilar, ucuslar] = await Promise.all([
-        User.find({}, 'email').lean(),
+        User.find({}, 'email profil.donemHedefSaat').lean(),
         Flight.find({}, 'userEmail tarih sure').lean()
     ]);
     const donem = donemSiniri();
@@ -1276,6 +1467,7 @@ async function kullaniciOzetleriniHesapla() {
             ucusSayisi: 0,
             toplamDakika: 0,
             donemDakika: 0,
+            hedefDakika: ((u.profil && u.profil.donemHedefSaat) || DONEM_HEDEF_SAAT) * 60,
             sonUcus: null
         });
     });
@@ -1316,7 +1508,7 @@ app.get('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
     const email = epostaTemizle(req.query && req.query.email);
     if (!email) return res.json({ success: false, message: 'E-posta gerekli.' });
     try {
-        const user = await User.findOne({ email }, 'email').lean();
+        const user = await User.findOne({ email }, 'email profil.donemHedefSaat').lean();
         if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
 
         const ucuslar = await Flight.find({ userEmail: emailFiltresi(email) })
@@ -1340,7 +1532,7 @@ app.get('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
                 gorevAciklamasi: f.gorevAciklamasi || ''
             })),
             tarihler: tarihler.map(t => ({ alan: t.alan, tarih: t.tarih })),
-            donem: { yil: donem.yil, bas: donem.bas, bit: donem.bit, hedefDakika: DONEM_HEDEF_SAAT * 60 },
+            donem: { yil: donem.yil, bas: donem.bas, bit: donem.bit, hedefDakika: ((user.profil && user.profil.donemHedefSaat) || DONEM_HEDEF_SAAT) * 60 },
             araclar: HAVA_ARACLARI_LISTESI,
             egitimTipleri: EGITIM_TIPLERI
         });
@@ -1380,6 +1572,7 @@ app.delete('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
         if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
 
         const ucusSonuc = await Flight.deleteMany({ userEmail: emailFiltresi(email) });
+        await DeletedFlight.deleteMany({ userEmail: emailFiltresi(email) });
         const tarihSonuc = await ReportDate.deleteMany({ userEmail: emailFiltresi(email) });
         await User.deleteOne({ email });
 

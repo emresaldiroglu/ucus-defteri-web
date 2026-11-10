@@ -197,7 +197,7 @@
 
         var l = durum.liste.filter(function (u) {
             if (q && u.email.toLowerCase().indexOf(q) === -1) return false;
-            if (f === 'dolan') return u.donemDakika >= hedef;
+            if (f === 'dolan') return u.donemDakika >= (u.hedefDakika || hedef);
             if (f === 'pasif') return u.ucusSayisi > 0 && u.sonUcus < otuz;
             if (f === 'hic') return u.ucusSayisi === 0;
             return true;
@@ -217,7 +217,7 @@
     }
 
     function kullaniciSatiri(u) {
-        var hedef = durum.donem.hedefDakika;
+        var hedef = u.hedefDakika || durum.donem.hedefDakika;
         var tr = eleman('tr', 'k-satir');
         tr.dataset.eylem = 'kullanici-ac';
         tr.dataset.email = u.email;

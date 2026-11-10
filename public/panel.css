@@ -543,3 +543,59 @@ html[data-tema="acik"] .ekleme-simge { color: #1b5fb8; }
 html[data-tema="acik"] .uygulama-btn { color: var(--yazi); }
 @media (prefers-reduced-motion: reduce) { .ekleme-karti { animation: none; } }
 @media (display-mode: standalone) { .uygulama-btn { display: none; } }
+
+
+/* ===================== ÇÖP KUTUSU / ŞABLON / TAKVİM ===================== */
+.toast.eylemli { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.toast-eylem { width: auto; flex: none; padding: 7px 14px; font-size: 13px; border-radius: 10px; background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.35); }
+.arac-cubugu .arac-btn { min-width: 30%; }
+
+.cop-not { margin: -4px 0 10px; text-align: center; font-size: 12px; color: var(--yazi-soluk); }
+.cop-satir { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; background: var(--cam); border: 1px solid var(--cizgi); }
+.cop-satir.tema-ay { background: #1f2a4d; border-color: #34437a; border-left: 4px solid #8fa8ff; color: #e8ecff; }
+.cop-satir.tema-gunes { background: #fff3c4; border-color: #f3d98a; border-left: 4px solid #f5a623; color: #4a3600; }
+.cop-satir.tema-ay .liste-tarih { color: #e8ecff; } .cop-satir.tema-gunes .liste-tarih { color: #4a3600; }
+.cop-satir.tema-ay .liste-ince { color: #b9c4ee; } .cop-satir.tema-gunes .liste-ince { color: #7a5a10; }
+.cop-kalan { font-style: italic; }
+.cop-butonlar { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.cop-geri, .cop-sil { width: auto; padding: 7px 12px; font-size: 12px; border-radius: 9px; }
+.cop-geri { background: linear-gradient(135deg, #34d399, #10a37a); }
+.cop-sil { background: rgba(255,107,107,.9); }
+
+.sablon-alani { width: 100%; padding: 12px 14px; border-radius: 14px; background: rgba(255,200,87,.08); border: 1px solid rgba(255,200,87,.3); }
+.sablon-baslik { font-size: 13px; font-weight: 800; color: var(--altin); margin-bottom: 8px; }
+.sablon-liste { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.sablon-bos { font-size: 12px; color: var(--yazi-soluk); }
+.sablon-chip { display: inline-flex; align-items: stretch; border-radius: 12px; overflow: hidden; border: 1px solid var(--cizgi); background: var(--cam); }
+.sablon-uygula { width: auto; text-align: left; padding: 8px 12px; background: transparent; border-radius: 0; font-size: 13px; color: var(--yazi); }
+.sablon-uygula b { display: block; }
+.sablon-uygula small { display: block; font-weight: 500; color: var(--yazi-soluk); font-size: 11px; margin-top: 1px; }
+.sablon-x { width: 34px; padding: 0; background: rgba(255,255,255,.08); border-radius: 0; color: var(--yazi-soluk); font-size: 13px; border-left: 1px solid var(--cizgi); }
+.sablon-kaydet-btn { width: auto; padding: 8px 12px; font-size: 12.5px; background: rgba(255,200,87,.15); border: 1px dashed rgba(255,200,87,.5); color: var(--altin); }
+
+.tk-ust { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; margin-bottom: 10px; }
+.tk-ok { padding: 8px 0; font-size: 20px; line-height: 1; background: var(--cam); border: 1px solid var(--cizgi); }
+.tk-baslik { text-align: center; } .tk-baslik b { display: block; font-size: 16px; } .tk-baslik small { font-size: 11.5px; color: var(--yazi-soluk); }
+.tk-icerik { overflow-y: auto; }
+.tk-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.tk-hafta { text-align: center; font-size: 11px; font-weight: 700; color: var(--yazi-soluk); padding: 4px 0; }
+.tk-gun-btn { position: relative; width: 100%; aspect-ratio: 1 / 1.05; padding: 3px 2px; border-radius: 10px; background: var(--cam); border: 1px solid transparent; color: var(--yazi); display: flex; flex-direction: column; align-items: center; justify-content: space-between; font-size: 13px; }
+.tk-gun-btn.dolu { background: rgba(74,163,255,.14); border-color: rgba(74,163,255,.3); }
+.tk-gun-btn.bugun { border-color: var(--altin); }
+.tk-gun-btn.secili { background: linear-gradient(135deg, var(--mavi), var(--mavi-koyu)); color: #fff; border-color: transparent; }
+.tk-no { font-weight: 700; }
+.tk-noktalar { display: flex; gap: 3px; }
+.tk-noktalar i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.n-ay { background: #8fa8ff; } .n-gunes { background: #f5a623; } .n-sim { background: #9aa8c2; }
+.tk-sure { font-size: 9.5px; font-weight: 700; opacity: .85; }
+.tk-gun { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.tk-gun-baslik { font-weight: 800; font-size: 14px; }
+.tk-ipucu { font-size: 12.5px; color: var(--yazi-soluk); text-align: center; padding: 6px; }
+.tk-ekle { background: rgba(74,163,255,.18); border: 1px solid rgba(74,163,255,.45); font-size: 13.5px; }
+.duz-grid .tam { grid-column: 1 / -1; }
+
+html[data-tema="acik"] .sablon-uygula, html[data-tema="acik"] .tk-ok, html[data-tema="acik"] .tk-gun-btn { color: var(--yazi); }
+html[data-tema="acik"] .tk-gun-btn.secili { color: #fff; }
+html[data-tema="acik"] .sablon-baslik, html[data-tema="acik"] .sablon-kaydet-btn { color: #8a5200; }
+html[data-tema="acik"] .toast-eylem { color: #fff; }
+@media (max-width: 420px) { .tk-sure { display: none; } .tk-gun-btn { aspect-ratio: 1 / 1; } }

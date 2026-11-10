@@ -41,15 +41,24 @@
 
     /* ---------- BİLDİRİM VE ONAY ---------- */
 
-    function bildir(mesaj, tur) {
+    // eylem: { etiket, islem } verilirse bildirimde bir düğme (ör. "Geri al") görünür
+    function bildir(mesaj, tur, eylem) {
         var alan = $('toastAlani');
-        var t = eleman('div', 'toast ' + (tur || ''), mesaj);
-        alan.appendChild(t);
-        requestAnimationFrame(function () { t.classList.add('goster'); });
-        setTimeout(function () {
+        var t = eleman('div', 'toast ' + (tur || '') + (eylem ? ' eylemli' : ''));
+        t.appendChild(eleman('span', '', mesaj));
+        var kapat = function () {
             t.classList.remove('goster');
             setTimeout(function () { t.remove(); }, 300);
-        }, 3500);
+        };
+        if (eylem) {
+            var d = eleman('button', 'toast-eylem', eylem.etiket);
+            d.type = 'button';
+            d.onclick = function () { kapat(); eylem.islem(); };
+            t.appendChild(d);
+        }
+        alan.appendChild(t);
+        requestAnimationFrame(function () { t.classList.add('goster'); });
+        setTimeout(kapat, eylem ? 7000 : 3500);
     }
 
     function onayIste(mesaj) {
@@ -74,12 +83,12 @@
 
     async function apiCagir(url, yontem, govde) {
         try {
-            var r = await fetch(url, {
-                method: yontem,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin',
-                body: JSON.stringify(govde)
-            });
+            var secenek = { method: yontem, credentials: 'same-origin', cache: 'no-store' };
+            if (govde !== undefined) {
+                secenek.headers = { 'Content-Type': 'application/json' };
+                secenek.body = JSON.stringify(govde);
+            }
+            var r = await fetch(url, secenek);
             if (r.status === 401) {
                 bildir('Oturum süresi doldu, giriş sayfasına yönlendiriliyorsunuz...', 'hata');
                 setTimeout(function () { location.href = '/'; }, 1500);
@@ -111,6 +120,7 @@
             mevcutSayfa = 1;
             filtreleUcuslari();
             sonKopyaGuncelle();
+            sablonlariCiz();
         } catch (e) {
             bildir('Panel yenilenemedi, sayfayı elle yenileyin.', 'hata');
         }
@@ -219,7 +229,8 @@
             boy: $('profilBoy').value,
             kilo: $('profilKilo').value,
             dogumTarihi: $('profilDogum').value,
-            kanGrubu: $('profilKan').value
+            kanGrubu: $('profilKan').value,
+            donemHedefSaat: $('profilHedef').value
         });
         dugme.disabled = false;
         if (sonuc.oturumYok) return;
@@ -350,7 +361,11 @@
         var sonuc = await apiCagir('/api/delete-flight', 'DELETE', { id: id });
         if (sonuc.oturumYok) return;
         if (sonuc.success) {
-            bildir('Uçuş kaydı silindi.', 'basari');
+            if (sonuc.cop) {
+                bildir('Uçuş silindi.', 'basari', { etiket: 'Geri al', islem: function () { copGeriAl(sonuc.cop); } });
+            } else {
+                bildir('Uçuş kaydı silindi.', 'basari');
+            }
             await paneliYenile();
         } else {
             bildir(sonuc.message || 'Kayıt silinemedi.', 'hata');
@@ -732,6 +747,281 @@
         });
     }
 
+
+    /* ---------- ÇÖP KUTUSU ---------- */
+
+    async function copGeriAl(id) {
+        // Panel yenilenince pencereler de yenilendiği için, açık olup olmadığı önceden hatırlanır
+        var copAcikti = $('copModal').classList.contains('acik');
+        var sonuc = await apiCagir('/api/restore-flight', 'POST', { id: id });
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) {
+            bildir('Uçuş geri alındı.', 'basari');
+            await paneliYenile();
+            if (copAcikti) copAc();
+        } else {
+            bildir(sonuc.message || 'Uçuş geri alınamadı.', 'hata');
+        }
+    }
+
+    async function copKaliciSil(id) {
+        if (!(await onayIste('Bu uçuş kalıcı olarak silinecek, geri alınamaz. Emin misiniz?'))) return;
+        var sonuc = await apiCagir('/api/purge-flight', 'POST', { id: id });
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) { bildir('Kalıcı olarak silindi.', 'basari'); copAc(); }
+        else bildir(sonuc.message || 'Silinemedi.', 'hata');
+    }
+
+    async function copAc() {
+        var kap = $('copIcerik');
+        kap.textContent = '';
+        kap.appendChild(eleman('div', 'bos-mesaj', 'Yükleniyor...'));
+        modalAc('copModal');
+        var sonuc = await apiCagir('/api/trash', 'GET');
+        if (sonuc.oturumYok) return;
+        kap.textContent = '';
+        if (!sonuc.success) {
+            kap.appendChild(eleman('div', 'bos-mesaj', sonuc.message || 'Silinenler alınamadı.'));
+            return;
+        }
+        if (!sonuc.liste.length) {
+            kap.appendChild(eleman('div', 'bos-mesaj', 'Silinmiş uçuş yok.'));
+            return;
+        }
+        sonuc.liste.forEach(function (f) {
+            var tema = f.egitimTipi === 'ggg' ? ' tema-ay' : (f.egitimTipi === 'gş' ? ' tema-gunes' : '');
+            var ikon = f.egitimTipi === 'ggg' ? '🌙 ' : (f.egitimTipi === 'gş' ? '☀️ ' : '');
+            var satir = eleman('div', 'cop-satir' + tema);
+            var sol = document.createElement('div');
+            sol.appendChild(eleman('strong', 'liste-tarih', trTarih(f.tarih) + '  ' + f.sure));
+            sol.appendChild(document.createElement('br'));
+            sol.appendChild(eleman('span', 'liste-ince', ikon + (f.havaAraciTipi || '').toUpperCase() + ' · ' + (f.egitimTipi || '').toUpperCase()));
+            if (f.gorevAciklamasi) {
+                sol.appendChild(document.createElement('br'));
+                sol.appendChild(eleman('span', 'liste-ince cop-acik', f.gorevAciklamasi.length > 50 ? f.gorevAciklamasi.slice(0, 50) + '...' : f.gorevAciklamasi));
+            }
+            if (f.silinme) {
+                var kalanGun = Math.max(0, (sonuc.gun || 30) - Math.floor((Date.now() - new Date(f.silinme).getTime()) / 86400000));
+                sol.appendChild(document.createElement('br'));
+                sol.appendChild(eleman('span', 'liste-ince cop-kalan', kalanGun + ' gün sonra kalıcı silinir'));
+            }
+            satir.appendChild(sol);
+            var sag = eleman('div', 'cop-butonlar');
+            var geri = eleman('button', 'cop-geri', 'Geri al'); geri.type = 'button'; geri.dataset.eylem = 'cop-geri'; geri.dataset.id = f.id;
+            var sil = eleman('button', 'cop-sil', 'Sil'); sil.type = 'button'; sil.dataset.eylem = 'cop-sil'; sil.dataset.id = f.id;
+            sag.appendChild(geri); sag.appendChild(sil);
+            satir.appendChild(sag);
+            kap.appendChild(satir);
+        });
+    }
+
+    /* ---------- UÇUŞ ŞABLONLARI ---------- */
+
+    function sablonlariCiz() {
+        var kap = $('sablonListe');
+        if (!kap) return;
+        kap.textContent = '';
+        var liste = panelVeri.sablonlar || [];
+        if (!liste.length) {
+            kap.appendChild(eleman('span', 'sablon-bos', 'Henüz şablon yok. Sık yaptığın bir uçuşu aşağıdan kaydet.'));
+            return;
+        }
+        liste.forEach(function (t) {
+            var chip = eleman('div', 'sablon-chip');
+            var ana = eleman('button', 'sablon-uygula');
+            ana.type = 'button';
+            ana.dataset.eylem = 'sablon-uygula';
+            ana.dataset.id = t.id;
+            ana.appendChild(eleman('b', '', t.ad));
+            ana.appendChild(eleman('small', '', (t.havaAraciTipi || '').toUpperCase() + ' · ' + (t.egitimTipi || '').toUpperCase() + ' · ' + (t.sure || '')));
+            chip.appendChild(ana);
+            var x = eleman('button', 'sablon-x', '✕');
+            x.type = 'button';
+            x.dataset.eylem = 'sablon-sil';
+            x.dataset.id = t.id;
+            x.setAttribute('aria-label', t.ad + ' şablonunu sil');
+            chip.appendChild(x);
+            kap.appendChild(chip);
+        });
+    }
+
+    function sablonUygula(id) {
+        var t = (panelVeri.sablonlar || []).filter(function (x) { return x.id === id; })[0];
+        if (!t) return;
+        $('havaAraciTipi').value = t.havaAraciTipi;
+        $('egitimTipi').value = t.egitimTipi;
+        $('gorevAciklamasi').value = t.gorevAciklamasi || '';
+        var p = String(t.sure || '00:00').split(':');
+        sureyiYaz($('sureAlani'), $('sureAlaniMetin'), String(p[0] || '0').padStart(2, '0'), String(p[1] || '0').padStart(2, '0'));
+        bildir('"' + t.ad + '" şablonu forma uygulandı. Tarihi kontrol edin.', 'basari');
+    }
+
+    function sablonKaydetAc() {
+        var egitim = $('egitimTipi').value;
+        var saat = $('sureAlani').dataset.saat || '00';
+        var dakika = $('sureAlani').dataset.dakika || '00';
+        if (!egitim) return bildir('Önce formda Eğitim Sınıflandırması seçin.', 'hata');
+        if (saat === '00' && dakika === '00') return bildir('Önce formda uçuş süresini seçin.', 'hata');
+        var hava = $('havaAraciTipi').value;
+        $('sablonOnizleme').textContent = hava.toUpperCase() + ' · ' + egitim.toUpperCase() + ' · ' + saat + ':' + dakika;
+        $('sablonAd').value = hava.toUpperCase() + ' ' + egitim.toUpperCase() + ' ' + saat + ':' + dakika;
+        modalAc('sablonModal');
+        setTimeout(function () { $('sablonAd').select(); }, 50);
+    }
+
+    async function sablonKaydet(dugme) {
+        var ad = $('sablonAd').value.trim();
+        if (!ad) return bildir('Şablon adı gerekli.', 'hata');
+        dugme.disabled = true;
+        var sonuc = await apiCagir('/api/add-template', 'POST', {
+            ad: ad,
+            havaAraciTipi: $('havaAraciTipi').value,
+            egitimTipi: $('egitimTipi').value,
+            sure: ($('sureAlani').dataset.saat || '00') + ':' + ($('sureAlani').dataset.dakika || '00'),
+            gorevAciklamasi: $('gorevAciklamasi').value
+        });
+        dugme.disabled = false;
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) {
+            panelVeri.sablonlar = sonuc.sablonlar;
+            sablonlariCiz();
+            modalKapat('sablonModal');
+            bildir('Şablon kaydedildi.', 'basari');
+        } else {
+            bildir(sonuc.message || 'Şablon kaydedilemedi.', 'hata');
+        }
+    }
+
+    async function sablonSil(id) {
+        if (!(await onayIste('Bu şablon silinsin mi?'))) return;
+        var sonuc = await apiCagir('/api/delete-template', 'POST', { id: id });
+        if (sonuc.oturumYok) return;
+        if (sonuc.success) {
+            panelVeri.sablonlar = sonuc.sablonlar;
+            sablonlariCiz();
+            bildir('Şablon silindi.', 'basari');
+        } else {
+            bildir(sonuc.message || 'Şablon silinemedi.', 'hata');
+        }
+    }
+
+    /* ---------- TAKVİM ---------- */
+
+    var AY_ADLARI = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    var tk = { yil: 0, ay: 0, secili: '' };
+
+    function iki(n) { return String(n).padStart(2, '0'); }
+    function tarihAnahtari(y, a, g) { return y + '-' + iki(a + 1) + '-' + iki(g); }
+
+    // Takvim, listedeki tüm uçuşlardan beslenir (filtre ve sayfalamadan etkilenmez)
+    function gunlereGore() {
+        var harita = {};
+        document.querySelectorAll('.ucus-satiri').forEach(function (r) {
+            var d = r.dataset;
+            if (!d.tarih) return;
+            (harita[d.tarih] = harita[d.tarih] || []).push({ hava: d.hava, egitim: d.egitim, sure: d.sure, aciklama: d.aciklama || '' });
+        });
+        return harita;
+    }
+
+    function takvimCiz() {
+        var harita = gunlereGore();
+        var bugun = new Date();
+        var bugunAnahtar = tarihAnahtari(bugun.getFullYear(), bugun.getMonth(), bugun.getDate());
+        $('tkBaslik').textContent = AY_ADLARI[tk.ay] + ' ' + tk.yil;
+
+        var grid = $('tkGrid');
+        grid.textContent = '';
+        ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].forEach(function (g) { grid.appendChild(eleman('div', 'tk-hafta', g)); });
+
+        var ilk = (new Date(tk.yil, tk.ay, 1).getDay() + 6) % 7;
+        var gunSayisi = new Date(tk.yil, tk.ay + 1, 0).getDate();
+        for (var i = 0; i < ilk; i++) grid.appendChild(eleman('div', 'tk-bos'));
+
+        var aylikDakika = 0, aylikUcus = 0;
+        for (var g = 1; g <= gunSayisi; g++) {
+            var anahtar = tarihAnahtari(tk.yil, tk.ay, g);
+            var ucuslar = harita[anahtar] || [];
+            var hucre = eleman('button', 'tk-gun-btn' + (anahtar === bugunAnahtar ? ' bugun' : '') + (anahtar === tk.secili ? ' secili' : '') + (ucuslar.length ? ' dolu' : ''));
+            hucre.type = 'button';
+            hucre.dataset.eylem = 'takvim-gun';
+            hucre.dataset.tarih = anahtar;
+            hucre.appendChild(eleman('span', 'tk-no', String(g)));
+            if (ucuslar.length) {
+                var dk = 0, tipler = {};
+                ucuslar.forEach(function (u) { dk += sureDakika(u.sure); tipler[u.egitim] = true; });
+                aylikDakika += dk; aylikUcus += ucuslar.length;
+                var noktalar = eleman('span', 'tk-noktalar');
+                if (tipler['ggg']) noktalar.appendChild(eleman('i', 'n-ay'));
+                if (tipler['gş']) noktalar.appendChild(eleman('i', 'n-gunes'));
+                if (tipler['au(sim)']) noktalar.appendChild(eleman('i', 'n-sim'));
+                hucre.appendChild(noktalar);
+                hucre.appendChild(eleman('span', 'tk-sure', Math.floor(dk / 60) + ':' + iki(dk % 60)));
+            }
+            grid.appendChild(hucre);
+        }
+        $('tkOzet').textContent = aylikUcus ? (Math.floor(aylikDakika / 60) + ':' + iki(aylikDakika % 60) + ' saat · ' + aylikUcus + ' uçuş') : 'Bu ay uçuş yok';
+        takvimGunDetay(harita);
+    }
+
+    function takvimGunDetay(harita) {
+        var kap = $('tkGun');
+        kap.textContent = '';
+        if (!tk.secili) {
+            kap.appendChild(eleman('div', 'tk-ipucu', 'Bir güne dokunarak o günün uçuşlarını gör.'));
+            return;
+        }
+        var ucuslar = (harita || gunlereGore())[tk.secili] || [];
+        kap.appendChild(eleman('div', 'tk-gun-baslik', trTarih(tk.secili)));
+        if (!ucuslar.length) kap.appendChild(eleman('div', 'tk-ipucu', 'Bu günde uçuş kaydı yok.'));
+        ucuslar.forEach(function (u) {
+            var tema = u.egitim === 'ggg' ? ' tema-ay' : (u.egitim === 'gş' ? ' tema-gunes' : '');
+            var ikon = u.egitim === 'ggg' ? '🌙 ' : (u.egitim === 'gş' ? '☀️ ' : '');
+            var satir = eleman('div', 'liste-satir' + tema);
+            var sol = document.createElement('div');
+            sol.appendChild(eleman('strong', 'liste-tarih', (u.hava || '').toUpperCase()));
+            sol.appendChild(eleman('span', 'liste-alt', ikon + (u.egitim || '').toUpperCase()));
+            if (u.aciklama) {
+                sol.appendChild(document.createElement('br'));
+                sol.appendChild(eleman('span', 'liste-ince', u.aciklama.length > 60 ? u.aciklama.slice(0, 60) + '...' : u.aciklama));
+            }
+            satir.appendChild(sol);
+            satir.appendChild(eleman('div', 'rozet', u.sure || ''));
+            kap.appendChild(satir);
+        });
+        var ekle = eleman('button', 'tk-ekle', '➕ Bu güne uçuş ekle');
+        ekle.type = 'button';
+        ekle.dataset.eylem = 'takvim-ekle';
+        ekle.dataset.tarih = tk.secili;
+        kap.appendChild(ekle);
+    }
+
+    function takvimAc() {
+        var t = new Date();
+        tk.yil = t.getFullYear();
+        tk.ay = t.getMonth();
+        tk.secili = tarihAnahtari(tk.yil, tk.ay, t.getDate());
+        takvimCiz();
+        modalAc('takvimModal');
+    }
+
+    function takvimAyDegistir(fark) {
+        tk.ay += fark;
+        if (tk.ay < 0) { tk.ay = 11; tk.yil--; }
+        if (tk.ay > 11) { tk.ay = 0; tk.yil++; }
+        tk.secili = '';
+        takvimCiz();
+    }
+
+    function takvimBuGuneEkle(tarih) {
+        modalKapat('takvimModal');
+        $('tarih').value = tarih;
+        var kutu = $('ekleIcerikKutusu');
+        if (!kutu.classList.contains('acik')) akordeonAcKapat('ekleIcerikKutusu', 'ekleOkIkon', document.querySelector('[data-icerik="ekleIcerikKutusu"]'));
+        $('ekleIcerikKutusu').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        bildir(trTarih(tarih) + ' tarihi forma yazıldı. Diğer bilgileri doldurun.', 'basari');
+    }
+
     /* ---------- KAYDIRMALI SÜRE SEÇİCİ ---------- */
 
     var OGE_YUKSEKLIK = 44;
@@ -917,6 +1207,19 @@
             case 'sayac-modal': sayacModalAc(d.tip); break;
             case 'profil-modal': profilModalAc('bilgi'); break;
             case 'ekle-goster': modalKapat('profilModal'); eklemeKartiAc(); break;
+            case 'cop-ac': copAc(); break;
+            case 'cop-geri': copGeriAl(d.id); break;
+            case 'cop-sil': copKaliciSil(d.id); break;
+            case 'sablon-uygula': sablonUygula(d.id); break;
+            case 'sablon-sil': sablonSil(d.id); break;
+            case 'sablon-kaydet-ac': sablonKaydetAc(); break;
+            case 'sablon-kaydet': sablonKaydet(hedef); break;
+            case 'takvim-ac': takvimAc(); break;
+            case 'takvim-onceki': takvimAyDegistir(-1); break;
+            case 'takvim-sonraki': takvimAyDegistir(1); break;
+            case 'takvim-bugun': takvimAc(); break;
+            case 'takvim-gun': tk.secili = d.tarih; takvimCiz(); break;
+            case 'takvim-ekle': takvimBuGuneEkle(d.tarih); break;
             case 'profil-sekme': profilSekme(d.sekme); break;
             case 'profil-kaydet': profilKaydet(hedef); break;
             case 'sure-modal': sureModalAc(d.hedef, d.metin); break;
@@ -964,6 +1267,7 @@
     tekerlekleriKur();
     filtreleUcuslari();
     sonKopyaGuncelle();
+    sablonlariCiz();
     eklemeKartiniBelirle();
     if (uygulamaModundaMi()) document.querySelectorAll('[data-eylem="ekle-goster"]').forEach(function (b) { b.hidden = true; });
 })();
