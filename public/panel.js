@@ -762,13 +762,20 @@
 
     /* ---------- TEMA (koyu / açık) ---------- */
 
+    // Üç tema sırayla: koyu → açık → NVG (gece görüş) → koyu
+    var TEMALAR = ['koyu', 'acik', 'nvg'];
+    var TEMA_AD = { koyu: 'Koyu', acik: 'Açık', nvg: 'NVG (gece görüş)' };
+    var TEMA_RENK = { koyu: '#0b1220', acik: '#eef3fb', nvg: '#000a04' };
+
     function temaDegistir() {
-        var acik = document.documentElement.getAttribute('data-tema') === 'acik';
-        if (acik) document.documentElement.removeAttribute('data-tema');
-        else document.documentElement.setAttribute('data-tema', 'acik');
-        try { localStorage.setItem('logbookTema', acik ? 'koyu' : 'acik'); } catch (e) { /* tarayıcı depolamayı engelliyor olabilir */ }
+        var simdi = document.documentElement.getAttribute('data-tema') || 'koyu';
+        var sonraki = TEMALAR[(TEMALAR.indexOf(simdi) + 1) % TEMALAR.length];
+        if (sonraki === 'koyu') document.documentElement.removeAttribute('data-tema');
+        else document.documentElement.setAttribute('data-tema', sonraki);
+        try { localStorage.setItem('logbookTema', sonraki); } catch (e) { /* tarayıcı depolamayı engelliyor olabilir */ }
         var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', acik ? '#0b1220' : '#eef3fb');
+        if (meta) meta.setAttribute('content', TEMA_RENK[sonraki]);
+        bildir('Tema: ' + TEMA_AD[sonraki], 'basari');
     }
 
 

@@ -169,8 +169,12 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 1;
+const YENILIK_SURUMU = 2;
 const YENILIKLER = [
+    { baslik: '🆕 Son eklenenler', maddeler: [
+        '📊 İstatistik artık dönem dönem incelenebiliyor: güncel dönem, geçmiş dönemler ve "Tümü" (dönemleri karşılaştırma grafiğiyle).',
+        '🟢 NVG (gece görüş) teması geldi: sağ üstteki tema düğmesine bastıkça koyu → açık → NVG sırasıyla geçer, seçimin hatırlanır.'
+    ]},
     { baslik: '✈️ Uçuş kaydı', maddeler: [
         'Süreyi iPhone tarzı tekerlekle seçersin. 24 saati aşan eskiye dönük süreler için "toplu süre" kutucuğu var, listede "toplu" etiketiyle görünür.',
         'Kayıtlı uçuşları ✏️ Düzenle ile değiştirebilirsin.',
@@ -182,13 +186,13 @@ const YENILIKLER = [
         'Süresi yaklaşan sayaçlar ve muayeneler için uyarı bandı çıkar.',
         'GGG uçuşları 🌙 ay, GŞ uçuşları ☀️ güneş renginde listelenir.',
         '🔍 Ara ile yıl, ay, araç ve türe göre filtreleyebilirsin.',
-        '📊 İstatistik ve 📅 Takvim görünümleri eklendi.',
+        '📊 İstatistik (dönem dönem ve tüm dönemler) ve 📅 Takvim görünümleri eklendi.',
         '⬇ CSV ve ⬇ PDF ile uçuşlarını dışa aktarabilirsin.'
     ]},
     { baslik: '👤 Hesap ve görünüm', maddeler: [
         'Profil: ad soyad, boy, kilo, doğum tarihi, kan grubu ve şifre değiştirme tek yerde. Bilgileri yalnızca sen görürsün.',
         '"Beni hatırla" ile 30 gün oturum açık kalır; seçmezsen 15 dakika işlem yapılmazsa oturum kapanır.',
-        '🌙/☀️ düğmesiyle koyu ve açık tema arasında geçiş yapabilirsin. Giriş ve uçuş paneli yeni gece gökyüzü tasarımına kavuştu.',
+        'Tema düğmesiyle koyu, açık ve yeşil NVG (gece görüş) temaları arasında geçiş yapabilirsin. Giriş ve uçuş paneli yeni gece gökyüzü tasarımına kavuştu.',
         'Telefonda 📲 "Ana ekrana ekle" ile Logbook\'u uygulama gibi kullanabilirsin (Profil menüsünden de ulaşırsın).'
     ]}
 ];
@@ -612,8 +616,8 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
             <div class="marka">
                 <span class="marka-ikon" aria-hidden="true">✈</span>
                 <span class="marka-ad">Uçuş <b>Logbook</b></span>
-                <button type="button" class="tema-btn" data-eylem="tema-degistir" aria-label="Koyu / açık tema">
-                    <span class="tb-koyu" aria-hidden="true">🌙</span><span class="tb-acik" aria-hidden="true">☀️</span>
+                <button type="button" class="tema-btn" data-eylem="tema-degistir" aria-label="Tema: koyu / açık / NVG">
+                    <span class="tb-koyu" aria-hidden="true">🌙</span><span class="tb-acik" aria-hidden="true">☀️</span><span class="tb-nvg" aria-hidden="true">NVG</span>
                 </button>
             </div>
 
@@ -937,7 +941,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <title>Uçuş Takip Paneli</title>
-    <script>try{var t=localStorage.getItem('logbookTema');if(t==='acik')document.documentElement.setAttribute('data-tema','acik');}catch(e){}</script>
+    <script>try{var t=localStorage.getItem('logbookTema');if(t==='acik'||t==='nvg')document.documentElement.setAttribute('data-tema',t);}catch(e){}</script>
     <link rel="stylesheet" href="/panel.css">
 </head>
 <body>
