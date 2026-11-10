@@ -605,52 +605,127 @@
         return String(Math.round(dk / 6) / 10).replace('.', ',');
     }
 
+    /* ---------- İSTATİSTİK (dönem seçmeli) ---------- */
+
+    var ist = { secili: '' };
+
+    // Listedeki tüm uçuşlar (filtreden bağımsız: gizlenen satırlar da DOM'da durur)
+    function tumUcuslar() {
+        return [].map.call(document.querySelectorAll('.ucus-satiri'), function (s) {
+            var d = s.dataset;
+            return { tarih: d.tarih || '', hava: d.hava || '', egitim: d.egitim || '', sure: d.sure || '', toplu: d.toplu === '1' };
+        });
+    }
+
+    // Dönem Eylül-Ağustos: Eylül 2026 - Ağustos 2027 → "2027 dönemi"
+    function donemYiliBul(tarih) {
+        var p = String(tarih || '').split('-');
+        var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+        if (isNaN(y) || isNaN(m)) return null;
+        return m >= 9 ? y + 1 : y;
+    }
+
     function istatistikAc() {
+        ist.secili = String(panelVeri.aktifDonem || '');
+        istatistikCiz();
+        modalAc('istatistikModal');
+    }
+
+    function istatistikCiz() {
         var kap = $('istatistikIcerik');
         kap.textContent = '';
-        var liste = panelVeri.donemUcuslari || [];
+        var hepsi = tumUcuslar();
+        var aktif = panelVeri.aktifDonem ? String(panelVeri.aktifDonem) : '';
+
+        // Hangi dönemlerde uçuş var
+        var donemler = {};
+        hepsi.forEach(function (f) {
+            var y = donemYiliBul(f.tarih);
+            if (y !== null) donemler[y] = true;
+        });
+        if (aktif) donemler[aktif] = true;
+        var yillar = Object.keys(donemler).sort(function (a, b) { return b - a; });
+        var dolu = yillar.filter(function (y) { return hepsi.some(function (f) { return String(donemYiliBul(f.tarih)) === y; }); });
+        if (ist.secili !== 'tumu' && yillar.indexOf(ist.secili) === -1) ist.secili = aktif || yillar[0] || '';
+
+        // Dönem seçici
+        var cubuk = eleman('div', 'ist-donemler');
+        yillar.forEach(function (y) {
+            var c = eleman('button', 'ist-chip' + (ist.secili === y ? ' aktif' : ''), y === aktif ? y + ' (güncel)' : y);
+            c.type = 'button';
+            c.dataset.eylem = 'ist-donem';
+            c.dataset.donem = y;
+            cubuk.appendChild(c);
+        });
+        if (dolu.length > 1) {
+            var tum = eleman('button', 'ist-chip' + (ist.secili === 'tumu' ? ' aktif' : ''), 'Tümü');
+            tum.type = 'button';
+            tum.dataset.eylem = 'ist-donem';
+            tum.dataset.donem = 'tumu';
+            cubuk.appendChild(tum);
+        }
+        kap.appendChild(cubuk);
+
+        var tumuMu = ist.secili === 'tumu';
+        var liste = tumuMu ? hepsi : hepsi.filter(function (f) { return String(donemYiliBul(f.tarih)) === ist.secili; });
         if (!liste.length) {
-            kap.appendChild(eleman('div', 'bos-mesaj', 'Bu dönemde uçuş kaydı bulunmamaktadır.'));
-            return modalAc('istatistikModal');
+            kap.appendChild(eleman('div', 'bos-mesaj', ist.secili + ' döneminde uçuş kaydı bulunmamaktadır.'));
+            return;
         }
 
-        var toplam = 0, aylar = {}, tipler = { ggg: 0, 'gş': 0, 'au(sim)': 0 }, araclar = {};
+        var toplam = 0, tekilSayi = 0, tekilToplam = 0, topluSayi = 0, topluDk = 0;
+        var aylar = {}, donemToplam = {}, tipler = { ggg: 0, 'gş': 0, 'au(sim)': 0 }, araclar = {};
         liste.forEach(function (f) {
             var dk = sureDakika(f.sure);
             toplam += dk;
+            if (f.toplu) { topluSayi++; topluDk += dk; } else { tekilSayi++; tekilToplam += dk; }
             var ay = String(f.tarih || '').split('-')[1];
             aylar[ay] = (aylar[ay] || 0) + dk;
-            if (tipler[f.egitimTipi] !== undefined) tipler[f.egitimTipi] += dk;
-            araclar[f.havaAraciTipi] = (araclar[f.havaAraciTipi] || 0) + dk;
+            var dy = donemYiliBul(f.tarih);
+            donemToplam[dy] = (donemToplam[dy] || 0) + dk;
+            if (tipler[f.egitim] !== undefined) tipler[f.egitim] += dk;
+            araclar[f.hava] = (araclar[f.hava] || 0) + dk;
         });
 
-        // Özet kutuları
+        // Özet kutuları: toplu kayıtlar toplam saate dahil, uçuş sayısı ve ortalamaya dahil değil
         var ozet = eleman('div', 'ist-ozet');
-        [['Toplam', dkSaat(toplam)], ['Uçuş', String(liste.length)], ['Ortalama', dkSaat(Math.round(toplam / liste.length))]].forEach(function (x) {
+        [['Toplam', dkSaat(toplam)], ['Uçuş', String(tekilSayi)], ['Ortalama', tekilSayi ? dkSaat(Math.round(tekilToplam / tekilSayi)) : '-']].forEach(function (x) {
             var k = eleman('div', 'ist-kutu');
             k.appendChild(eleman('b', '', x[1]));
             k.appendChild(eleman('span', '', x[0]));
             ozet.appendChild(k);
         });
         kap.appendChild(ozet);
+        if (topluSayi) {
+            kap.appendChild(eleman('div', 'ist-not', 'Not: ' + topluSayi + ' toplu kayıt (' + dkSaat(topluDk) + ') toplam saate dahil; uçuş sayısı ve ortalamaya dahil değil.'));
+        }
 
-        // Aylık grafik
-        kap.appendChild(eleman('div', 'ist-baslik', 'Aylık uçuş saati'));
-        var enCok = 0;
-        AY_SIRASI.forEach(function (a) { if ((aylar[a] || 0) > enCok) enCok = aylar[a]; });
-        var grafik = eleman('div', 'ist-grafik');
-        AY_SIRASI.forEach(function (a) {
-            var dk = aylar[a] || 0;
-            var sutun = eleman('div', 'ist-sutun');
-            var cubuk = eleman('div', 'ist-cubuk');
-            cubuk.style.height = (enCok ? Math.max(dk ? 4 : 0, Math.round((dk / enCok) * 100)) : 0) + '%';
-            cubuk.title = AY_KISA[a] + ': ' + dkSaat(dk);
-            if (dk) cubuk.appendChild(eleman('em', '', saatKisa(dk)));
-            sutun.appendChild(cubuk);
-            sutun.appendChild(eleman('span', '', AY_KISA[a]));
-            grafik.appendChild(sutun);
-        });
-        kap.appendChild(grafik);
+        function sutunGrafik(anahtarlar, deger, etiket, baslik) {
+            kap.appendChild(eleman('div', 'ist-baslik', baslik));
+            var enCok = 0;
+            anahtarlar.forEach(function (a) { if ((deger[a] || 0) > enCok) enCok = deger[a]; });
+            var grafik = eleman('div', 'ist-grafik');
+            anahtarlar.forEach(function (a) {
+                var dk = deger[a] || 0;
+                var sutun = eleman('div', 'ist-sutun');
+                var c = eleman('div', 'ist-cubuk');
+                c.style.height = (enCok ? Math.max(dk ? 4 : 0, Math.round((dk / enCok) * 100)) : 0) + '%';
+                c.title = etiket(a) + ': ' + dkSaat(dk);
+                if (dk) c.appendChild(eleman('em', '', saatKisa(dk)));
+                sutun.appendChild(c);
+                sutun.appendChild(eleman('span', '', etiket(a)));
+                grafik.appendChild(sutun);
+            });
+            kap.appendChild(grafik);
+        }
+
+        if (tumuMu) {
+            // Dönem karşılaştırması: eskiden yeniye
+            var sirali = Object.keys(donemToplam).filter(function (y) { return y !== 'null'; }).sort(function (a, b) { return a - b; });
+            sutunGrafik(sirali, donemToplam, function (y) { return y; }, 'Dönem karşılaştırması (saat)');
+        } else {
+            sutunGrafik(AY_SIRASI, aylar, function (a) { return AY_KISA[a]; }, 'Aylık uçuş saati');
+        }
 
         // Tür dağılımı
         kap.appendChild(eleman('div', 'ist-baslik', 'Uçuş türü dağılımı'));
@@ -671,19 +746,18 @@
 
         // Hava aracı dağılımı
         kap.appendChild(eleman('div', 'ist-baslik', 'Hava aracına göre'));
-        var sirali = Object.keys(araclar).sort(function (a, b) { return araclar[b] - araclar[a]; });
-        sirali.forEach(function (a) {
+        var arSirali = Object.keys(araclar).sort(function (a, b) { return araclar[b] - araclar[a]; });
+        arSirali.forEach(function (a) {
             var satir = eleman('div', 'ist-arac');
             satir.appendChild(eleman('span', 'ist-arac-ad', a.toUpperCase()));
             var seritKap = eleman('div', 'ist-serit');
             var serit = eleman('i');
-            serit.style.width = Math.round((araclar[a] / araclar[sirali[0]]) * 100) + '%';
+            serit.style.width = Math.round((araclar[a] / araclar[arSirali[0]]) * 100) + '%';
             seritKap.appendChild(serit);
             satir.appendChild(seritKap);
             satir.appendChild(eleman('b', '', dkSaat(araclar[a])));
             kap.appendChild(satir);
         });
-        modalAc('istatistikModal');
     }
 
     /* ---------- TEMA (koyu / açık) ---------- */
@@ -1318,6 +1392,7 @@
             case 'toplu-degis': topluDegis(d.onek); break;
             case 'yenilik-ac': modalKapat('profilModal'); yenilikAc(false); break;
             case 'istatistik-ac': istatistikAc(); break;
+            case 'ist-donem': ist.secili = d.donem; istatistikCiz(); break;
             case 'csv-indir': csvIndir(); break;
             case 'pdf-indir': pdfIndir(); break;
             case 'tema-degistir': temaDegistir(); break;

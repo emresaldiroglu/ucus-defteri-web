@@ -595,6 +595,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
 
     const panelVeri = {
         yenilik: yenilikGoster === true,
+        aktifDonem: aktifDonem.yil,
         aracBazli: aracBazliDurum,
         sablonlar: sablonListesi,
         donemUcuslari: aktifDonem.donemUcuslari.map(f => ({
@@ -882,7 +883,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
         <!-- İSTATİSTİK MODALI -->
         <div id="istatistikModal" class="modal-arka" role="dialog" aria-modal="true">
             <div class="modal-kutu genis">
-                <h3 class="modal-baslik">📊 ${esc(aktifDonem.yil)} Dönemi İstatistikleri</h3>
+                <h3 class="modal-baslik">📊 İstatistikler</h3>
                 <div id="istatistikIcerik" class="modal-liste"></div>
                 <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="istatistikModal">Kapat</button>
             </div>
