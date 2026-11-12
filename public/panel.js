@@ -1265,6 +1265,29 @@
     var AY_ADLARI = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
     var tk = { yil: 0, ay: 0, secili: '' };
 
+    // Gün adları (Pazar = 0). Cumartesi ve Pazar hafta sonu sayılır.
+    var GUN_KISA = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+    var GUN_TAM = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    function gunNo(iso) {
+        var p = String(iso || '').split('-');
+        if (p.length !== 3) return -1;
+        return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay();
+    }
+    // "07.11.2026 Cmt": gün adı hafta sonuysa kırmızı
+    function tarihGunEl(iso, tam) {
+        var kap = eleman('span', 'tarih-gun');
+        kap.appendChild(document.createTextNode(trTarih(iso) + ' '));
+        var g = gunNo(iso);
+        if (g >= 0) kap.appendChild(eleman('span', 'gun-ad' + (g === 0 || g === 6 ? ' hs' : ''), (tam ? GUN_TAM : GUN_KISA)[g]));
+        return kap;
+    }
+    function aralikGunEl(b, s) {
+        var kap = eleman('span', 'liste-alt');
+        kap.appendChild(tarihGunEl(b));
+        if (s && s !== b) { kap.appendChild(document.createTextNode(' – ')); kap.appendChild(tarihGunEl(s)); }
+        return kap;
+    }
+
     function iki(n) { return String(n).padStart(2, '0'); }
     function tarihAnahtari(y, a, g) { return y + '-' + iki(a + 1) + '-' + iki(g); }
 
@@ -1287,7 +1310,7 @@
 
         var grid = $('tkGrid');
         grid.textContent = '';
-        ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].forEach(function (g) { grid.appendChild(eleman('div', 'tk-hafta', g)); });
+        ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].forEach(function (g) { grid.appendChild(eleman('div', 'tk-hafta' + (g === 'Cmt' || g === 'Paz' ? ' hs' : ''), g)); });
 
         var ilk = (new Date(tk.yil, tk.ay, 1).getDay() + 6) % 7;
         var gunSayisi = new Date(tk.yil, tk.ay + 1, 0).getDate();
@@ -1301,6 +1324,8 @@
             hucre.type = 'button';
             hucre.dataset.eylem = 'takvim-gun';
             hucre.dataset.tarih = anahtar;
+            var gn = gunNo(anahtar);
+            if (gn === 0 || gn === 6) hucre.classList.add('hs');
             hucre.appendChild(eleman('span', 'tk-no', String(g)));
             if (ucuslar.length) {
                 var dk = 0, tipler = {};
@@ -1340,7 +1365,9 @@
             return;
         }
         var ucuslar = (harita || gunlereGore())[tk.secili] || [];
-        kap.appendChild(eleman('div', 'tk-gun-baslik', trTarih(tk.secili)));
+        var gb = eleman('div', 'tk-gun-baslik');
+        gb.appendChild(tarihGunEl(tk.secili, true));
+        kap.appendChild(gb);
         var ajGunu = ajandaGunde(tk.secili);
         if (!ucuslar.length && !ajGunu.length) kap.appendChild(eleman('div', 'tk-ipucu', 'Bu günde kayıt yok.'));
         else if (!ucuslar.length) kap.appendChild(eleman('div', 'tk-ipucu', 'Bu günde uçuş kaydı yok.'));
@@ -1364,7 +1391,7 @@
             var satir = eleman('div', 'aj-satir aj-' + a.tur);
             var sol = document.createElement('div');
             sol.appendChild(eleman('strong', 'liste-tarih', tur.e + ' ' + tur.a));
-            if (a.b !== a.s) { sol.appendChild(document.createElement('br')); sol.appendChild(eleman('span', 'liste-alt', trTarih(a.b) + ' – ' + trTarih(a.s))); }
+            if (a.b !== a.s) { sol.appendChild(document.createElement('br')); sol.appendChild(aralikGunEl(a.b, a.s)); }
             if (a.not) { sol.appendChild(document.createElement('br')); sol.appendChild(eleman('span', 'liste-ince', a.not)); }
             satir.appendChild(sol);
             var duz = eleman('button', 'aj-ikon', '✏️');
@@ -1406,6 +1433,15 @@
         return (panelVeri.ajanda || []).filter(function (a) { return a.b <= tarih && tarih <= a.s; });
     }
 
+    function ajandaGunGoster() {
+        [['ajBas', 'ajBasGun'], ['ajBit', 'ajBitGun']].forEach(function (x) {
+            var kap = $(x[1]);
+            kap.textContent = '';
+            var g = gunNo($(x[0]).value);
+            if (g >= 0) kap.appendChild(eleman('span', 'gun-ad' + (g === 0 || g === 6 ? ' hs' : ''), GUN_TAM[g]));
+        });
+    }
+
     function ajandaTurSec(tur) {
         aj.tur = tur;
         document.querySelectorAll('#ajTurler .aj-tur').forEach(function (b) {
@@ -1424,6 +1460,7 @@
         $('ajBit').value = kayit ? kayit.s : tarih;
         $('ajNot').value = kayit ? kayit.not : '';
         $('ajSil').hidden = !kayit;
+        ajandaGunGoster();
         ajandaTurSec(kayit ? kayit.tur : aj.tur);
         modalAc('ajandaModal');
     }
@@ -1578,7 +1615,7 @@
                         var sol = document.createElement('div');
                         sol.appendChild(eleman('strong', 'liste-tarih', tur.e + ' ' + tur.a));
                         sol.appendChild(document.createElement('br'));
-                        sol.appendChild(eleman('span', 'liste-alt', a.b === a.s ? trTarih(a.b) : trTarih(a.b) + ' – ' + trTarih(a.s)));
+                        sol.appendChild(aralikGunEl(a.b, a.s));
                         if (a.not) { sol.appendChild(document.createElement('br')); sol.appendChild(eleman('span', 'liste-ince', a.not)); }
                         d.appendChild(sol);
                         var duz = eleman('button', 'aj-ikon', '✏️');
@@ -1940,6 +1977,7 @@
     // Başlangıç değişince bitiş geride kalmasın
     document.addEventListener('change', function (e) {
         if (e.target && e.target.id === 'ajBas' && $('ajBit').value < e.target.value) $('ajBit').value = e.target.value;
+        if (e.target && (e.target.id === 'ajBas' || e.target.id === 'ajBit')) ajandaGunGoster();
     });
 
     // ESC: açık pencereyi kapat

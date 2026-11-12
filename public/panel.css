@@ -945,3 +945,18 @@ html[data-tema="acik"] .ist-aj-sayi { color: #b7700a; }
 .ao-ay.acik { border-color: var(--altin); }
 .ao-detay { display: flex; flex-direction: column; gap: 6px; margin: -2px 0 4px 10px; }
 .ao-detay .aj-satir { padding: 8px 10px; }
+
+/* Gün adları: hafta sonu kırmızı */
+.gun-ad { font-weight: 700; font-size: .85em; opacity: .75; }
+.gun-ad.hs { color: #ff8585; opacity: 1; }
+.tk-hafta.hs { color: #ff8585; }
+.tk-gun-btn.hs .tk-no { color: #ff8585; }
+.tk-gun-btn.secili.hs .tk-no { color: #fff; }
+.aj-gun { display: block; min-height: 16px; margin-top: 3px; font-size: 12px; }
+html[data-tema="acik"] .gun-ad.hs, html[data-tema="acik"] .tk-hafta.hs, html[data-tema="acik"] .tk-gun-btn.hs .tk-no { color: #c62828; }
+html[data-tema="acik"] .tk-gun-btn.secili.hs .tk-no { color: #fff; }
+html[data-tema="nvg"] .gun-ad.hs, html[data-tema="nvg"] .tk-hafta.hs, html[data-tema="nvg"] .tk-gun-btn.hs .tk-no { color: #eaffef; text-shadow: 0 0 6px rgba(70,255,122,.8); font-weight: 800; }
+html[data-tema="nvg"] .tk-gun-btn.secili.hs .tk-no { color: #fff; }
+.tk-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.tk-gun-btn { min-width: 0; }
+.aj-gun { margin-bottom: 8px; }

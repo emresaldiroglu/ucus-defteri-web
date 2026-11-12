@@ -181,9 +181,10 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 8;
+const YENILIK_SURUMU = 9;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
+        '📅 Ajanda ve takvimde tarihlerin yanında artık gün adı yazıyor (Pzt, Sal… Cmt, Paz). Cumartesi ve Pazar kırmızı görünür; takvimde hafta sonu sütunları da kırmızıdır. NVG temasında kırmızı yerine parlak yeşil vurgu kullanılır.',
         '🗓️ Yeni "🗓️ Ajanda" düğmesi: seçtiğin yılda ay ay ne yaptığını (nöbet, kurtarma, yangın, izin) görürsün. Yıl olarak normal takvim yılı (Ocak–Aralık) esas alınır; Cumartesi ve Pazar günleri ayrı sayılır.',
         '🗓️ Takvim artık ajanda olarak da kullanılıyor: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer kayıtlarını girebilirsin. Birkaç gün süren kayıtlar için başlangıç ve bitiş seç; kayıtlar saat ve istatistiklerini etkilemez.',
         '🔔 Panelin üstündeki turuncu uyarıları artık ✕ ile kaldırabilirsin. Kırmızı (15 gün ve altı) uyarılar kaldırılamaz. Kaldırdıklarını bandın altındaki "gizli uyarı" bağlantısından geri getirebilirsin.',
@@ -237,7 +238,7 @@ const KILAVUZ = [
         { b: '📊 İstatistik ve dönem seçici', y: true, m: 'Üstte dönem düğmeleri bulunur: güncel dönem, geçmiş dönemler ve "Tümü". Seçilen dönem için toplam saat, uçuş sayısı, ortalama süre, aylık grafik (Eylül\'den Ağustos\'a), GGG/GŞ/Sim dağılımı ve hava aracına göre dağılım gösterilir. "Tümü" seçilince dönemleri yan yana karşılaştıran bir grafik çıkar.' },
         { b: '📅 Takvim', m: 'Ay ay gezilen bir takvimdir, uçuş yapılan günler işaretlidir. Bir güne dokununca o günün uçuşları ve ajanda kayıtları alta listelenir. "➕ Bu güne uçuş ekle" düğmesi tarihi forma yazar, diğer bilgileri sen doldurursun. "Bugün" düğmesi bugünün ayına döner.' },
         { b: '🗓️ Ajanda (Kurtarma, Nöb. Amir, Yangın, İzin)', y: true, m: 'Takvimde bir güne dokun, "🗓️ Ajanda ekle"ye bas. Türü seç (🚑 Kurtarma, 🛡️ Nöb. Amir, 🔥 Yangın, 🏖️ İzin, 📌 Diğer), istersen kısa not yaz. Birkaç gün süren nöbet ya da izin için başlangıç ve bitiş tarihini ayrı seç; aradaki bütün günler işaretlenir. Günlerde türüne göre renkli çizgi görünür. Kaydın yanındaki ✏️ ile düzeltir, 🗑️ ile (onay sorulduktan sonra) silersin. Ajanda hesabına kaydedilir, her cihazda aynıdır. Uçuş saatini, istatistiği, dönem hedefini ve sayaçları hiç etkilemez.' },
-        { b: '🗓️ Ajanda penceresi (ay ay özet)', y: true, m: 'Ana ekrandaki "🗓️ Ajanda" düğmesiyle açılır. Üstte yıl seçilir (normal takvim yılı, Ocak–Aralık; birden fazla yıl varsa "Tümü" de çıkar). Önce yılın toplamı görünür: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer için kaç kayıt ve kaç gün olduğu; Kurtarma, Nöb. Amir ve Yangın satırlarında kaç Cumartesi ve kaç Pazar gününe denk geldiği ayrı ayrı yazar, en altta üçünün toplamı vardır. Altında Ocak\u2019tan Aralık\u2019a ay ay liste vardır; her ayda türlerin gün sayıları ve hafta sonu günleri görünür. Bir aya dokununca o ayın kayıtları tarih sırasıyla açılır ve oradan ✏️ ile düzeltebilirsin. Birkaç gün süren kayıtlar gün gün sayılır. Resmi tatiller hafta sonu olarak sayılmaz. İzin için gün sayısı yazar ve toplama girmez.' },
+        { b: '🗓️ Ajanda penceresi (ay ay özet)', y: true, m: 'Ana ekrandaki "🗓️ Ajanda" düğmesiyle açılır. Üstte yıl seçilir (normal takvim yılı, Ocak–Aralık; birden fazla yıl varsa "Tümü" de çıkar). Önce yılın toplamı görünür: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer için kaç kayıt ve kaç gün olduğu; Kurtarma, Nöb. Amir ve Yangın satırlarında kaç Cumartesi ve kaç Pazar gününe denk geldiği ayrı ayrı yazar, en altta üçünün toplamı vardır. Altında Ocak\u2019tan Aralık\u2019a ay ay liste vardır; her ayda türlerin gün sayıları ve hafta sonu günleri görünür. Bir aya dokununca o ayın kayıtları tarih sırasıyla açılır ve oradan ✏️ ile düzeltebilirsin. Kayıtların tarihinin yanında gün adı yazar, Cumartesi ve Pazar kırmızı görünür (takvimde de aynı; NVG temasında parlak yeşil). Kayıt eklerken ya da düzenlerken seçtiğin tarihin altında günün adı çıkar. Birkaç gün süren kayıtlar gün gün sayılır. Resmi tatiller hafta sonu olarak sayılmaz. İzin için gün sayısı yazar ve toplama girmez.' },
         { b: '🗑️ Silinenler', m: 'Sildiğin uçuşlar 30 gün saklanır. Her satırda kalıcı silinmeye kaç gün kaldığı yazar. "Geri yükle" uçuşu listeye döndürür, "Kalıcı sil" onay sorduktan sonra tamamen siler. 30 gün dolunca kayıt kendiliğinden silinir.' },
         { b: '⬇ CSV ve ⬇ PDF', m: 'CSV, uçuşlarını Excel gibi programlarda açabileceğin bir dosya olarak indirir. PDF, yazdırma penceresini açar, orada "PDF olarak kaydet"i seçersin. İkisi de ekranda o an süzülen listeyi (filtre uyguladıysan yalnızca onu) kapsar.' },
         { b: '📟 KDU', m: 'KDU sayfasını yeni bir sekmede açar.' }
@@ -968,8 +969,8 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                     <button type="button" class="aj-tur" data-eylem="ajanda-tur" data-tur="diger">📌 Diğer</button>
                 </div>
                 <div class="aj-tarihler">
-                    <div><label for="ajBas">Başlangıç</label><input type="date" id="ajBas"></div>
-                    <div><label for="ajBit">Bitiş</label><input type="date" id="ajBit"></div>
+                    <div><label for="ajBas">Başlangıç</label><input type="date" id="ajBas"><small class="aj-gun" id="ajBasGun"></small></div>
+                    <div><label for="ajBit">Bitiş</label><input type="date" id="ajBit"><small class="aj-gun" id="ajBitGun"></small></div>
                 </div>
                 <label for="ajNot">Not (isteğe bağlı)</label>
                 <input type="text" id="ajNot" maxlength="100" autocomplete="off" placeholder="Örn. 1. vardiya">
