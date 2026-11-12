@@ -929,3 +929,12 @@ html[data-tema="nvg"] .aj-tur.secili { background: rgba(70,255,122,.25); color: 
 .tk-aj-noktalar .aj-simge { font-size: 11px; line-height: 1; background: none; width: auto; height: auto; border-radius: 0; display: inline-block; }
 .tk-aj-noktalar .aj-fazla { font-size: 10px; font-weight: 800; opacity: .8; }
 @media (max-width: 420px) { .tk-aj-noktalar .aj-simge { font-size: 10px; } }
+
+/* İstatistik: ajanda özeti */
+.ist-aj-liste { display: flex; flex-direction: column; gap: 6px; }
+.ist-aj { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 9px 12px; border-radius: 12px; background: var(--cam); border: 1px solid var(--cizgi); font-size: 13px; }
+.ist-aj-ad { font-weight: 700; flex: 1 1 140px; }
+.ist-aj-sayi { color: var(--altin); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ist-aj-hs { color: var(--yazi-soluk); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ist-aj-top { border-color: var(--altin); }
+html[data-tema="acik"] .ist-aj-sayi { color: #b7700a; }

@@ -746,9 +746,15 @@
             var y = donemYiliBul(f.tarih);
             if (y !== null) donemler[y] = true;
         });
+        var ajDonemleri = {};
+        (panelVeri.ajanda || []).forEach(function (a) {
+            var y1 = donemYiliBul(a.b), y2 = donemYiliBul(a.s);
+            if (y1 !== null) { donemler[y1] = true; ajDonemleri[y1] = true; }
+            if (y2 !== null) { donemler[y2] = true; ajDonemleri[y2] = true; }
+        });
         if (aktif) donemler[aktif] = true;
         var yillar = Object.keys(donemler).sort(function (a, b) { return b - a; });
-        var dolu = yillar.filter(function (y) { return hepsi.some(function (f) { return String(donemYiliBul(f.tarih)) === y; }); });
+        var dolu = yillar.filter(function (y) { return ajDonemleri[y] || hepsi.some(function (f) { return String(donemYiliBul(f.tarih)) === y; }); });
         if (ist.secili !== 'tumu' && yillar.indexOf(ist.secili) === -1) ist.secili = aktif || yillar[0] || '';
 
         // Dönem seçici
@@ -773,6 +779,7 @@
         var liste = tumuMu ? hepsi : hepsi.filter(function (f) { return String(donemYiliBul(f.tarih)) === ist.secili; });
         if (!liste.length) {
             kap.appendChild(eleman('div', 'bos-mesaj', ist.secili + ' döneminde uçuş kaydı bulunmamaktadır.'));
+            ajandaOzetiCiz(kap, ist.secili);
             return;
         }
 
@@ -861,6 +868,79 @@
             satir.appendChild(eleman('b', '', dkSaat(araclar[a])));
             kap.appendChild(satir);
         });
+        ajandaOzetiCiz(kap, ist.secili);
+    }
+
+    // Ajanda özeti: seçili dönemde (ya da "Tümü") tür başına kayıt, gün, Cumartesi ve Pazar günü sayısı
+    function ajandaOzetiHesapla(secili) {
+        var turler = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
+        var sonuc = { tur: {}, izinDonem: {}, toplam: { kayit: 0, gun: 0, cmt: 0, paz: 0 } };
+        turler.forEach(function (t) { sonuc.tur[t] = { kayit: 0, gun: 0, cmt: 0, paz: 0 }; });
+        (panelVeri.ajanda || []).forEach(function (a) {
+            var s = sonuc.tur[a.tur] || sonuc.tur.diger;
+            var b = a.b.split('-'), e = a.s.split('-');
+            var gun = Date.UTC(+b[0], +b[1] - 1, +b[2]);
+            var son = Date.UTC(+e[0], +e[1] - 1, +e[2]);
+            var sayildi = false;
+            for (var n = 0; gun <= son && n < 400; n++, gun += 86400000) {
+                var iso = new Date(gun).toISOString().slice(0, 10);
+                var dy = String(donemYiliBul(iso));
+                if (secili !== 'tumu' && dy !== secili) continue;
+                sayildi = true;
+                s.gun++;
+                var hg = new Date(gun).getUTCDay();
+                if (hg === 6) s.cmt++;
+                if (hg === 0) s.paz++;
+                if (a.tur === 'izin') sonuc.izinDonem[dy] = (sonuc.izinDonem[dy] || 0) + 1;
+            }
+            if (sayildi) s.kayit++;
+        });
+        ['kurtarma', 'nobet', 'yangin'].forEach(function (t) {
+            var s = sonuc.tur[t];
+            sonuc.toplam.kayit += s.kayit; sonuc.toplam.gun += s.gun; sonuc.toplam.cmt += s.cmt; sonuc.toplam.paz += s.paz;
+        });
+        return sonuc;
+    }
+
+    function ajandaOzetiCiz(kap, secili) {
+        kap.appendChild(eleman('div', 'ist-baslik', '🗓️ Ajanda özeti'));
+        var o = ajandaOzetiHesapla(secili);
+        var turler = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
+        var varMi = turler.some(function (t) { return o.tur[t].kayit > 0; });
+        if (!varMi) {
+            kap.appendChild(eleman('div', 'ist-not', secili === 'tumu' ? 'Henüz ajanda kaydı yok.' : 'Bu dönemde ajanda kaydı yok.'));
+            return;
+        }
+        var kutu = eleman('div', 'ist-aj-liste');
+        function satir(ad, s, haftasonu, ek) {
+            var r = eleman('div', 'ist-aj' + (ek ? ' ' + ek : ''));
+            r.appendChild(eleman('span', 'ist-aj-ad', ad));
+            r.appendChild(eleman('span', 'ist-aj-sayi', s.kayit + ' kayıt · ' + s.gun + ' gün'));
+            if (haftasonu) r.appendChild(eleman('span', 'ist-aj-hs', 'Cmt ' + s.cmt + ' · Paz ' + s.paz));
+            kutu.appendChild(r);
+        }
+        turler.forEach(function (t) {
+            var s = o.tur[t];
+            if (!s.kayit) return;
+            var tur = AJ_TURLERI[t];
+            satir(tur.e + ' ' + tur.a, s, t === 'kurtarma' || t === 'nobet' || t === 'yangin');
+        });
+        if (o.tur.kurtarma.kayit + o.tur.nobet.kayit + o.tur.yangin.kayit > 0) satir('Kurtarma + Nöb. Amir + Yangın', o.toplam, true, 'ist-aj-top');
+        kap.appendChild(kutu);
+        if (secili === 'tumu') {
+            var yillar = Object.keys(o.izinDonem).sort(function (a, b) { return b - a; });
+            if (yillar.length) {
+                kap.appendChild(eleman('div', 'ist-baslik', '🏖️ Dönem dönem izin günü'));
+                var iz = eleman('div', 'ist-aj-liste');
+                yillar.forEach(function (y) {
+                    var r = eleman('div', 'ist-aj');
+                    r.appendChild(eleman('span', 'ist-aj-ad', y + ' dönemi'));
+                    r.appendChild(eleman('span', 'ist-aj-sayi', o.izinDonem[y] + ' gün'));
+                    iz.appendChild(r);
+                });
+                kap.appendChild(iz);
+            }
+        }
     }
 
     /* ---------- TEMA (koyu / açık) ---------- */
