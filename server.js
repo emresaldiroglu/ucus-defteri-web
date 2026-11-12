@@ -181,10 +181,10 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 7;
+const YENILIK_SURUMU = 8;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
-        '📊 İstatistikte yeni "🗓️ Ajanda özeti": seçtiğin dönemde kaç kurtarma, nöbet ve yangın tuttuğunu, kaçının Cumartesi ve Pazar günlerine denk geldiğini ve yılda kaç gün izne gittiğini görebilirsin.',
+        '🗓️ Yeni "🗓️ Ajanda" düğmesi: seçtiğin yılda ay ay ne yaptığını (nöbet, kurtarma, yangın, izin) görürsün. Yıl olarak normal takvim yılı (Ocak–Aralık) esas alınır; Cumartesi ve Pazar günleri ayrı sayılır.',
         '🗓️ Takvim artık ajanda olarak da kullanılıyor: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer kayıtlarını girebilirsin. Birkaç gün süren kayıtlar için başlangıç ve bitiş seç; kayıtlar saat ve istatistiklerini etkilemez.',
         '🔔 Panelin üstündeki turuncu uyarıları artık ✕ ile kaldırabilirsin. Kırmızı (15 gün ve altı) uyarılar kaldırılamaz. Kaldırdıklarını bandın altındaki "gizli uyarı" bağlantısından geri getirebilirsin.',
         '✈️ Uçuş listesi artık kapalı geliyor: ana ekranda "✈️ Uçuşlarım" şeridine dokununca açılır. Ekran kısaldı, kartlar ve sayaçlar hemen görünür.',
@@ -237,7 +237,7 @@ const KILAVUZ = [
         { b: '📊 İstatistik ve dönem seçici', y: true, m: 'Üstte dönem düğmeleri bulunur: güncel dönem, geçmiş dönemler ve "Tümü". Seçilen dönem için toplam saat, uçuş sayısı, ortalama süre, aylık grafik (Eylül\'den Ağustos\'a), GGG/GŞ/Sim dağılımı ve hava aracına göre dağılım gösterilir. "Tümü" seçilince dönemleri yan yana karşılaştıran bir grafik çıkar.' },
         { b: '📅 Takvim', m: 'Ay ay gezilen bir takvimdir, uçuş yapılan günler işaretlidir. Bir güne dokununca o günün uçuşları ve ajanda kayıtları alta listelenir. "➕ Bu güne uçuş ekle" düğmesi tarihi forma yazar, diğer bilgileri sen doldurursun. "Bugün" düğmesi bugünün ayına döner.' },
         { b: '🗓️ Ajanda (Kurtarma, Nöb. Amir, Yangın, İzin)', y: true, m: 'Takvimde bir güne dokun, "🗓️ Ajanda ekle"ye bas. Türü seç (🚑 Kurtarma, 🛡️ Nöb. Amir, 🔥 Yangın, 🏖️ İzin, 📌 Diğer), istersen kısa not yaz. Birkaç gün süren nöbet ya da izin için başlangıç ve bitiş tarihini ayrı seç; aradaki bütün günler işaretlenir. Günlerde türüne göre renkli çizgi görünür. Kaydın yanındaki ✏️ ile düzeltir, 🗑️ ile (onay sorulduktan sonra) silersin. Ajanda hesabına kaydedilir, her cihazda aynıdır. Uçuş saatini, istatistiği, dönem hedefini ve sayaçları hiç etkilemez.' },
-        { b: '🗓️ Ajanda özeti (nöbet, kurtarma, yangın, izin sayıları)', y: true, m: '📊 İstatistikler penceresinin en altında bulunur ve üstteki dönem seçicisine uyar (bir dönem ya da "Tümü"). Her tür için kaç kayıt ve toplam kaç gün olduğu yazar. Kurtarma, Nöb. Amir ve Yangın satırlarında bunların kaç Cumartesi ve kaç Pazar gününe denk geldiği ayrı ayrı gösterilir; en altta üçünün toplamı vardır. İzin için gün sayısı yazar, "Tümü" seçiliyken dönem dönem izin günü de listelenir. Birkaç gün süren kayıtlar gün gün sayılır. Resmi tatiller hafta sonu olarak sayılmaz.' },
+        { b: '🗓️ Ajanda penceresi (ay ay özet)', y: true, m: 'Ana ekrandaki "🗓️ Ajanda" düğmesiyle açılır. Üstte yıl seçilir (normal takvim yılı, Ocak–Aralık; birden fazla yıl varsa "Tümü" de çıkar). Önce yılın toplamı görünür: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer için kaç kayıt ve kaç gün olduğu; Kurtarma, Nöb. Amir ve Yangın satırlarında kaç Cumartesi ve kaç Pazar gününe denk geldiği ayrı ayrı yazar, en altta üçünün toplamı vardır. Altında Ocak\u2019tan Aralık\u2019a ay ay liste vardır; her ayda türlerin gün sayıları ve hafta sonu günleri görünür. Bir aya dokununca o ayın kayıtları tarih sırasıyla açılır ve oradan ✏️ ile düzeltebilirsin. Birkaç gün süren kayıtlar gün gün sayılır. Resmi tatiller hafta sonu olarak sayılmaz. İzin için gün sayısı yazar ve toplama girmez.' },
         { b: '🗑️ Silinenler', m: 'Sildiğin uçuşlar 30 gün saklanır. Her satırda kalıcı silinmeye kaç gün kaldığı yazar. "Geri yükle" uçuşu listeye döndürür, "Kalıcı sil" onay sorduktan sonra tamamen siler. 30 gün dolunca kayıt kendiliğinden silinir.' },
         { b: '⬇ CSV ve ⬇ PDF', m: 'CSV, uçuşlarını Excel gibi programlarda açabileceğin bir dosya olarak indirir. PDF, yazdırma penceresini açar, orada "PDF olarak kaydet"i seçersin. İkisi de ekranda o an süzülen listeyi (filtre uyguladıysan yalnızca onu) kapsar.' },
         { b: '📟 KDU', m: 'KDU sayfasını yeni bir sekmede açar.' }
@@ -787,6 +787,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                 <button type="button" class="arac-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="filtreIcerikKutusu" data-ok="filtreOkIkon">🔍 Ara</button>
                 <button type="button" class="arac-btn" data-eylem="istatistik-ac">📊 İstatistik</button>
                 <button type="button" class="arac-btn" data-eylem="takvim-ac">📅 Takvim</button>
+                <button type="button" class="arac-btn" data-eylem="ajanda-ozet-ac">🗓️ Ajanda</button>
                 <button type="button" class="arac-btn" data-eylem="cop-ac">🗑️ Silinenler</button>
                 <button type="button" class="arac-btn" data-eylem="csv-indir">⬇ CSV</button>
                 <button type="button" class="arac-btn" data-eylem="pdf-indir">⬇ PDF</button>
@@ -943,6 +944,15 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                     <button type="button" class="btn-filtre" data-eylem="takvim-bugun">Bugün</button>
                     <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="takvimModal">Kapat</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- AJANDA ÖZETİ MODALI (ay ay) -->
+        <div id="ajandaOzetModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu genis">
+                <h3 class="modal-baslik">🗓️ Ajanda</h3>
+                <div id="ajOzetIcerik" class="modal-liste"></div>
+                <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="ajandaOzetModal">Kapat</button>
             </div>
         </div>
 

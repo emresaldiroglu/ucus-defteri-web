@@ -746,15 +746,9 @@
             var y = donemYiliBul(f.tarih);
             if (y !== null) donemler[y] = true;
         });
-        var ajDonemleri = {};
-        (panelVeri.ajanda || []).forEach(function (a) {
-            var y1 = donemYiliBul(a.b), y2 = donemYiliBul(a.s);
-            if (y1 !== null) { donemler[y1] = true; ajDonemleri[y1] = true; }
-            if (y2 !== null) { donemler[y2] = true; ajDonemleri[y2] = true; }
-        });
         if (aktif) donemler[aktif] = true;
         var yillar = Object.keys(donemler).sort(function (a, b) { return b - a; });
-        var dolu = yillar.filter(function (y) { return ajDonemleri[y] || hepsi.some(function (f) { return String(donemYiliBul(f.tarih)) === y; }); });
+        var dolu = yillar.filter(function (y) { return hepsi.some(function (f) { return String(donemYiliBul(f.tarih)) === y; }); });
         if (ist.secili !== 'tumu' && yillar.indexOf(ist.secili) === -1) ist.secili = aktif || yillar[0] || '';
 
         // Dönem seçici
@@ -779,7 +773,6 @@
         var liste = tumuMu ? hepsi : hepsi.filter(function (f) { return String(donemYiliBul(f.tarih)) === ist.secili; });
         if (!liste.length) {
             kap.appendChild(eleman('div', 'bos-mesaj', ist.secili + ' döneminde uçuş kaydı bulunmamaktadır.'));
-            ajandaOzetiCiz(kap, ist.secili);
             return;
         }
 
@@ -868,79 +861,6 @@
             satir.appendChild(eleman('b', '', dkSaat(araclar[a])));
             kap.appendChild(satir);
         });
-        ajandaOzetiCiz(kap, ist.secili);
-    }
-
-    // Ajanda özeti: seçili dönemde (ya da "Tümü") tür başına kayıt, gün, Cumartesi ve Pazar günü sayısı
-    function ajandaOzetiHesapla(secili) {
-        var turler = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
-        var sonuc = { tur: {}, izinDonem: {}, toplam: { kayit: 0, gun: 0, cmt: 0, paz: 0 } };
-        turler.forEach(function (t) { sonuc.tur[t] = { kayit: 0, gun: 0, cmt: 0, paz: 0 }; });
-        (panelVeri.ajanda || []).forEach(function (a) {
-            var s = sonuc.tur[a.tur] || sonuc.tur.diger;
-            var b = a.b.split('-'), e = a.s.split('-');
-            var gun = Date.UTC(+b[0], +b[1] - 1, +b[2]);
-            var son = Date.UTC(+e[0], +e[1] - 1, +e[2]);
-            var sayildi = false;
-            for (var n = 0; gun <= son && n < 400; n++, gun += 86400000) {
-                var iso = new Date(gun).toISOString().slice(0, 10);
-                var dy = String(donemYiliBul(iso));
-                if (secili !== 'tumu' && dy !== secili) continue;
-                sayildi = true;
-                s.gun++;
-                var hg = new Date(gun).getUTCDay();
-                if (hg === 6) s.cmt++;
-                if (hg === 0) s.paz++;
-                if (a.tur === 'izin') sonuc.izinDonem[dy] = (sonuc.izinDonem[dy] || 0) + 1;
-            }
-            if (sayildi) s.kayit++;
-        });
-        ['kurtarma', 'nobet', 'yangin'].forEach(function (t) {
-            var s = sonuc.tur[t];
-            sonuc.toplam.kayit += s.kayit; sonuc.toplam.gun += s.gun; sonuc.toplam.cmt += s.cmt; sonuc.toplam.paz += s.paz;
-        });
-        return sonuc;
-    }
-
-    function ajandaOzetiCiz(kap, secili) {
-        kap.appendChild(eleman('div', 'ist-baslik', '🗓️ Ajanda özeti'));
-        var o = ajandaOzetiHesapla(secili);
-        var turler = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
-        var varMi = turler.some(function (t) { return o.tur[t].kayit > 0; });
-        if (!varMi) {
-            kap.appendChild(eleman('div', 'ist-not', secili === 'tumu' ? 'Henüz ajanda kaydı yok.' : 'Bu dönemde ajanda kaydı yok.'));
-            return;
-        }
-        var kutu = eleman('div', 'ist-aj-liste');
-        function satir(ad, s, haftasonu, ek) {
-            var r = eleman('div', 'ist-aj' + (ek ? ' ' + ek : ''));
-            r.appendChild(eleman('span', 'ist-aj-ad', ad));
-            r.appendChild(eleman('span', 'ist-aj-sayi', s.kayit + ' kayıt · ' + s.gun + ' gün'));
-            if (haftasonu) r.appendChild(eleman('span', 'ist-aj-hs', 'Cmt ' + s.cmt + ' · Paz ' + s.paz));
-            kutu.appendChild(r);
-        }
-        turler.forEach(function (t) {
-            var s = o.tur[t];
-            if (!s.kayit) return;
-            var tur = AJ_TURLERI[t];
-            satir(tur.e + ' ' + tur.a, s, t === 'kurtarma' || t === 'nobet' || t === 'yangin');
-        });
-        if (o.tur.kurtarma.kayit + o.tur.nobet.kayit + o.tur.yangin.kayit > 0) satir('Kurtarma + Nöb. Amir + Yangın', o.toplam, true, 'ist-aj-top');
-        kap.appendChild(kutu);
-        if (secili === 'tumu') {
-            var yillar = Object.keys(o.izinDonem).sort(function (a, b) { return b - a; });
-            if (yillar.length) {
-                kap.appendChild(eleman('div', 'ist-baslik', '🏖️ Dönem dönem izin günü'));
-                var iz = eleman('div', 'ist-aj-liste');
-                yillar.forEach(function (y) {
-                    var r = eleman('div', 'ist-aj');
-                    r.appendChild(eleman('span', 'ist-aj-ad', y + ' dönemi'));
-                    r.appendChild(eleman('span', 'ist-aj-sayi', o.izinDonem[y] + ' gün'));
-                    iz.appendChild(r);
-                });
-                kap.appendChild(iz);
-            }
-        }
     }
 
     /* ---------- TEMA (koyu / açık) ---------- */
@@ -1508,6 +1428,174 @@
         modalAc('ajandaModal');
     }
 
+    /* ---------- AJANDA ÖZETİ (ay ay, takvim yılı) ---------- */
+
+    var ao = { yil: '', acik: {} };
+    var AJ_SIRA = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
+
+    function ajandaYillari() {
+        var y = {};
+        (panelVeri.ajanda || []).forEach(function (a) { y[a.b.slice(0, 4)] = true; y[a.s.slice(0, 4)] = true; });
+        y[String(new Date().getFullYear())] = true;
+        return Object.keys(y).sort(function (a, b) { return b - a; });
+    }
+
+    // yil: '2026' ya da 'tumu'. Her kayıt gün gün açılır; Cumartesi/Pazar ayrı sayılır.
+    function ajandaOzetiHesapla(yil) {
+        var boslar = function () { var o = {}; AJ_SIRA.forEach(function (t) { o[t] = { kayit: 0, gun: 0, cmt: 0, paz: 0 }; }); return o; };
+        var sonuc = { tur: boslar(), ay: [], yillar: {}, toplam: { kayit: 0, gun: 0, cmt: 0, paz: 0 } };
+        for (var m = 0; m < 12; m++) sonuc.ay.push({ gun: {}, cmt: 0, paz: 0, kayitlar: [] });
+        (panelVeri.ajanda || []).forEach(function (a) {
+            var tur = AJ_TURLERI[a.tur] ? a.tur : 'diger';
+            var s = sonuc.tur[tur];
+            var b = a.b.split('-'), e = a.s.split('-');
+            var gun = Date.UTC(+b[0], +b[1] - 1, +b[2]);
+            var son = Date.UTC(+e[0], +e[1] - 1, +e[2]);
+            var sayildi = false, aylar = {};
+            for (var n = 0; gun <= son && n < 400; n++, gun += 86400000) {
+                var dt = new Date(gun);
+                var iso = dt.toISOString().slice(0, 10);
+                var y = iso.slice(0, 4);
+                if (yil !== 'tumu' && y !== yil) continue;
+                sayildi = true;
+                s.gun++;
+                var hg = dt.getUTCDay();
+                if (hg === 6) s.cmt++;
+                if (hg === 0) s.paz++;
+                var yk = sonuc.yillar[y] = sonuc.yillar[y] || {};
+                yk[tur] = (yk[tur] || 0) + 1;
+                if (yil !== 'tumu') {
+                    var ay = sonuc.ay[dt.getUTCMonth()];
+                    ay.gun[tur] = (ay.gun[tur] || 0) + 1;
+                    if (tur === 'kurtarma' || tur === 'nobet' || tur === 'yangin') {
+                        if (hg === 6) ay.cmt++;
+                        if (hg === 0) ay.paz++;
+                    }
+                    aylar[dt.getUTCMonth()] = true;
+                }
+            }
+            if (sayildi) s.kayit++;
+            Object.keys(aylar).forEach(function (m) { sonuc.ay[m].kayitlar.push(a); });
+        });
+        ['kurtarma', 'nobet', 'yangin'].forEach(function (t) {
+            var s = sonuc.tur[t];
+            sonuc.toplam.kayit += s.kayit; sonuc.toplam.gun += s.gun; sonuc.toplam.cmt += s.cmt; sonuc.toplam.paz += s.paz;
+        });
+        return sonuc;
+    }
+
+    function ajandaOzetAc() {
+        var yillar = ajandaYillari();
+        ao.yil = ao.yil && (ao.yil === 'tumu' || yillar.indexOf(ao.yil) !== -1) ? ao.yil : String(new Date().getFullYear());
+        ao.acik = {};
+        ajandaOzetiCiz();
+        modalAc('ajandaOzetModal');
+    }
+
+    function ajandaOzetYenile() {
+        if ($('ajandaOzetModal').classList.contains('acik')) ajandaOzetiCiz();
+    }
+
+    function ajanGunMetni(gun) {
+        return AJ_SIRA.filter(function (t) { return gun[t]; }).map(function (t) { return AJ_TURLERI[t].e + ' ' + gun[t]; }).join(' · ');
+    }
+
+    function ajandaOzetiCiz() {
+        var kap = $('ajOzetIcerik');
+        var ustKaydirma = kap.scrollTop;
+        kap.textContent = '';
+        var yillar = ajandaYillari();
+        var kayitlilar = {};
+        (panelVeri.ajanda || []).forEach(function (a) { kayitlilar[a.b.slice(0, 4)] = true; kayitlilar[a.s.slice(0, 4)] = true; });
+
+        var cubuk = eleman('div', 'ist-donemler');
+        yillar.forEach(function (y) {
+            var c = eleman('button', 'ist-chip' + (ao.yil === y ? ' aktif' : ''), y);
+            c.type = 'button'; c.dataset.eylem = 'ajanda-yil'; c.dataset.yil = y;
+            cubuk.appendChild(c);
+        });
+        if (Object.keys(kayitlilar).length > 1) {
+            var tum = eleman('button', 'ist-chip' + (ao.yil === 'tumu' ? ' aktif' : ''), 'Tümü');
+            tum.type = 'button'; tum.dataset.eylem = 'ajanda-yil'; tum.dataset.yil = 'tumu';
+            cubuk.appendChild(tum);
+        }
+        kap.appendChild(cubuk);
+
+        var o = ajandaOzetiHesapla(ao.yil);
+        var varMi = AJ_SIRA.some(function (t) { return o.tur[t].kayit > 0; });
+        var ekle = eleman('button', 'tk-ekle', '🗓️ Ajanda ekle');
+        ekle.type = 'button'; ekle.dataset.eylem = 'ajanda-ekle'; ekle.dataset.tarih = bugunDamga();
+        if (!varMi) {
+            kap.appendChild(eleman('div', 'ist-not', ao.yil === 'tumu' ? 'Henüz ajanda kaydı yok.' : ao.yil + ' yılında ajanda kaydı yok.'));
+            kap.appendChild(ekle);
+            return;
+        }
+
+        var kutu = eleman('div', 'ist-aj-liste');
+        function satir(ad, s, haftasonu, ek) {
+            var r = eleman('div', 'ist-aj' + (ek ? ' ' + ek : ''));
+            r.appendChild(eleman('span', 'ist-aj-ad', ad));
+            r.appendChild(eleman('span', 'ist-aj-sayi', s.kayit + ' kayıt · ' + s.gun + ' gün'));
+            if (haftasonu) r.appendChild(eleman('span', 'ist-aj-hs', 'Cmt ' + s.cmt + ' · Paz ' + s.paz));
+            kutu.appendChild(r);
+        }
+        kap.appendChild(eleman('div', 'ist-baslik', ao.yil === 'tumu' ? 'Tüm zamanlar' : ao.yil + ' toplamı'));
+        AJ_SIRA.forEach(function (t) {
+            var s = o.tur[t];
+            if (!s.kayit) return;
+            satir(AJ_TURLERI[t].e + ' ' + AJ_TURLERI[t].a, s, t === 'kurtarma' || t === 'nobet' || t === 'yangin');
+        });
+        if (o.tur.kurtarma.kayit + o.tur.nobet.kayit + o.tur.yangin.kayit > 0) satir('Kurtarma + Nöb. Amir + Yangın', o.toplam, true, 'ist-aj-top');
+        kap.appendChild(kutu);
+
+        if (ao.yil === 'tumu') {
+            kap.appendChild(eleman('div', 'ist-baslik', 'Yıl yıl (gün sayısı)'));
+            var yl = eleman('div', 'ist-aj-liste');
+            Object.keys(o.yillar).sort(function (a, b) { return b - a; }).forEach(function (y) {
+                var r = eleman('div', 'ist-aj');
+                r.appendChild(eleman('span', 'ist-aj-ad', y));
+                r.appendChild(eleman('span', 'ist-aj-sayi', ajanGunMetni(o.yillar[y])));
+                yl.appendChild(r);
+            });
+            kap.appendChild(yl);
+        } else {
+            kap.appendChild(eleman('div', 'ist-baslik', 'Ay ay (gün sayısı)'));
+            var al = eleman('div', 'ist-aj-liste');
+            o.ay.forEach(function (ay, i) {
+                var bos = !ay.kayitlar.length;
+                var acikMi = !!ao.acik[i] && !bos;
+                var r = eleman(bos ? 'div' : 'button', 'ist-aj ao-ay' + (bos ? ' bos' : '') + (acikMi ? ' acik' : ''));
+                if (!bos) { r.type = 'button'; r.dataset.eylem = 'ajanda-ay'; r.dataset.ay = String(i); r.setAttribute('aria-expanded', acikMi ? 'true' : 'false'); }
+                r.appendChild(eleman('span', 'ist-aj-ad', AY_ADLARI[i]));
+                r.appendChild(eleman('span', 'ist-aj-sayi', bos ? '—' : ajanGunMetni(ay.gun)));
+                if (!bos && (ay.cmt || ay.paz)) r.appendChild(eleman('span', 'ist-aj-hs', 'Cmt ' + ay.cmt + ' · Paz ' + ay.paz));
+                al.appendChild(r);
+                if (acikMi) {
+                    var det = eleman('div', 'ao-detay');
+                    ay.kayitlar.sort(function (a, b) { return a.b.localeCompare(b.b); }).forEach(function (a) {
+                        var tur = AJ_TURLERI[a.tur] || AJ_TURLERI.diger;
+                        var d = eleman('div', 'aj-satir aj-' + a.tur);
+                        var sol = document.createElement('div');
+                        sol.appendChild(eleman('strong', 'liste-tarih', tur.e + ' ' + tur.a));
+                        sol.appendChild(document.createElement('br'));
+                        sol.appendChild(eleman('span', 'liste-alt', a.b === a.s ? trTarih(a.b) : trTarih(a.b) + ' – ' + trTarih(a.s)));
+                        if (a.not) { sol.appendChild(document.createElement('br')); sol.appendChild(eleman('span', 'liste-ince', a.not)); }
+                        d.appendChild(sol);
+                        var duz = eleman('button', 'aj-ikon', '✏️');
+                        duz.type = 'button'; duz.dataset.eylem = 'ajanda-duzenle'; duz.dataset.id = a.id;
+                        duz.setAttribute('aria-label', 'Ajanda kaydını düzenle');
+                        d.appendChild(duz);
+                        det.appendChild(d);
+                    });
+                    al.appendChild(det);
+                }
+            });
+            kap.appendChild(al);
+        }
+        kap.appendChild(ekle);
+        kap.scrollTop = ustKaydirma;
+    }
+
     async function ajandaKaydet(dugme) {
         var bas = $('ajBas').value, bit = $('ajBit').value || bas;
         if (!bas) return bildir('Başlangıç tarihi seçin.', 'hata');
@@ -1524,6 +1612,7 @@
             modalKapat('ajandaModal');
             // Ay kayıt başlangıcına gitmez; seçili gün açık kalır
             if ($('takvimModal').classList.contains('acik')) takvimCiz();
+            ajandaOzetYenile();
             bildir(duzenle ? 'Ajanda kaydı güncellendi.' : 'Ajanda kaydı eklendi.', 'basari');
         } else {
             bildir(sonuc.message || 'Kayıt yapılamadı.', 'hata');
@@ -1542,6 +1631,7 @@
             panelVeri.ajanda = sonuc.ajanda;
             modalKapat('ajandaModal');
             if ($('takvimModal').classList.contains('acik')) takvimCiz();
+            ajandaOzetYenile();
             bildir('Ajanda kaydı silindi.', 'basari');
         } else {
             bildir(sonuc.message || 'Silinemedi.', 'hata');
@@ -1793,6 +1883,9 @@
             case 'takvim-gun': tk.secili = d.tarih; takvimCiz(); break;
             case 'takvim-ekle': takvimBuGuneEkle(d.tarih); break;
             case 'ajanda-ekle': ajandaAc(d.tarih, ''); break;
+            case 'ajanda-ozet-ac': ajandaOzetAc(); break;
+            case 'ajanda-yil': ao.yil = d.yil; ao.acik = {}; ajandaOzetiCiz(); break;
+            case 'ajanda-ay': ao.acik[d.ay] = !ao.acik[d.ay]; ajandaOzetiCiz(); break;
             case 'ajanda-duzenle': ajandaAc('', d.id); break;
             case 'ajanda-sil': ajandaSil(d.id); break;
             case 'ajanda-sil-modal': ajandaSil(aj.id); break;

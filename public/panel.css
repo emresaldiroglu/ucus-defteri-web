@@ -938,3 +938,10 @@ html[data-tema="nvg"] .aj-tur.secili { background: rgba(70,255,122,.25); color: 
 .ist-aj-hs { color: var(--yazi-soluk); font-size: 12px; font-variant-numeric: tabular-nums; }
 .ist-aj-top { border-color: var(--altin); }
 html[data-tema="acik"] .ist-aj-sayi { color: #b7700a; }
+
+/* Ajanda penceresi: ay ay */
+.ao-ay { width: 100%; text-align: left; color: var(--yazi); font-family: inherit; }
+.ao-ay.bos { opacity: .5; }
+.ao-ay.acik { border-color: var(--altin); }
+.ao-detay { display: flex; flex-direction: column; gap: 6px; margin: -2px 0 4px 10px; }
+.ao-detay .aj-satir { padding: 8px 10px; }
