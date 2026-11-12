@@ -165,7 +165,7 @@ const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
 // Ajanda: kurtarma, nöbet, yangın, izin gibi uçuş dışı kayıtlar (saat/istatistikleri etkilemez)
 const AJANDA_TURLERI = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
-const AJANDA_LIMITI = 500;
+const AJANDA_LIMITI = 5000;
 const AjandaSchema = new mongoose.Schema({
     userEmail: String,
     tur: String,
