@@ -1283,8 +1283,8 @@
     }
     function aralikGunEl(b, s) {
         var kap = eleman('span', 'liste-alt');
-        kap.appendChild(tarihGunEl(b));
-        if (s && s !== b) { kap.appendChild(document.createTextNode(' – ')); kap.appendChild(tarihGunEl(s)); }
+        kap.appendChild(tarihGunEl(b, true));
+        if (s && s !== b) { kap.appendChild(document.createTextNode(' – ')); kap.appendChild(tarihGunEl(s, true)); }
         return kap;
     }
 

@@ -960,3 +960,5 @@ html[data-tema="nvg"] .tk-gun-btn.secili.hs .tk-no { color: #fff; }
 .tk-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .tk-gun-btn { min-width: 0; }
 .aj-gun { margin-bottom: 8px; }
+.tarih-gun { white-space: nowrap; }
+.aj-satir .liste-alt { display: block; margin-left: 0; padding-left: 0; }
