@@ -163,15 +163,28 @@ const FlightSchema = new mongoose.Schema({
 });
 const Flight = mongoose.model('Flight', FlightSchema, 'flights');
 
+// Ajanda: kurtarma, nöbet, yangın, izin gibi uçuş dışı kayıtlar (saat/istatistikleri etkilemez)
+const AJANDA_TURLERI = ['kurtarma', 'nobet', 'yangin', 'izin', 'diger'];
+const AJANDA_LIMITI = 500;
+const AjandaSchema = new mongoose.Schema({
+    userEmail: String,
+    tur: String,
+    baslangic: String,
+    bitis: String,
+    not: String
+});
+const Ajanda = mongoose.model('Ajanda', AjandaSchema, 'ajanda');
+
 // Silinen uçuşların çöp kutusu: 30 gün sonra MongoDB kendiliğinden kalıcı olarak siler
 const SILINEN_SAKLAMA_GUN = 30;
 const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 5;
+const YENILIK_SURUMU = 6;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
+        '🗓️ Takvim artık ajanda olarak da kullanılıyor: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer kayıtlarını girebilirsin. Birkaç gün süren kayıtlar için başlangıç ve bitiş seç; kayıtlar saat ve istatistiklerini etkilemez.',
         '🔔 Panelin üstündeki turuncu uyarıları artık ✕ ile kaldırabilirsin. Kırmızı (15 gün ve altı) uyarılar kaldırılamaz. Kaldırdıklarını bandın altındaki "gizli uyarı" bağlantısından geri getirebilirsin.',
         '✈️ Uçuş listesi artık kapalı geliyor: ana ekranda "✈️ Uçuşlarım" şeridine dokununca açılır. Ekran kısaldı, kartlar ve sayaçlar hemen görünür.',
         '📖 Yeni Kılavuz: sağ üstteki ❓ düğmesiyle (ya da Profil → Kılavuz) her özelliğin nasıl kullanıldığını okuyabilir, kelime yazarak arayabilirsin.',
@@ -221,7 +234,8 @@ const KILAVUZ = [
     { baslik: '🔍 Arama ve raporlar', maddeler: [
         { b: '🔍 Ara (filtre)', m: 'Araç çubuğundaki "🔍 Ara" bir kutu açar. Yıl (1 Eylül dönemine göre), ay, hava aracı ve uçuş türüne göre listeyi süzersin, "Filtreyi Uygula"ya basarsın. Altta "Filtrelenen Süre" toplamı görünür. "Temizle" bütün seçimleri sıfırlar.' },
         { b: '📊 İstatistik ve dönem seçici', y: true, m: 'Üstte dönem düğmeleri bulunur: güncel dönem, geçmiş dönemler ve "Tümü". Seçilen dönem için toplam saat, uçuş sayısı, ortalama süre, aylık grafik (Eylül\'den Ağustos\'a), GGG/GŞ/Sim dağılımı ve hava aracına göre dağılım gösterilir. "Tümü" seçilince dönemleri yan yana karşılaştıran bir grafik çıkar.' },
-        { b: '📅 Takvim', m: 'Ay ay gezilen bir takvimdir, uçuş yapılan günler işaretlidir. Bir güne dokununca o günün uçuşları alta listelenir. "➕ Bu güne uçuş ekle" düğmesi tarihi forma yazar, diğer bilgileri sen doldurursun. "Bugün" düğmesi bugünün ayına döner.' },
+        { b: '📅 Takvim', m: 'Ay ay gezilen bir takvimdir, uçuş yapılan günler işaretlidir. Bir güne dokununca o günün uçuşları ve ajanda kayıtları alta listelenir. "➕ Bu güne uçuş ekle" düğmesi tarihi forma yazar, diğer bilgileri sen doldurursun. "Bugün" düğmesi bugünün ayına döner.' },
+        { b: '🗓️ Ajanda (Kurtarma, Nöb. Amir, Yangın, İzin)', y: true, m: 'Takvimde bir güne dokun, "🗓️ Ajanda ekle"ye bas. Türü seç (🚑 Kurtarma, 🛡️ Nöb. Amir, 🔥 Yangın, 🏖️ İzin, 📌 Diğer), istersen kısa not yaz. Birkaç gün süren nöbet ya da izin için başlangıç ve bitiş tarihini ayrı seç; aradaki bütün günler işaretlenir. Günlerde türüne göre renkli çizgi görünür. Kaydın yanındaki ✏️ ile düzeltir, 🗑️ ile (onay sorulduktan sonra) silersin. Ajanda hesabına kaydedilir, her cihazda aynıdır. Uçuş saatini, istatistiği, dönem hedefini ve sayaçları hiç etkilemez.' },
         { b: '🗑️ Silinenler', m: 'Sildiğin uçuşlar 30 gün saklanır. Her satırda kalıcı silinmeye kaç gün kaldığı yazar. "Geri yükle" uçuşu listeye döndürür, "Kalıcı sil" onay sorduktan sonra tamamen siler. 30 gün dolunca kayıt kendiliğinden silinir.' },
         { b: '⬇ CSV ve ⬇ PDF', m: 'CSV, uçuşlarını Excel gibi programlarda açabileceğin bir dosya olarak indirir. PDF, yazdırma penceresini açar, orada "PDF olarak kaydet"i seçersin. İkisi de ekranda o an süzülen listeyi (filtre uyguladıysan yalnızca onu) kapsar.' },
         { b: '📟 KDU', m: 'KDU sayfasını yeni bir sekmede açar.' }
@@ -565,6 +579,16 @@ function hesaplaUyarilar(flights, kayitliTarihler) {
     return liste.slice(0, 6);
 }
 
+function ajandaListesiHazirla(ajanda) {
+    return (ajanda || []).map(a => ({
+        id: String(a._id),
+        tur: a.tur || 'diger',
+        b: a.baslangic || '',
+        s: a.bitis || a.baslangic || '',
+        not: a.not || ''
+    })).sort((x, y) => x.b.localeCompare(y.b));
+}
+
 function sablonListesiHazirla(sablonlar) {
     return (sablonlar || []).map(t => ({
         id: String(t._id),
@@ -634,7 +658,7 @@ function ucusSatiriHtml(f) {
         </tr>`;
 }
 
-function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar, yenilikGoster) {
+function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar, yenilikGoster, ajanda) {
     profil = profil || {};
     const hedefSaat = profil.donemHedefSaat || DONEM_HEDEF_SAAT;
     const sablonListesi = sablonListesiHazirla(sablonlar);
@@ -657,6 +681,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
         aktifDonem: aktifDonem.yil,
         aracBazli: aracBazliDurum,
         sablonlar: sablonListesi,
+        ajanda: ajandaListesiHazirla(ajanda),
         donemUcuslari: aktifDonem.donemUcuslari.map(f => ({
             tarih: f.tarih,
             havaAraciTipi: f.havaAraciTipi,
@@ -902,7 +927,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
         <!-- TAKVİM MODALI -->
         <div id="takvimModal" class="modal-arka" role="dialog" aria-modal="true">
             <div class="modal-kutu genis">
-                <h3 class="modal-baslik">📅 Uçuş Takvimi</h3>
+                <h3 class="modal-baslik">📅 Takvim ve Ajanda</h3>
                 <div class="tk-ust">
                     <button type="button" class="tk-ok" data-eylem="takvim-onceki" aria-label="Önceki ay">‹</button>
                     <div class="tk-baslik"><b id="tkBaslik"></b><small id="tkOzet"></small></div>
@@ -916,6 +941,31 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                     <button type="button" class="btn-filtre" data-eylem="takvim-bugun">Bugün</button>
                     <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="takvimModal">Kapat</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- AJANDA KAYDI MODALI -->
+        <div id="ajandaModal" class="modal-arka" role="dialog" aria-modal="true">
+            <div class="modal-kutu kucuk">
+                <h3 class="modal-baslik" id="ajBaslik">🗓️ Ajanda Kaydı</h3>
+                <div class="aj-turler" id="ajTurler" role="group" aria-label="Kayıt türü">
+                    <button type="button" class="aj-tur" data-eylem="ajanda-tur" data-tur="kurtarma">🚑 Kurtarma</button>
+                    <button type="button" class="aj-tur" data-eylem="ajanda-tur" data-tur="nobet">🛡️ Nöb. Amir</button>
+                    <button type="button" class="aj-tur" data-eylem="ajanda-tur" data-tur="yangin">🔥 Yangın</button>
+                    <button type="button" class="aj-tur" data-eylem="ajanda-tur" data-tur="izin">🏖️ İzin</button>
+                    <button type="button" class="aj-tur" data-eylem="ajanda-tur" data-tur="diger">📌 Diğer</button>
+                </div>
+                <div class="aj-tarihler">
+                    <div><label for="ajBas">Başlangıç</label><input type="date" id="ajBas"></div>
+                    <div><label for="ajBit">Bitiş</label><input type="date" id="ajBit"></div>
+                </div>
+                <label for="ajNot">Not (isteğe bağlı)</label>
+                <input type="text" id="ajNot" maxlength="100" autocomplete="off" placeholder="Örn. 1. vardiya">
+                <div class="modal-butonlar">
+                    <button type="button" class="btn-tamam" data-eylem="ajanda-kaydet">Kaydet</button>
+                    <button type="button" class="btn-iptal" data-eylem="modal-kapat" data-modal="ajandaModal">İptal</button>
+                </div>
+                <button type="button" class="btn-tehlike aj-sil" id="ajSil" data-eylem="ajanda-sil-modal" hidden>🗑️ Bu kaydı sil</button>
             </div>
         </div>
 
@@ -1188,9 +1238,10 @@ const loginHandler = async (req, res) => {
 
         const flights = await Flight.find({ userEmail: email }).sort({ tarih: -1 });
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
+        const ajanda = await Ajanda.find({ userEmail: email });
 
         res.set('Cache-Control', 'no-store');
-        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar, (user.gorulenSurum || 0) < YENILIK_SURUMU));
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar, (user.gorulenSurum || 0) < YENILIK_SURUMU, ajanda));
     } catch (error) {
         console.error(error);
         if (cerezle) return res.status(500).send("Sunucu hatası.");
@@ -1433,6 +1484,66 @@ app.post('/api/yenilik-goruldu', oturumGerekli, async (req, res) => {
     try {
         await User.updateOne({ email: req.oturumEmail }, { $set: { gorulenSurum: YENILIK_SURUMU } });
         res.json({ success: true });
+    } catch (e) { res.json({ success: false }); }
+});
+
+// --- AJANDA (kurtarma, nöbetçi amir, yangın, izin, diğer) ---
+
+function ajandaGovdesiniDogrula(g) {
+    g = g || {};
+    const tarihTamam = (t) => metinMi(t) && /^\d{4}-\d{2}-\d{2}$/.test(t) && !isNaN(new Date(t).getTime());
+    if (!metinMi(g.tur) || !AJANDA_TURLERI.includes(g.tur)) return { hata: 'Geçersiz kayıt türü.' };
+    if (!tarihTamam(g.baslangic)) return { hata: 'Geçersiz başlangıç tarihi.' };
+    const bitis = (g.bitis === undefined || g.bitis === null || g.bitis === '') ? g.baslangic : g.bitis;
+    if (!tarihTamam(bitis)) return { hata: 'Geçersiz bitiş tarihi.' };
+    if (bitis < g.baslangic) return { hata: 'Bitiş tarihi başlangıçtan önce olamaz.' };
+    const gun = Math.round((new Date(bitis) - new Date(g.baslangic)) / 86400000) + 1;
+    if (gun > 366) return { hata: 'Bir kayıt en fazla 366 gün sürebilir.' };
+    let not = '';
+    if (g.not !== undefined && g.not !== null) {
+        if (!metinMi(g.not)) return { hata: 'Geçersiz not.' };
+        not = g.not.replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+        if (not.length > 100) return { hata: 'Not en fazla 100 karakter olabilir.' };
+    }
+    return { veri: { tur: g.tur, baslangic: g.baslangic, bitis, not } };
+}
+
+async function ajandaYanit(res, email) {
+    const liste = await Ajanda.find({ userEmail: email });
+    res.json({ success: true, ajanda: ajandaListesiHazirla(liste) });
+}
+
+app.post('/api/ajanda-ekle', oturumGerekli, async (req, res) => {
+    const d = ajandaGovdesiniDogrula(req.body);
+    if (d.hata) return res.json({ success: false, message: d.hata });
+    try {
+        const adet = await Ajanda.countDocuments({ userEmail: req.oturumEmail });
+        if (adet >= AJANDA_LIMITI) return res.json({ success: false, message: `En fazla ${AJANDA_LIMITI} ajanda kaydı tutulabilir. Eski kayıtları silin.` });
+        await new Ajanda({ userEmail: req.oturumEmail, ...d.veri }).save();
+        await ajandaYanit(res, req.oturumEmail);
+    } catch (e) { res.json({ success: false }); }
+});
+
+app.post('/api/ajanda-guncelle', oturumGerekli, async (req, res) => {
+    const g = req.body || {};
+    if (!metinMi(g.id) || !mongoose.isValidObjectId(g.id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
+    const d = ajandaGovdesiniDogrula(g);
+    if (d.hata) return res.json({ success: false, message: d.hata });
+    try {
+        // Yalnızca oturumdaki kullanıcının kendi kaydı değiştirilebilir
+        const sonuc = await Ajanda.updateOne({ _id: g.id, userEmail: req.oturumEmail }, { $set: d.veri });
+        const eslesen = (sonuc && (sonuc.matchedCount !== undefined ? sonuc.matchedCount : sonuc.n)) || 0;
+        if (!eslesen) return res.json({ success: false, message: 'Kayıt bulunamadı.' });
+        await ajandaYanit(res, req.oturumEmail);
+    } catch (e) { res.json({ success: false }); }
+});
+
+app.delete('/api/ajanda-sil', oturumGerekli, async (req, res) => {
+    const { id } = req.body || {};
+    if (!metinMi(id) || !mongoose.isValidObjectId(id)) return res.json({ success: false, message: 'Geçersiz kayıt.' });
+    try {
+        await Ajanda.deleteOne({ _id: id, userEmail: req.oturumEmail });
+        await ajandaYanit(res, req.oturumEmail);
     } catch (e) { res.json({ success: false }); }
 });
 
@@ -1744,6 +1855,7 @@ app.delete('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
 
         const ucusSonuc = await Flight.deleteMany({ userEmail: emailFiltresi(email) });
         await DeletedFlight.deleteMany({ userEmail: emailFiltresi(email) });
+        await Ajanda.deleteMany({ userEmail: emailFiltresi(email) });
         const tarihSonuc = await ReportDate.deleteMany({ userEmail: emailFiltresi(email) });
         await User.deleteOne({ email });
 

@@ -900,3 +900,27 @@ html[data-tema="acik"] .uyari-alani .uyari-daha { background: rgba(0,0,0,.05); b
 html[data-tema="acik"] .uyari-geri b { background: rgba(0,0,0,.08); }
 html[data-tema="nvg"] .uyari-alani .uyari-daha { background: rgba(57,255,20,.06); border-color: rgba(57,255,20,.3); }
 html[data-tema="nvg"] .uyari-geri b { background: rgba(57,255,20,.14); }
+
+/* Ajanda */
+.tk-aj-noktalar { display: flex; gap: 3px; margin-top: 1px; }
+.tk-aj-noktalar i { width: 8px; height: 3px; border-radius: 2px; display: block; }
+.aj-kurtarma { --aj: #ff6b6b; } .aj-nobet { --aj: #b794f6; } .aj-yangin { --aj: #ff9f43; } .aj-izin { --aj: #3ddc97; } .aj-diger { --aj: #9aa8c2; }
+.tk-aj-noktalar i { background: var(--aj); }
+.tk-gun-btn.ajandali:not(.dolu):not(.secili) { border-color: rgba(255,255,255,.22); }
+.tk-ekle-satir { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.aj-satir { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--cam); border: 1px solid var(--cizgi); border-left: 5px solid var(--aj); }
+.aj-butonlar { display: flex; gap: 6px; }
+.aj-ikon { width: 36px; height: 36px; padding: 0; border-radius: 10px; background: rgba(255,255,255,.08); border: 1px solid var(--cizgi); font-size: 15px; }
+.aj-turler { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.aj-tur { width: auto; padding: 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--cam); border: 1px solid var(--cizgi); color: var(--yazi); }
+.aj-tur.secili { background: linear-gradient(135deg, var(--mavi), var(--mavi-koyu)); color: #fff; border-color: transparent; }
+.aj-tarihler { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.aj-sil { margin-top: 10px; width: 100%; }
+.aj-sil[hidden] { display: none; }
+html[data-tema="acik"] .aj-ikon { background: rgba(0,0,0,.05); }
+html[data-tema="acik"] .tk-gun-btn.ajandali:not(.dolu):not(.secili) { border-color: rgba(0,0,0,.2); }
+html[data-tema="nvg"] .aj-tur.secili { background: rgba(70,255,122,.25); color: #eaffef; border: 1px solid rgba(70,255,122,.6); }
+.aj-tarihler > div { min-width: 0; }
+.aj-tarihler input { width: 100%; min-width: 0; box-sizing: border-box; }
+.aj-satir > div:first-child { min-width: 0; }
+.aj-tarihler input { padding-left: 10px; padding-right: 6px; font-size: 14px; }
