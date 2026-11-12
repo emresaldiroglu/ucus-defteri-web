@@ -316,7 +316,7 @@
         ust.appendChild(eleman('h2', null, u.email));
         ust.appendChild(eleman('div', 'kayit', 'Kayıt: ' + (u.kayit ? trZaman(u.kayit) : '-')));
         var bg = eleman('div', 'buton-grubu');
-        bg.appendChild(dugme('✈️ Uçuş ekle', 'btn btn-tamam', 'ucus-ekle'));
+        bg.appendChild(dugme('🚁 Uçuş ekle', 'btn btn-tamam', 'ucus-ekle'));
         bg.appendChild(dugme('🔑 Şifre sıfırla', 'btn btn-mavi', 'sifre-sifirla'));
         bg.appendChild(dugme('🗑️ Hesabı sil', 'btn btn-tehlike', 'kullanici-sil'));
         ust.appendChild(bg);

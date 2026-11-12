@@ -962,3 +962,6 @@ html[data-tema="nvg"] .tk-gun-btn.secili.hs .tk-no { color: #fff; }
 .aj-gun { margin-bottom: 8px; }
 .tarih-gun { white-space: nowrap; }
 .aj-satir .liste-alt { display: block; margin-left: 0; padding-left: 0; }
+
+/* Marka: helikopter simgesi */
+.marka-svg { width: 24px; height: 24px; display: block; }

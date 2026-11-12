@@ -181,20 +181,21 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 9;
+const YENILIK_SURUMU = 10;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
+        '🚁 Uçak simgeleri helikopter oldu: uygulamanın logosu, düğmelerdeki simgeler ve ana ekrana eklenen uygulama ikonu artık helikopter. Ana ekrandaki ikon, uygulamayı kaldırıp yeniden eklediğinde değişir.',
         '📅 Ajanda ve takvimde tarihlerin yanında artık gün adı yazıyor (Pzt, Sal… Cmt, Paz). Cumartesi ve Pazar kırmızı görünür; takvimde hafta sonu sütunları da kırmızıdır. NVG temasında kırmızı yerine parlak yeşil vurgu kullanılır.',
         '🗓️ Yeni "🗓️ Ajanda" düğmesi: seçtiğin yılda ay ay ne yaptığını (nöbet, kurtarma, yangın, izin) görürsün. Yıl olarak normal takvim yılı (Ocak–Aralık) esas alınır; Cumartesi ve Pazar günleri ayrı sayılır.',
         '🗓️ Takvim artık ajanda olarak da kullanılıyor: Kurtarma, Nöb. Amir, Yangın, İzin ve Diğer kayıtlarını girebilirsin. Birkaç gün süren kayıtlar için başlangıç ve bitiş seç; kayıtlar saat ve istatistiklerini etkilemez.',
         '🔔 Panelin üstündeki turuncu uyarıları artık ✕ ile kaldırabilirsin. Kırmızı (15 gün ve altı) uyarılar kaldırılamaz. Kaldırdıklarını bandın altındaki "gizli uyarı" bağlantısından geri getirebilirsin.',
-        '✈️ Uçuş listesi artık kapalı geliyor: ana ekranda "✈️ Uçuşlarım" şeridine dokununca açılır. Ekran kısaldı, kartlar ve sayaçlar hemen görünür.',
+        '🚁 Uçuş listesi artık kapalı geliyor: ana ekranda "🚁 Uçuşlarım" şeridine dokununca açılır. Ekran kısaldı, kartlar ve sayaçlar hemen görünür.',
         '📖 Yeni Kılavuz: sağ üstteki ❓ düğmesiyle (ya da Profil → Kılavuz) her özelliğin nasıl kullanıldığını okuyabilir, kelime yazarak arayabilirsin.',
         '📊 İstatistik artık dönem dönem incelenebiliyor: güncel dönem, geçmiş dönemler ve "Tümü" (dönemleri karşılaştırma grafiğiyle).',
         '✅ Muayene, Alet Kart ve Standardizasyon kartlarına dokununca çıkan pencerede "Bugün yenilendi" düğmesi var: tek dokunuşla bugünün tarihi kaydedilir, yanlışlıkla basarsan "Geri al" ile eski tarihe dönersin.',
         '🟢 NVG (gece görüş) teması geldi: sağ üstteki tema düğmesine bastıkça koyu → açık → NVG sırasıyla geçer, seçimin hatırlanır.'
     ]},
-    { baslik: '✈️ Uçuş kaydı', maddeler: [
+    { baslik: '🚁 Uçuş kaydı', maddeler: [
         'Süreyi iPhone tarzı tekerlekle seçersin. 24 saati aşan eskiye dönük süreler için "toplu süre" kutucuğu var, listede "toplu" etiketiyle görünür.',
         'Kayıtlı uçuşları ✏️ Düzenle ile değiştirebilirsin.',
         'Sildiğin uçuş 30 gün boyunca 🗑️ Silinenler\'de bekler; "Geri al" ile ya da Silinenler\'den geri getirebilirsin.',
@@ -218,15 +219,15 @@ const YENILIKLER = [
 // "Kılavuz": her özelliğin kullanımını anlatan kalıcı yardım listesi. y: true → "yeni" etiketi gösterilir.
 // Yeni bir özellik eklendiğinde buraya maddesi de eklenir.
 const KILAVUZ = [
-    { baslik: '✈️ Uçuş ekleme', maddeler: [
-        { b: 'Yeni uçuş nasıl eklenir?', m: 'Ana ekrandaki "✈️ Yeni Uçuş Saati Girmek İçin Tıkla" şeridine dokun, form açılır. Tarihi, hava aracını, eğitim sınıflandırmasını (GGG, GŞ ya da AU(SİM)) ve süreyi seç, istersen görev açıklaması yaz, sonra "✈️ Uçuşu Ekle"ye bas. Kaydetmeden önce onay sorulur. Tarih kutusu her zaman bugünle açılır.' },
+    { baslik: '🚁 Uçuş ekleme', maddeler: [
+        { b: 'Yeni uçuş nasıl eklenir?', m: 'Ana ekrandaki "🚁 Yeni Uçuş Saati Girmek İçin Tıkla" şeridine dokun, form açılır. Tarihi, hava aracını, eğitim sınıflandırmasını (GGG, GŞ ya da AU(SİM)) ve süreyi seç, istersen görev açıklaması yaz, sonra "🚁 Uçuşu Ekle"ye bas. Kaydetmeden önce onay sorulur. Tarih kutusu her zaman bugünle açılır.' },
         { b: 'Süre nasıl girilir? (⏱️)', m: 'Süre kutusuna dokununca iPhone tarzı bir tekerlek açılır. Saati ve dakikayı parmağınla kaydırarak seç, "Tamam"a bas. Tek bir uçuş en fazla 24 saat olabilir.' },
         { b: '24 saati aşan toplu süre', y: true, m: 'Eski bir dönemden devreden toplam saati girmek istiyorsan süre kutusunun altındaki "24 saati aşan eskiye dönük toplu süre giriyorum" kutucuğunu işaretle. Tekerlek yerine saat ve dakika kutuları açılır (en fazla 1000 saat).\nBöyle kayıtlar listede "toplu" etiketiyle görünür, toplam saate ve dönem saatine dahil olur. İstatistikte uçuş sayısına ve ortalamaya katılmaz, şablon olarak kaydedilemez.' },
         { b: 'Son uçuşu kopyala (📋)', m: 'Form açıldığında en üstte listedeki son uçuşunun özeti ve "Son uçuşu kopyala" düğmesi durur. Basınca hava aracı, eğitim, süre ve açıklama forma yazılır. Tarihi ve süreyi kontrol edip uçuşu eklersin. Aynı tür uçuşları art arda girerken zaman kazandırır.' },
         { b: 'Şablonlar (⭐)', m: 'Sık yaptığın bir uçuşu bir kere forma doldurup "➕ Formdaki bilgileri şablon olarak kaydet"e bas ve ona bir ad ver (en fazla 30 karakter). Şablon, form alanında bir düğme olarak görünür. Dokununca araç, eğitim, süre ve açıklama forma yazılır (tarih bugün kalır). Şablonun yanındaki ✕ ile silinir. En fazla 10 şablon kaydedebilirsin.' }
     ]},
     { baslik: '📋 Uçuş listesi', maddeler: [
-        { b: '✈️ Uçuşlarım şeridi', y: true, m: 'Uçuş listesi ana ekranı uzatmasın diye kapalı gelir. "✈️ Uçuşlarım" şeridine dokununca liste açılır, tekrar dokununca kapanır. Şeridin yanında toplam kayıt sayın yazar. 🔍 Ara ile bir filtre uygularsan liste kendiliğinden açılır ve şeritte "12 / 47 kayıt" gibi süzülen sayı görünür. Uçuşu düzenlediğinde ya da sildiğinde liste açık kalır.' },
+        { b: '🚁 Uçuşlarım şeridi', y: true, m: 'Uçuş listesi ana ekranı uzatmasın diye kapalı gelir. "🚁 Uçuşlarım" şeridine dokununca liste açılır, tekrar dokununca kapanır. Şeridin yanında toplam kayıt sayın yazar. 🔍 Ara ile bir filtre uygularsan liste kendiliğinden açılır ve şeritte "12 / 47 kayıt" gibi süzülen sayı görünür. Uçuşu düzenlediğinde ya da sildiğinde liste açık kalır.' },
         { b: 'Uçuşun tam açıklaması', m: 'Listede görev açıklaması kısaltılır. Bir uçuş satırına dokunursan altında tam açıklama açılır, tekrar dokununca kapanır.' },
         { b: '✏️ Uçuşu düzenleme', m: 'Satırdaki "✏️ Düzenle" düğmesi tarihi, hava aracını, eğitimi, süreyi ve açıklamayı değiştirmeni sağlar. "Kaydet"e basınca liste, dönem saati ve sayaçlar yeniden hesaplanır.' },
         { b: '🗑️ Silme ve geri alma', m: 'Silmeden önce onay sorulur. Silince bildirimde "Geri al" düğmesi çıkar, hemen basarsan uçuş yerine döner. Basmasan bile uçuş 30 gün boyunca "🗑️ Silinenler"de bekler, oradan geri getirebilirsin.' },
@@ -697,7 +698,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
         <div class="container">
 
             <div class="marka">
-                <span class="marka-ikon" aria-hidden="true">✈</span>
+                <span class="marka-ikon" aria-hidden="true"><svg class="marka-svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g fill="currentColor" stroke="currentColor"><rect x="5" y="20" width="90" height="4.6" rx="2.3" stroke="none"/><rect x="46" y="23" width="5.6" height="9" stroke="none"/><path fill-rule="evenodd" stroke="none" d="M14 57C14 45 24 36 40 34L62 34C69 34 73 38 75 44L91 40 91 31 96.5 31 96.5 46 77 54C76 60 71 64 65 64L27 64C19 64 14 62 14 57ZM23 53C23 47 29 42 37 41.5L46 41.5 46 53Z"/><path d="M18.5 77H73M34 64V77M58 64V77" fill="none" stroke-width="3.8" stroke-linecap="round"/></g></svg></span>
                 <span class="marka-ad">Uçuş <b>Logbook</b></span>
                 <button type="button" class="tema-btn kilavuz-btn" data-eylem="kilavuz-ac" aria-label="Kılavuz: her özelliğin kullanımı" title="Kılavuz"><span aria-hidden="true">❓</span></button>
                 <button type="button" class="tema-btn" data-eylem="tema-degistir" aria-label="Tema: koyu / açık / NVG">
@@ -752,7 +753,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
 
             <div class="akordeon-container ekle-toggle-stil">
                 <button type="button" class="akordeon-toggle-btn ekle-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="ekleIcerikKutusu" data-ok="ekleOkIkon">
-                    <span>✈️ Yeni Uçuş Saati Girmek İçin Tıkla</span>
+                    <span>🚁 Yeni Uçuş Saati Girmek İçin Tıkla</span>
                     <span id="ekleOkIkon">▼</span>
                 </button>
                 <div id="ekleIcerikKutusu" class="akordeon-icerik">
@@ -779,7 +780,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                             <label class="toplu-onay"><input type="checkbox" id="topluKutu" data-eylem="toplu-degis" data-onek=""> 24 saati aşan eskiye dönük toplu süre giriyorum</label>
                         </div>
                         <div class="span-2"><label for="gorevAciklamasi">Görev Açıklaması:</label><textarea id="gorevAciklamasi" maxlength="1000"></textarea></div>
-                        <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">✈️ Uçuşu Ekle</button>
+                        <button type="button" id="btnUcusEkle" class="btn-ekle span-2" data-eylem="ucus-ekle">🚁 Uçuşu Ekle</button>
                     </form>
                 </div>
             </div>
@@ -809,7 +810,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
 
             <div class="akordeon-container liste-baslik-kutu">
                 <button type="button" class="akordeon-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="listeIcerikKutusu" data-ok="listeOkIkon">
-                    <span>✈️ Uçuşlarım <small id="listeOzet" class="liste-ozet">${esc(flights.length)} kayıt</small></span>
+                    <span>🚁 Uçuşlarım <small id="listeOzet" class="liste-ozet">${esc(flights.length)} kayıt</small></span>
                     <span id="listeOkIkon">▼</span>
                 </button>
             </div>
@@ -842,7 +843,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
         <!-- ARAÇ BAZLI DETAYLI SAYAÇ MODALI -->
         <div id="detayliSayacModal" class="modal-arka" role="dialog" aria-modal="true">
             <div class="modal-kutu">
-                <h3 id="sayacModalBaslik" class="modal-baslik">✈️ Hava Araçları Durumu</h3>
+                <h3 id="sayacModalBaslik" class="modal-baslik">🚁 Hava Araçları Durumu</h3>
                 <div id="sayacModalIcerik" class="modal-liste"></div>
                 <button type="button" class="btn-iptal modal-kapat-btn" data-eylem="modal-kapat" data-modal="detayliSayacModal">Kapat</button>
             </div>

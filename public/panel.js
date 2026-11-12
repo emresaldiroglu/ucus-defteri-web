@@ -670,7 +670,7 @@
         var toplam = 0;
         sonFiltreli.forEach(function (s) { toplam += sureDakika(s.dataset.sure); });
 
-        kap.appendChild(eleman('h1', '', '✈ Uçuş Logbook'));
+        kap.appendChild(eleman('h1', '', '🚁 Uçuş Logbook'));
         kap.appendChild(eleman('p', 'yz-alt',
             (mail ? mail.textContent + ' · ' : '') + trTarih(bugunDamga()) + (sonFiltreOzet ? ' · Filtre: ' + sonFiltreOzet : '')));
         kap.appendChild(eleman('p', 'yz-toplam',
