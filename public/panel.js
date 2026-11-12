@@ -1317,8 +1317,10 @@
             if (ajGun.length) {
                 hucre.classList.add('ajandali');
                 var ajNok = eleman('span', 'tk-aj-noktalar');
-                var gorulen = {};
-                ajGun.forEach(function (a) { if (!gorulen[a.tur]) { gorulen[a.tur] = true; ajNok.appendChild(eleman('i', 'aj-' + a.tur)); } });
+                var gorulen = {}, turSirasi = [];
+                ajGun.forEach(function (a) { if (!gorulen[a.tur]) { gorulen[a.tur] = true; turSirasi.push(a.tur); } });
+                turSirasi.slice(0, 3).forEach(function (tur) { ajNok.appendChild(eleman('span', 'aj-simge aj-' + tur, (AJ_TURLERI[tur] || AJ_TURLERI.diger).e)); });
+                if (turSirasi.length > 3) ajNok.appendChild(eleman('span', 'aj-simge aj-fazla', '+'));
                 hucre.appendChild(ajNok);
                 ajandaGunSayisi++;
             }

@@ -924,3 +924,8 @@ html[data-tema="nvg"] .aj-tur.secili { background: rgba(70,255,122,.25); color: 
 .aj-tarihler input { width: 100%; min-width: 0; box-sizing: border-box; }
 .aj-satir > div:first-child { min-width: 0; }
 .aj-tarihler input { padding-left: 10px; padding-right: 6px; font-size: 14px; }
+/* Takvim hücresinde ajanda simgeleri */
+.tk-aj-noktalar { gap: 1px; line-height: 1; flex-wrap: nowrap; justify-content: center; }
+.tk-aj-noktalar .aj-simge { font-size: 11px; line-height: 1; background: none; width: auto; height: auto; border-radius: 0; display: inline-block; }
+.tk-aj-noktalar .aj-fazla { font-size: 10px; font-weight: 800; opacity: .8; }
+@media (max-width: 420px) { .tk-aj-noktalar .aj-simge { font-size: 10px; } }
