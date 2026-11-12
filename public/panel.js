@@ -1071,7 +1071,9 @@
         if (gizli) {
             var g = document.createElement('button');
             g.type = 'button'; g.className = 'uyari-daha uyari-geri'; g.setAttribute('data-eylem', 'uyari-geri-getir');
-            g.textContent = '\u21A9 ' + gizli + ' gizli uyarı \u00B7 göster';
+            var gs = document.createElement('span'); gs.textContent = '\uD83D\uDD14 ' + gizli + ' gizli uyarı';
+            var gb = document.createElement('b'); gb.textContent = 'Göster';
+            g.appendChild(gs); g.appendChild(gb);
             alan.appendChild(g);
         }
         alan.hidden = !alan.children.length;
