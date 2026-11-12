@@ -124,6 +124,7 @@
             filtreleUcuslari();
             sonKopyaGuncelle();
             sablonlariCiz();
+            uyariBandiKur();
             if (listeAcikti) listeAc();
         } catch (e) {
             bildir('Panel yenilenemedi, sayfayı elle yenileyin.', 'hata');
@@ -1010,6 +1011,87 @@
     }
 
 
+    /* ---------- UYARI BANDI: turuncu uyarıları kaldırma (cihazda hatırlanır) ---------- */
+
+    var UYARI_ANAHTAR = 'uyariGizli';
+    function gizliUyarilar() {
+        try { var o = JSON.parse(localStorage.getItem(UYARI_ANAHTAR) || '{}'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; }
+    }
+    function gizliUyarilariKaydet(o) {
+        try { localStorage.setItem(UYARI_ANAHTAR, JSON.stringify(o)); } catch (e) { /* kayıt yoksa oturum boyunca geçerli */ }
+    }
+    var uyariOturumGizli = {};
+    var uyariTumuGoster = false;
+    function uyariBandiKur() {
+        var alan = document.querySelector('.uyari-alani');
+        if (!alan) return;
+        if (!alan._satirlar) {
+            alan._satirlar = Array.prototype.slice.call(alan.querySelectorAll('.uyari-satiri'));
+        }
+        var satirlar = alan._satirlar;
+        var kayit = gizliUyarilar();
+        // Artık listede olmayan (tarihi yenilenmiş) uyarıların kayıtlarını temizle
+        var var_ = {};
+        satirlar.forEach(function (s) { var_[s.getAttribute('data-anahtar')] = true; });
+        var temiz = {}, degisti = false;
+        Object.keys(kayit).forEach(function (k) { if (var_[k]) temiz[k] = true; else degisti = true; });
+        if (degisti) { gizliUyarilariKaydet(temiz); kayit = temiz; }
+        var gorunen = [], gizli = 0;
+        satirlar.forEach(function (s) {
+            var k = s.getAttribute('data-anahtar');
+            var kirmizi = s.classList.contains('uy-k');
+            var saklanmis = !kirmizi && (kayit[k] || uyariOturumGizli[k]);
+            var eskiX = s.querySelector('.uyari-kapat');
+            if (eskiX) eskiX.remove();
+            if (!kirmizi) {
+                var x = document.createElement('button');
+                x.type = 'button'; x.className = 'uyari-kapat';
+                x.setAttribute('data-eylem', 'uyari-kaldir');
+                x.setAttribute('aria-label', 'Uyarıyı kaldır');
+                x.textContent = '✕';
+                s.appendChild(x);
+            }
+            if (saklanmis) gizli++; else gorunen.push(s);
+        });
+        alan.textContent = '';
+        if (gorunen.length) {
+            alan.appendChild(gorunen[0]);
+            var geri = gorunen.slice(1);
+            if (geri.length) {
+                var d = document.createElement('button');
+                d.type = 'button'; d.className = 'uyari-daha'; d.setAttribute('data-eylem', 'uyari-ac');
+                d.setAttribute('aria-expanded', 'false');
+                d.textContent = '\u25BC ' + geri.length + ' uyarı daha';
+                var kutu = document.createElement('div');
+                kutu.className = 'uyari-gizli'; kutu.hidden = true;
+                geri.forEach(function (s) { kutu.appendChild(s); });
+                alan.appendChild(d); alan.appendChild(kutu);
+            }
+        }
+        if (gizli) {
+            var g = document.createElement('button');
+            g.type = 'button'; g.className = 'uyari-daha uyari-geri'; g.setAttribute('data-eylem', 'uyari-geri-getir');
+            g.textContent = '\u21A9 ' + gizli + ' gizli uyarı \u00B7 göster';
+            alan.appendChild(g);
+        }
+        alan.hidden = !alan.children.length;
+    }
+    function uyariKaldir(dugme) {
+        var satir = dugme.closest('.uyari-satiri');
+        if (!satir || satir.classList.contains('uy-k')) return;
+        var k = satir.getAttribute('data-anahtar');
+        var kayit = gizliUyarilar();
+        kayit[k] = true;
+        gizliUyarilariKaydet(kayit);
+        uyariOturumGizli[k] = true;
+        uyariBandiKur();
+    }
+    function uyariGeriGetir() {
+        gizliUyarilariKaydet({});
+        uyariOturumGizli = {};
+        uyariBandiKur();
+    }
+
     function uyariAcKapat(dugme) {
         var kutu = document.querySelector('.uyari-gizli');
         if (!kutu) return;
@@ -1496,6 +1578,8 @@
             case 'profil-modal': profilModalAc('bilgi'); break;
             case 'ekle-goster': modalKapat('profilModal'); eklemeKartiAc(); break;
             case 'uyari-ac': uyariAcKapat(hedef); break;
+            case 'uyari-kaldir': uyariKaldir(hedef); break;
+            case 'uyari-geri-getir': uyariGeriGetir(); break;
             case 'cop-ac': copAc(); break;
             case 'cop-geri': copGeriAl(d.id); break;
             case 'cop-sil': copKaliciSil(d.id); break;
@@ -1568,6 +1652,7 @@
     filtreleUcuslari();
     sonKopyaGuncelle();
     sablonlariCiz();
+    uyariBandiKur();
     if (panelVeri.yenilik) setTimeout(function () { yenilikAc(true); }, 500);
     eklemeKartiniBelirle();
     if (uygulamaModundaMi()) document.querySelectorAll('[data-eylem="ekle-goster"]').forEach(function (b) { b.hidden = true; });

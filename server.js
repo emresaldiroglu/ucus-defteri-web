@@ -169,9 +169,10 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 4;
+const YENILIK_SURUMU = 5;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
+        '🔔 Panelin üstündeki turuncu uyarıları artık ✕ ile kaldırabilirsin. Kırmızı (15 gün ve altı) uyarılar kaldırılamaz. Kaldırdıklarını bandın altındaki "gizli uyarı" bağlantısından geri getirebilirsin.',
         '✈️ Uçuş listesi artık kapalı geliyor: ana ekranda "✈️ Uçuşlarım" şeridine dokununca açılır. Ekran kısaldı, kartlar ve sayaçlar hemen görünür.',
         '📖 Yeni Kılavuz: sağ üstteki ❓ düğmesiyle (ya da Profil → Kılavuz) her özelliğin nasıl kullanıldığını okuyabilir, kelime yazarak arayabilirsin.',
         '📊 İstatistik artık dönem dönem incelenebiliyor: güncel dönem, geçmiş dönemler ve "Tümü" (dönemleri karşılaştırma grafiğiyle).',
@@ -235,7 +236,7 @@ const KILAVUZ = [
         { b: '☀️ Son uçuş sayacı (60 gün)', m: 'Son gerçek uçuşundan sonra 60 gün sayar, renkleri GGG sayacıyla aynıdır. Karta dokununca her hava aracı için ayrı durumu görürsün.' },
         { b: 'Muayene, Alet Kart ve Standardizasyon', m: 'Kartlara dokununca son yapıldığı tarihi girebilirsin. 1 Yıllık Muayene, Alet Kart ve Standardizasyon için 1 yıl, 4 Yıllık Muayene için 4 yıl sonrası hesaplanır. Kartta kalan gün ve "Son Tarih" yazar. Kalan süre 90 günün altına inince kart kırmızıya döner.' },
         { b: '✅ Bugün yenilendi', y: true, m: 'Muayene, Alet Kart ya da Standardizasyon kartına dokununca açılan pencerede "✅ Bugün yenilendi" düğmesi vardır. Basınca bugünün tarihi tek dokunuşla kaydedilir. Yanlışlıkla bastıysan çıkan bildirimdeki "Geri al" önceki tarihi geri getirir. Tarihi kendin seçmek istersen aynı pencerede tarih kutusu da durur.' },
-        { b: 'Uyarı bandı', m: 'Panelin üstünde, son tarihine 30 günden az kalan muayene, alet kart, standardizasyon ve 60 günlük sayaçlar için bir uyarı bandı çıkar. 15 gün ve altı kırmızı, diğerleri turuncudur. İlk uyarı görünür, "daha fazla uyarı" bağlantısı diğerlerini açar.' }
+        { b: 'Uyarı bandı', m: 'Panelin üstünde, son tarihine 30 günden az kalan muayene, alet kart, standardizasyon ve 60 günlük sayaçlar için bir uyarı bandı çıkar. 15 gün ve altı kırmızı, diğerleri turuncudur. Turuncu uyarıları satırdaki ✕ ile kaldırabilirsin (bu telefonda hatırlanır); kırmızı uyarılar kaldırılamaz. Kaldırdıklarını bandın altındaki "gizli uyarı" bağlantısıyla geri getirirsin. Tarihi yenilersen ya da uyarı kırmızıya dönerse yeniden görünür. İlk uyarı görünür, "daha fazla uyarı" bağlantısı diğerlerini açar.' }
     ]},
     { baslik: '👤 Hesap', maddeler: [
         { b: '👤 Profil', m: 'Mavi kartın altındaki adına (ad girmediysen e-postana) dokun. Ad soyad, boy, kilo, doğum tarihi, kan grubu ve dönem hedefini girip "Kaydet"e basarsın. Bu bilgiler isteğe bağlıdır ve yalnızca sen görürsün.' },
@@ -521,8 +522,9 @@ function hesaplaAracaGoreDetayliDurum(flights) {
 const UYARI_ESIGI_GUN = 30;
 function hesaplaUyarilar(flights, kayitliTarihler) {
     const liste = [];
-    const ekle = (simge, metin, kalan) => {
-        liste.push({ simge, metin, kalan, seviye: kalan <= 15 ? 'k' : 't' });
+    const ekle = (simge, metin, kalan, hedef) => {
+        const gun = hedef && !isNaN(hedef.getTime()) ? hedef.toISOString().slice(0, 10) : '';
+        liste.push({ simge, metin, kalan, seviye: kalan <= 15 ? 'k' : 't', anahtar: `${metin}|${gun}` });
     };
 
     // Tarihli belgeler: süresi dolmuşsa da gösterilir
@@ -539,7 +541,7 @@ function hesaplaUyarilar(flights, kayitliTarihler) {
         if (isNaN(hedef.getTime())) return;
         hedef.setFullYear(hedef.getFullYear() + yil);
         const kalan = getGunFarki(hedef);
-        if (kalan <= UYARI_ESIGI_GUN) ekle('⚠️', etiket, kalan);
+        if (kalan <= UYARI_ESIGI_GUN) ekle('⚠️', etiket, kalan, hedef);
     });
 
     // 60 günlük sayaçlar: araç bazında, süresi dolmak üzere olanlar (dolmuşlar gürültü yapmasın diye gösterilmez)
@@ -549,13 +551,13 @@ function hesaplaUyarilar(flights, kayitliTarihler) {
         if (sonGgg) {
             const h = new Date(sonGgg.tarih); h.setDate(h.getDate() + 60);
             const k = getGunFarki(h);
-            if (k >= 0 && k <= UYARI_ESIGI_GUN) ekle('🌙', `GGG sayacı (${arac.toUpperCase()})`, k);
+            if (k >= 0 && k <= UYARI_ESIGI_GUN) ekle('🌙', `GGG sayacı (${arac.toUpperCase()})`, k, h);
         }
         const sonGenel = gercek.find(f => f.havaAraciTipi === arac);
         if (sonGenel) {
             const h = new Date(sonGenel.tarih); h.setDate(h.getDate() + 60);
             const k = getGunFarki(h);
-            if (k >= 0 && k <= UYARI_ESIGI_GUN) ekle('⏳', `Son uçuş sayacı (${arac.toUpperCase()})`, k);
+            if (k >= 0 && k <= UYARI_ESIGI_GUN) ekle('⏳', `Son uçuş sayacı (${arac.toUpperCase()})`, k, h);
         }
     });
 
@@ -578,7 +580,7 @@ function uyariBandiHtml(uyarilar) {
     if (!uyarilar.length) return '';
     const satir = (u) => {
         const sag = u.kalan < 0 ? 'Süresi doldu' : (u.kalan === 0 ? 'Bugün doluyor' : `${u.kalan} gün kaldı`);
-        return `<div class="uyari-satiri uy-${u.seviye}"><span aria-hidden="true">${u.simge}</span><span>${esc(u.metin)}</span><b>${esc(sag)}</b></div>`;
+        return `<div class="uyari-satiri uy-${u.seviye}" data-anahtar="${esc(u.anahtar)}"><span aria-hidden="true">${u.simge}</span><span>${esc(u.metin)}</span><b>${esc(sag)}</b></div>`;
     };
     const geri = uyarilar.slice(1);
     return `<div class="uyari-alani" role="status">${satir(uyarilar[0])}${geri.length ? `<button type="button" class="uyari-daha" data-eylem="uyari-ac" aria-expanded="false">▼ ${geri.length} uyarı daha</button><div class="uyari-gizli" hidden>${geri.map(satir).join('')}</div>` : ''}</div>`;

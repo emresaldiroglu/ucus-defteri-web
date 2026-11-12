@@ -886,3 +886,8 @@ html[data-tema="nvg"] .profil-yardim-btn { background: rgba(70,255,122,.14); bor
 .liste-ozet { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--yazi-soluk); }
 .liste-icerik { display: none; }
 .liste-icerik.acik { display: block; }
+
+/* Uyarı bandı: kaldırma düğmesi */
+.uyari-kapat { width: 26px; height: 26px; min-width: 26px; padding: 0; margin-left: 6px; border-radius: 50%; background: rgba(255,255,255,.12); color: inherit; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.uyari-kapat:hover { filter: brightness(1.2); }
+.uyari-alani[hidden] { display: none; }
