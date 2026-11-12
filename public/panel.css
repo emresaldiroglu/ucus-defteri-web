@@ -880,3 +880,9 @@ html[data-tema="nvg"] .kv-yeni { background: #b8ff46; }
 .profil-yardim-btn { height: 40px; padding: 0 10px; border-radius: 12px; font-size: 13.5px; font-weight: 700; background: rgba(74,163,255,.16); border: 1px solid rgba(74,163,255,.4); color: var(--yazi); }
 html[data-tema="acik"] .profil-yardim-btn { color: var(--yazi); }
 html[data-tema="nvg"] .profil-yardim-btn { background: rgba(70,255,122,.14); border-color: rgba(70,255,122,.4); color: #eaffef; }
+
+/* ---------- Uçuşlarım: açılır liste ---------- */
+.liste-baslik-kutu { margin-bottom: 10px; }
+.liste-ozet { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--yazi-soluk); }
+.liste-icerik { display: none; }
+.liste-icerik.acik { display: block; }

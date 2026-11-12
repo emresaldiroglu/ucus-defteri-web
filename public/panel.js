@@ -113,6 +113,9 @@
             var yeni = doc.getElementById('uygulama');
             var yeniVeri = doc.getElementById('panelVeri');
             if (!yeni || !yeniVeri) { location.href = '/'; return; }
+            // Düzenleme/silme gibi işlemlerden sonra açık olan uçuş listesi açık kalsın
+            var listeKutu = $('listeIcerikKutusu');
+            var listeAcikti = !!(listeKutu && listeKutu.classList.contains('acik'));
             $('uygulama').innerHTML = yeni.innerHTML;
             $('panelVeri').textContent = yeniVeri.textContent;
             veriyiOku();
@@ -121,6 +124,7 @@
             filtreleUcuslari();
             sonKopyaGuncelle();
             sablonlariCiz();
+            if (listeAcikti) listeAc();
         } catch (e) {
             bildir('Panel yenilenemedi, sayfayı elle yenileyin.', 'hata');
         }
@@ -1351,6 +1355,18 @@
         if (dugme) dugme.setAttribute('aria-expanded', acildi ? 'true' : 'false');
     }
 
+    function listeAc() {
+        var kutu = $('listeIcerikKutusu');
+        if (!kutu || kutu.classList.contains('acik')) return;
+        kutu.classList.add('acik');
+        var ok = $('listeOkIkon');
+        if (ok) {
+            ok.textContent = '▲';
+            var d = ok.closest('.akordeon-toggle-btn');
+            if (d) d.setAttribute('aria-expanded', 'true');
+        }
+    }
+
     function detayKapat(id) {
         var d = $('detay-' + id);
         if (d) d.classList.remove('acik');
@@ -1413,6 +1429,11 @@
         }
 
         sonFiltreli = gorunur;
+        var ozet = $('listeOzet');
+        if (ozet) {
+            var tumKayit = document.querySelectorAll('.ucus-satiri').length;
+            ozet.textContent = (filtreAktif ? gorunur.length + ' / ' + tumKayit : tumKayit) + ' kayıt';
+        }
         sayfalamayiCiz(gorunur);
     }
 
@@ -1509,7 +1530,12 @@
             case 'tarih-kaydet': kaydetKategoriTarihi(hedef); break;
             case 'yenilendi': kategoriYenilendi(hedef); break;
             case 'modal-kapat': modalKapat(d.modal); break;
-            case 'filtre-uygula': mevcutSayfa = 1; filtreleUcuslari(); break;
+            case 'filtre-uygula':
+                mevcutSayfa = 1;
+                filtreleUcuslari();
+                // Süzülen sonucu görebilmek için liste açılır
+                if ($('filtreYil').value || $('filtreAy').value || $('filtreHavaAraci').value || $('filtreUcusTipi').value) listeAc();
+                break;
             case 'filtre-temizle': filtreleriTemizle(); break;
             case 'sayfa': mevcutSayfa = parseInt(d.sayfa, 10) || 1; filtreleUcuslari(); break;
         }

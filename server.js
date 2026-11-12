@@ -169,9 +169,10 @@ const TOPLU_SURE_LIMITI_SAAT = 1000;
 
 // "Yenilikler" penceresi: yeni bir güncelleme eklendiğinde sürüm numarası artırılır,
 // kullanıcılar bir sonraki girişlerinde pencereyi bir kez görür. Yeni kayıtlara gösterilmez.
-const YENILIK_SURUMU = 3;
+const YENILIK_SURUMU = 4;
 const YENILIKLER = [
     { baslik: '🆕 Son eklenenler', maddeler: [
+        '✈️ Uçuş listesi artık kapalı geliyor: ana ekranda "✈️ Uçuşlarım" şeridine dokununca açılır. Ekran kısaldı, kartlar ve sayaçlar hemen görünür.',
         '📖 Yeni Kılavuz: sağ üstteki ❓ düğmesiyle (ya da Profil → Kılavuz) her özelliğin nasıl kullanıldığını okuyabilir, kelime yazarak arayabilirsin.',
         '📊 İstatistik artık dönem dönem incelenebiliyor: güncel dönem, geçmiş dönemler ve "Tümü" (dönemleri karşılaştırma grafiğiyle).',
         '✅ Muayene, Alet Kart ve Standardizasyon kartlarına dokununca çıkan pencerede "Bugün yenilendi" düğmesi var: tek dokunuşla bugünün tarihi kaydedilir, yanlışlıkla basarsan "Geri al" ile eski tarihe dönersin.',
@@ -209,11 +210,12 @@ const KILAVUZ = [
         { b: 'Şablonlar (⭐)', m: 'Sık yaptığın bir uçuşu bir kere forma doldurup "➕ Formdaki bilgileri şablon olarak kaydet"e bas ve ona bir ad ver (en fazla 30 karakter). Şablon, form alanında bir düğme olarak görünür. Dokununca araç, eğitim, süre ve açıklama forma yazılır (tarih bugün kalır). Şablonun yanındaki ✕ ile silinir. En fazla 10 şablon kaydedebilirsin.' }
     ]},
     { baslik: '📋 Uçuş listesi', maddeler: [
+        { b: '✈️ Uçuşlarım şeridi', y: true, m: 'Uçuş listesi ana ekranı uzatmasın diye kapalı gelir. "✈️ Uçuşlarım" şeridine dokununca liste açılır, tekrar dokununca kapanır. Şeridin yanında toplam kayıt sayın yazar. 🔍 Ara ile bir filtre uygularsan liste kendiliğinden açılır ve şeritte "12 / 47 kayıt" gibi süzülen sayı görünür. Uçuşu düzenlediğinde ya da sildiğinde liste açık kalır.' },
         { b: 'Uçuşun tam açıklaması', m: 'Listede görev açıklaması kısaltılır. Bir uçuş satırına dokunursan altında tam açıklama açılır, tekrar dokununca kapanır.' },
         { b: '✏️ Uçuşu düzenleme', m: 'Satırdaki "✏️ Düzenle" düğmesi tarihi, hava aracını, eğitimi, süreyi ve açıklamayı değiştirmeni sağlar. "Kaydet"e basınca liste, dönem saati ve sayaçlar yeniden hesaplanır.' },
         { b: '🗑️ Silme ve geri alma', m: 'Silmeden önce onay sorulur. Silince bildirimde "Geri al" düğmesi çıkar, hemen basarsan uçuş yerine döner. Basmasan bile uçuş 30 gün boyunca "🗑️ Silinenler"de bekler, oradan geri getirebilirsin.' },
         { b: '🌙 GGG ve ☀️ GŞ renkleri', m: 'GGG (gece görüş gözlüğü) uçuşları gece renginde ve 🌙 simgesiyle, GŞ (gündüz) uçuşları güneş renginde ve ☀️ simgesiyle listelenir. AU(SİM) uçuşları sade görünür. Böylece uçuş türlerini bir bakışta ayırt edersin.' },
-        { b: 'Sayfalar', m: 'Liste her sayfada 10 uçuş gösterir. Listenin altındaki sayı düğmeleriyle diğer sayfalara geçersin.' }
+        { b: 'Sayfalar', m: 'Açık liste her sayfada 10 uçuş gösterir. Listenin altındaki sayı düğmeleriyle diğer sayfalara geçersin.' }
     ]},
     { baslik: '🔍 Arama ve raporlar', maddeler: [
         { b: '🔍 Ara (filtre)', m: 'Araç çubuğundaki "🔍 Ara" bir kutu açar. Yıl (1 Eylül dönemine göre), ay, hava aracı ve uçuş türüne göre listeyi süzersin, "Filtreyi Uygula"ya basarsın. Altta "Filtrelenen Süre" toplamı görünür. "Temizle" bütün seçimleri sıfırlar.' },
@@ -774,6 +776,14 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                 </div>
             </div>
 
+            <div class="akordeon-container liste-baslik-kutu">
+                <button type="button" class="akordeon-toggle-btn" aria-expanded="false" data-eylem="akordeon" data-icerik="listeIcerikKutusu" data-ok="listeOkIkon">
+                    <span>✈️ Uçuşlarım <small id="listeOzet" class="liste-ozet">${esc(flights.length)} kayıt</small></span>
+                    <span id="listeOkIkon">▼</span>
+                </button>
+            </div>
+
+            <div id="listeIcerikKutusu" class="liste-icerik">
             <div class="tablo-sarmal">
                 <table>
                     <thead><tr><th>Tarih</th><th>Hava Aracı</th><th>Eğitim</th><th>Süre</th><th>Görev Açıklaması</th><th>İşlem</th></tr></thead>
@@ -785,6 +795,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
             </div>
 
             <div id="sayfalamaAlani" class="sayfalama-alani"></div>
+            </div>
 
         </div>
 
