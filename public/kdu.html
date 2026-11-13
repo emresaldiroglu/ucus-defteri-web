@@ -7017,6 +7017,39 @@ function findNavDataByFreq(type, freqVal) {
                     else { showError("INVALID ENTRY"); } return;
                 } else { showError("INVALID ENTRY"); return; }
             }
+            // Yönlü/mesafeli nokta: "240/5.0" (basılan noktadan, sonrasına ekler) veya "NOKTA/240/5.0"
+            {
+                const numTok = "(\\d{1,3}(?:\\.\\d+)?)\\s*/\\s*(\\d{1,4}(?:\\.\\d+)?)";
+                const mRel = new RegExp("^" + numTok + "$").exec(raw);
+                const mNamed = new RegExp("^([^/]+?)\\s*/\\s*" + numTok + "$").exec(raw);
+                if(mRel || mNamed){
+                    const brg = parseFloat(mRel ? mRel[1] : mNamed[2]);
+                    const dist = parseFloat(mRel ? mRel[2] : mNamed[3]);
+                    if(!(brg >= 0 && brg <= 360) || !(dist > 0)){ showError("INVALID ENTRY"); return; }
+                    let ref = null, insertAt = list.length;
+                    if(mRel){
+                        // basılan noktaya göre; boş satıra basıldıysa son noktaya göre
+                        const refIdx = (globalIdx < list.length) ? globalIdx : list.length - 1;
+                        if(refIdx >= 0 && list[refIdx]){ ref = list[refIdx]; insertAt = refIdx + 1; }
+                    } else {
+                        const nm = mNamed[1].trim();
+                        const c = parseInitCoord(nm);
+                        if(c) ref = c;
+                        else {
+                            ref = (state.userWptDB || []).find(w => (w?.name ?? "").toString().trim().toUpperCase() === nm && Number.isFinite(w?.lat) && Number.isFinite(w?.lon))
+                               || list.find(w => w && (w.label || "").toString().trim().toUpperCase() === nm);
+                        }
+                        insertAt = (globalIdx < list.length) ? globalIdx : list.length;
+                    }
+                    if(!ref || !Number.isFinite(ref.lat) || !Number.isFinite(ref.lon)){ showError("INVALID ENTRY"); return; }
+                    const d = Geo.calcDestination(ref.lat, ref.lon, brg, dist);
+                    const nw = { lat: d.lat, lon: d.lon, label: null, mgrs: MGRS.fromLatLon(d.lat, d.lon) };
+                    if(mRel) list.splice(insertAt, 0, nw);
+                    else if(insertAt < list.length) list[insertAt] = nw;
+                    else list.push(nw);
+                    state.scratch = ""; state.selectedWptIdx = -1; render(); return;
+                }
+            }
             if (globalIdx <= list.length) {
                 if(raw === "") return;
                 let parsed = null;
