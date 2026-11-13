@@ -7566,7 +7566,7 @@ function findNavDataByFreq(type, freqVal) {
             const ap=MGRS.parseToApproxLatLon(raw); 
             if(ap){
               state.lat=ap.lat; state.lon=ap.lon;
-              if(state.userWptDB.length > 0 && state.userWptDB[0].name.trim() === "PPOS") { state.userWptDB[0].lat = state.lat; state.userWptDB[0].lon = state.lon; state.userWptDB[0].mgrs = state.manualMgrs; }
+              { const pp = state.userWptDB.find(w => (w.name || "").trim() === "PPOS"); if(pp){ pp.lat = state.lat; pp.lon = state.lon; pp.mgrs = state.manualMgrs; } }
             } 
             state.scratch=""; render();
           } else showError("INVALID ENTRY"); 
@@ -7575,7 +7575,7 @@ function findNavDataByFreq(type, freqVal) {
           const c=parseInitCoord(raw); 
           if(c){
             state.lat=c.lat; state.lon=c.lon; state.manualMgrs=null;
-            if(state.userWptDB.length > 0 && state.userWptDB[0].name.trim() === "PPOS") { state.userWptDB[0].lat = state.lat; state.userWptDB[0].lon = state.lon; state.userWptDB[0].mgrs = MGRS.fromLatLon(state.lat, state.lon); }
+            { const pp = state.userWptDB.find(w => (w.name || "").trim() === "PPOS"); if(pp){ pp.lat = state.lat; pp.lon = state.lon; pp.mgrs = MGRS.fromLatLon(state.lat, state.lon); } }
             state.scratch=""; render();
           } else showError("INVALID ENTRY"); 
         } 
@@ -8258,7 +8258,17 @@ function findNavDataByFreq(type, freqVal) {
                           return d1 - d2;
                       });
                   } else if(state.userWptSortMethod === "NEAR_SEL") {
-                      // Placeholder for NEAR SEL logic
+                      // Seçili noktaya yakınlığa göre sırala; seçili nokta başa gelir ve seçili kalır
+                      const sel = state.userWptDB[state.selectedUwptIdx];
+                      if(sel){
+                          state.userWptDB.sort((a, b) => {
+                              const d1 = Geo.calcDistance(sel.lat, sel.lon, a.lat, a.lon);
+                              const d2 = Geo.calcDistance(sel.lat, sel.lon, b.lat, b.lon);
+                              return d1 - d2;
+                          });
+                          state.selectedUwptIdx = state.userWptDB.indexOf(sel);
+                          state.userWptPage = 0;
+                      }
                   }
                   state.userWptSortMode = false;
                   render();
@@ -8276,7 +8286,7 @@ function findNavDataByFreq(type, freqVal) {
                   state.userWptSortMethod = "NEAR_PPOS";
                   performSort(); return;
               }
-              if(idx === 6) { /* NEAR SEL - Placeholder */ state.userWptSortMethod = "NEAR_SEL"; performSort(); return; }
+              if(idx === 6) { /* NEAR SEL */ state.userWptSortMethod = "NEAR_SEL"; performSort(); return; }
           }
           // Exit sort mode on other keys if needed, or just return
           return;
