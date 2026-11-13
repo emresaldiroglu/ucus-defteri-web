@@ -999,3 +999,14 @@ html[data-tema="acik"] .mh { color: rgba(20,34,61,.6); filter: none; }
 html[data-tema="nvg"] .mh { color: #46ff7a; filter: drop-shadow(0 0 5px rgba(70,255,122,.7)); }
 html[data-tema="nvg"] .mh-isik { background: #b8ff46; box-shadow: 0 0 5px 2px rgba(184,255,70,.8); }
 @media (prefers-reduced-motion: reduce) { .heli-seridi { display: none; } }
+
+/* Üst satır helikopteri: fener ve duman */
+.heli-seridi { --fener: rgba(210,230,255,.32); --duman: rgba(255,255,255,.9); }
+html[data-tema="acik"] .heli-seridi { --fener: rgba(20,34,61,.22); --duman: rgba(20,34,61,.8); }
+html[data-tema="nvg"] .heli-seridi { --fener: rgba(70,255,122,.34); --duman: #46ff7a; }
+.mh-fener { position: absolute; left: 2px; top: 17px; width: 18px; height: 30px; background: linear-gradient(to bottom, var(--fener), transparent); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); transform-origin: 50% 0; animation: mh-fener 4s ease-in-out infinite alternate; }
+@keyframes mh-fener { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+.mh-duman { position: absolute; left: 9px; top: 3px; width: var(--b); height: var(--b); border-radius: 50%; background: var(--duman); opacity: var(--o); filter: blur(.8px); visibility: hidden; margin-top: 9px; }
+.mh-duman-git { margin-left: 1px; animation: mh-git 28s linear calc(2s + var(--g)) infinite; }
+.mh-duman-don { margin-left: 17px; animation: mh-don 28s linear calc(2s + var(--g)) infinite; }
+@media (prefers-reduced-motion: reduce) { .mh-duman, .mh-fener { display: none; } }
