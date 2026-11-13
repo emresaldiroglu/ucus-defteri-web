@@ -70,17 +70,45 @@
 
         /* Gökyüzünden geçen uçak */
         .ucak-yolu {
-            position: fixed; left: 0; right: 0; top: 14%; height: 40px;
+            position: fixed; left: 0; right: 0; top: 14%; height: 190px;
             pointer-events: none; z-index: 0; overflow: hidden;
         }
-        .ucak-yolu svg {
-            position: absolute; top: 0; left: -60px; width: 34px; height: 34px;
+        /* Helikopter ve ona bağlı efektler (aynı yolu izler) */
+        .heli, .iz-nokta { position: absolute; left: -60px; animation: gec 38s linear infinite; }
+        .heli { top: 0; width: 34px; height: 34px; }
+        .heli > svg {
+            display: block; width: 34px; height: 34px;
             color: rgba(255,255,255,.55);
             filter: drop-shadow(0 0 6px rgba(74,163,255,.6));
-            animation: gec 38s linear infinite;
         }
-        .ucak-yolu svg .rotor { transform-box: fill-box; transform-origin: center; animation: rotor .22s linear infinite alternate; }
+        .heli > svg .rotor { transform-box: fill-box; transform-origin: center; animation: rotor .22s linear infinite alternate; }
         @keyframes rotor { from { transform: scaleX(1); } to { transform: scaleX(.78); } }
+        /* Egzoz izi: aynı yolu biraz geriden izleyen, solan noktalar */
+        .iz-nokta {
+            top: 13px; left: -58px; width: var(--b); height: var(--b); border-radius: 50%;
+            background: rgba(255,255,255,.9); opacity: var(--o); filter: blur(1px);
+            animation-delay: var(--g);
+        }
+        /* Çakar ışıklar */
+        .isik { position: absolute; width: 4px; height: 4px; border-radius: 50%; opacity: .15; animation: cakar 1.4s linear infinite; }
+        .isik.kirmizi { left: 2px; top: 10px; background: #ff4d4d; box-shadow: 0 0 6px 2px rgba(255,77,77,.8); }
+        .isik.beyaz { left: 15px; top: 28px; background: #fff; box-shadow: 0 0 6px 2px rgba(255,255,255,.8); animation-delay: .7s; }
+        @keyframes cakar { 0%, 84%, 100% { opacity: .12; } 88%, 94% { opacity: 1; } 91% { opacity: .25; } }
+        /* Projektör ışığı */
+        .projektor {
+            position: absolute; left: 2px; top: 29px; width: 30px; height: 120px;
+            background: linear-gradient(to bottom, rgba(210,230,255,.24), rgba(210,230,255,0));
+            clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+            transform-origin: 50% 0; animation: sallan 5s ease-in-out infinite alternate;
+        }
+        @keyframes sallan { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+        /* Rotor rüzgârı */
+        .ruzgar { position: absolute; left: 4px; top: 37px; width: 26px; height: 10px; }
+        .ruzgar i { position: absolute; left: 0; right: 0; height: 1.5px; border-radius: 2px; background: rgba(255,255,255,.35); animation: ruzgar .5s ease-in-out infinite alternate; }
+        .ruzgar i:nth-child(1) { top: 0; }
+        .ruzgar i:nth-child(2) { top: 4px; left: 3px; right: 3px; animation-delay: .12s; }
+        .ruzgar i:nth-child(3) { top: 8px; left: 6px; right: 6px; animation-delay: .24s; }
+        @keyframes ruzgar { from { transform: scaleX(.65); opacity: .15; } to { transform: scaleX(1); opacity: .65; } }
         @keyframes gec {
             0%   { transform: translate(0, 0); }
             25%  { transform: translate(calc((100vw + 120px) * .25), -4px); }
@@ -283,7 +311,7 @@
             .tanitim p { display: none; }
         }
         @media (prefers-reduced-motion: reduce) {
-            .yildizlar, .ucak-yolu svg, .ucak-yolu svg .rotor, .mesaj.goster, .form-box.active { animation: none; }
+            .yildizlar, .heli, .iz-nokta, .heli > svg .rotor, .isik, .projektor, .ruzgar i, .mesaj.goster, .form-box.active { animation: none; }
             .tab-menu::before { transition: none; }
         }
     </style>
@@ -292,7 +320,18 @@
 
 <div class="yildizlar" aria-hidden="true"></div>
 <div class="ucak-yolu" aria-hidden="true">
-    <svg viewBox="0 0 100 100" focusable="false"><g fill="currentColor" stroke="currentColor" transform="translate(100 0) scale(-1 1)"><rect class="rotor" x="5" y="20" width="90" height="4.6" rx="2.3" stroke="none"/><rect x="46" y="23" width="5.6" height="9" stroke="none"/><path fill-rule="evenodd" stroke="none" d="M14 57C14 45 24 36 40 34L62 34C69 34 73 38 75 44L91 40 91 31 96.5 31 96.5 46 77 54C76 60 71 64 65 64L27 64C19 64 14 62 14 57ZM23 53C23 47 29 42 37 41.5L46 41.5 46 53Z"/><path d="M18.5 77H73M34 64V77M58 64V77" fill="none" stroke-width="3.8" stroke-linecap="round"/></g></svg>
+    <i class="iz-nokta" style="--g:0.5s;--o:0.34;--b:4px"></i>
+    <i class="iz-nokta" style="--g:1.0s;--o:0.28;--b:4px"></i>
+    <i class="iz-nokta" style="--g:1.5s;--o:0.22;--b:5px"></i>
+    <i class="iz-nokta" style="--g:2.0s;--o:0.16;--b:5px"></i>
+    <i class="iz-nokta" style="--g:2.5s;--o:0.1;--b:6px"></i>
+    <i class="iz-nokta" style="--g:3.0s;--o:0.06;--b:6px"></i>
+    <div class="heli">
+        <svg viewBox="0 0 100 100" focusable="false"><g fill="currentColor" stroke="currentColor" transform="translate(100 0) scale(-1 1)"><rect class="rotor" x="5" y="20" width="90" height="4.6" rx="2.3" stroke="none"/><rect x="46" y="23" width="5.6" height="9" stroke="none"/><path fill-rule="evenodd" stroke="none" d="M14 57C14 45 24 36 40 34L62 34C69 34 73 38 75 44L91 40 91 31 96.5 31 96.5 46 77 54C76 60 71 64 65 64L27 64C19 64 14 62 14 57ZM23 53C23 47 29 42 37 41.5L46 41.5 46 53Z"/><path d="M18.5 77H73M34 64V77M58 64V77" fill="none" stroke-width="3.8" stroke-linecap="round"/></g></svg>
+        <span class="projektor"></span>
+        <span class="ruzgar"><i></i><i></i><i></i></span>
+        <i class="isik kirmizi"></i><i class="isik beyaz"></i>
+    </div>
 </div>
 
 <div class="sahne">
