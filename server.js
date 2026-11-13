@@ -110,6 +110,48 @@ app.use(bodyParser.json());
     });
 });
 
+const KDU_ID = process.env.KDU_ID || '14donem';
+const KDU_SIFRE = process.env.KDU_SIFRE || 'jandarma123';
+// KDU sayfası public/ dışında tutulur; yalnızca giriş yapmış kullanıcıya verilir
+app.get('/kdu.html', (req, res) => {
+    if (!oturumOku(req)) return res.redirect('/');
+    res.set('Cache-Control', 'no-store');
+    // Kullanıcı uygulamaya zaten doğrulanarak girdiği için ID/şifre alanları hazır gelir.
+    // Değerler yalnızca giriş yapmış kullanıcıya, sunucudan eklenir (dosyada saklanmaz).
+    fs.readFile(path.join(__dirname, 'kdu', 'kdu.html'), 'utf8', (err, html) => {
+        if (err) return res.status(404).send('KDU bulunamadi');
+        const giris = JSON.stringify({ id: KDU_ID, sifre: KDU_SIFRE }).replace(/</g, '\\u003c');
+        res.type('html').send(html.replace('<head>', '<head><script>window.__KDU_GIRIS=' + giris + ';</script>'));
+    });
+});
+
+// KDU ekranındaki ID/şifre kontrolü sunucuda yapılır (istemci kodunda şifre tutulmaz).
+// Render ortam değişkenleri: KDU_ID ve KDU_SIFRE (tanımlı değilse aşağıdaki varsayılanlar kullanılır).
+function kduSabitKarsilastir(girilen, beklenen) {
+    const a = crypto.createHash('sha256').update(String(girilen)).digest();
+    const b = crypto.createHash('sha256').update(String(beklenen)).digest();
+    return crypto.timingSafeEqual(a, b);
+}
+const kduDenemeler = new Map(); // e-posta -> { sayi, ilk }
+app.post('/api/kdu-giris', oturumGerekli, (req, res) => {
+    const simdi = Date.now();
+    const kayit = kduDenemeler.get(req.oturumEmail);
+    if (kayit && simdi - kayit.ilk < 10 * 60 * 1000 && kayit.sayi >= 10) {
+        return res.status(429).json({ success: false, message: "Çok fazla deneme, biraz sonra tekrar dene." });
+    }
+    const id = (req.body && req.body.id) || '';
+    const sifre = (req.body && req.body.sifre) || '';
+    const idOk = kduSabitKarsilastir(id, KDU_ID);
+    const sifreOk = kduSabitKarsilastir(sifre, KDU_SIFRE);
+    if (idOk && sifreOk) {
+        kduDenemeler.delete(req.oturumEmail);
+        return res.json({ success: true });
+    }
+    if (!kayit || simdi - kayit.ilk >= 10 * 60 * 1000) kduDenemeler.set(req.oturumEmail, { sayi: 1, ilk: simdi });
+    else kayit.sayi += 1;
+    res.json({ success: false });
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { index: false })); // '/' adresini aşağıdaki rota yönetir
 
 const mongoURI = process.env.MONGO_URI;
