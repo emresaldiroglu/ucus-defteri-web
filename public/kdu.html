@@ -2916,6 +2916,101 @@ button[data-k="BRT"]::before {
     ],
   };
 
+  // Türkiye havalimanları (ICAO kodu adıyla, ARP koordinatları) — kaynak: Türkiye Havalimanları Kodları ve Koordinatları Listesi
+  (function seedTurkiyeHavalimanlari(){
+    const HAVALIMANLARI = [
+    ["LTAB",39.93472,32.74056],
+    ["LTAC",40.12806,32.99500],
+    ["LTAD",39.94972,32.68861],
+    ["LTAE",40.07889,32.56556],
+    ["LTAF",36.98194,35.28028],
+    ["LTAG",37.00194,35.42583],
+    ["LTAH",38.72639,30.60111],
+    ["LTAI",36.90028,30.79278],
+    ["LTAJ",36.94778,37.47889],
+    ["LTAK",36.57444,36.15333],
+    ["LTAL",41.31380,33.79490],
+    ["LTAN",37.97889,32.56167],
+    ["LTAO",38.35389,38.25389],
+    ["LTAP",40.82917,35.52194],
+    ["LTAQ",41.27861,36.30528],
+    ["LTAR",39.76667,37.01667],
+    ["LTAS",41.50640,32.08860],
+    ["LTAT",38.43528,38.09083],
+    ["LTAU",38.77028,35.49528],
+    ["LTAV",39.45139,31.36528],
+    ["LTAW",40.31167,36.37361],
+    ["LTAY",37.78556,29.70111],
+    ["LTAZ",38.76889,34.52639],
+    ["LTBA",40.97611,28.81417],
+    ["LTBD",37.81500,27.88917],
+    ["LTBE",40.23056,29.01111],
+    ["LTBF",39.61917,27.92583],
+    ["LTBG",40.31778,27.97750],
+    ["LTBH",40.13750,26.42667],
+    ["LTBI",39.78389,30.58194],
+    ["LTBJ",38.28917,27.15500],
+    ["LTBK",38.31889,27.15917],
+    ["LTBL",38.51278,27.01000],
+    ["LTBN",39.42667,30.01667],
+    ["LTBO",38.67960,29.48160],
+    ["LTBP",40.68389,29.37611],
+    ["LTBQ",40.73500,30.08333],
+    ["LTBR",40.25500,29.56250],
+    ["LTBS",36.71472,28.79278],
+    ["LTBT",38.80944,27.83500],
+    ["LTBU",41.13833,27.91917],
+    ["LTBV",37.14028,27.66972],
+    ["LTBW",41.10444,28.55000],
+    ["LTBX",40.99278,29.21556],
+    ["LTBY",39.81000,30.51944],
+    ["LTBZ",39.11139,30.12972],
+    ["LTCA",38.60667,39.29139],
+    ["LTCB",40.96806,38.07639],
+    ["LTCC",37.89389,40.20083],
+    ["LTCD",39.71000,39.52694],
+    ["LTCE",39.95528,41.16917],
+    ["LTCF",40.56222,43.11500],
+    ["LTCG",40.99510,39.78970],
+    ["LTCH",37.10028,38.84278],
+    ["LTCI",38.46833,43.33222],
+    ["LTCJ",37.93222,41.11639],
+    ["LTCK",38.74472,41.65389],
+    ["LTCL",37.96667,41.83333],
+    ["LTCM",42.01583,35.06639],
+    ["LTCN",37.53889,36.95333],
+    ["LTCO",39.65444,43.02722],
+    ["LTCP",37.73167,38.46889],
+    ["LTCR",37.23278,40.64056],
+    ["LTCS",37.45000,38.90000],
+    ["LTCT",39.98306,43.86639],
+    ["LTCU",38.86000,40.59389],
+    ["LTCV",37.36333,42.05972],
+    ["LTCW",37.55167,44.23361],
+    ["LTDA",36.36278,36.28222],
+    ["LTDB",36.89694,35.06750],
+    ["LTFA",38.52389,26.97444],
+    ["LTFB",37.95056,27.32917],
+    ["LTFC",37.86500,30.38194],
+    ["LTFD",39.55444,27.01361],
+    ["LTFE",37.25056,27.66417],
+    ["LTFG",36.29930,32.30140],
+    ["LTFH",41.26556,36.54861],
+    ["LTFJ",40.89833,29.30917],
+    ["LTFK",40.20111,25.88222],
+    ["LTFL",40.78722,26.60667],
+    ["LTFM",41.26278,28.74111],
+    ["LTFO",41.16917,40.82889]
+    ];
+    let n = state.userWptDB.reduce((m, w) => Math.max(m, parseInt(w.num, 10) || 0), 0);
+    HAVALIMANLARI.forEach(([icao, lat, lon]) => {
+      if(state.userWptDB.some(w => (w.name || "").trim() === icao)) return;
+      n += 1;
+      state.userWptDB.push({ num: String(n).padStart(3, "0"), name: icao.padEnd(8, " "), lat, lon, mgrs: MGRS.fromLatLon(lat, lon) });
+    });
+  })();
+
+
   let scratchTimer = null; 
   let idntTimer = null;
   let alertTimer = null;
@@ -7017,7 +7112,7 @@ function findNavDataByFreq(type, freqVal) {
                     else { showError("INVALID ENTRY"); } return;
                 } else { showError("INVALID ENTRY"); return; }
             }
-            // Yönlü/mesafeli nokta: "240/5.0" (basılan noktadan, sonrasına ekler) veya "NOKTA/240/5.0"
+            // Yönlü/mesafeli nokta: "240/5.0" (scratchpad'e NOKTA/240/5.0 yazar) veya "NOKTA/240/5.0" (basılan satıra atar)
             {
                 const numTok = "(\\d{1,3}(?:\\.\\d+)?)\\s*/\\s*(\\d{1,4}(?:\\.\\d+)?)";
                 const mRel = new RegExp("^" + numTok + "$").exec(raw);
@@ -7028,9 +7123,17 @@ function findNavDataByFreq(type, freqVal) {
                     if(!(brg >= 0 && brg <= 360) || !(dist > 0)){ showError("INVALID ENTRY"); return; }
                     let ref = null, insertAt = list.length;
                     if(mRel){
-                        // basılan noktaya göre; boş satıra basıldıysa son noktaya göre
+                        // "240/5.5": basılan noktanın adını başa ekleyip scratchpad'e yazar ("NOKTA/240/5.5");
+                        // sonra kullanıcı istediği satıra basarak yeni noktayı oraya atar.
                         const refIdx = (globalIdx < list.length) ? globalIdx : list.length - 1;
-                        if(refIdx >= 0 && list[refIdx]){ ref = list[refIdx]; insertAt = refIdx + 1; }
+                        const rw = (refIdx >= 0) ? list[refIdx] : null;
+                        if(!rw || !Number.isFinite(rw.lat) || !Number.isFinite(rw.lon)){ showError("INVALID ENTRY"); return; }
+                        let nm = (rw.label || "").toString().trim().toUpperCase();
+                        if(!nm){
+                            const f = (v, dg) => { const a = Math.abs(v); let d = Math.floor(a); let m = Math.round((a - d) * 60 * 1000) / 1000; if(m >= 60){ d += 1; m = 0; } return String(d).padStart(dg, "0") + m.toFixed(3).padStart(6, "0"); };
+                            nm = (rw.lat >= 0 ? "N" : "S") + f(rw.lat, 2) + (rw.lon >= 0 ? "E" : "W") + f(rw.lon, 3);
+                        }
+                        state.scratch = nm + "/" + raw; render(); return;
                     } else {
                         const nm = mNamed[1].trim();
                         const c = parseInitCoord(nm);
@@ -7044,8 +7147,7 @@ function findNavDataByFreq(type, freqVal) {
                     if(!ref || !Number.isFinite(ref.lat) || !Number.isFinite(ref.lon)){ showError("INVALID ENTRY"); return; }
                     const d = Geo.calcDestination(ref.lat, ref.lon, brg, dist);
                     const nw = { lat: d.lat, lon: d.lon, label: null, mgrs: MGRS.fromLatLon(d.lat, d.lon) };
-                    if(mRel) list.splice(insertAt, 0, nw);
-                    else if(insertAt < list.length) list[insertAt] = nw;
+                    if(insertAt < list.length) list[insertAt] = nw;
                     else list.push(nw);
                     state.scratch = ""; state.selectedWptIdx = -1; render(); return;
                 }
