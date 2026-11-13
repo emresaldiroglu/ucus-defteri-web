@@ -1328,6 +1328,8 @@ button[data-k="BRT"]::before {
 }
     .navkey.smalltxt{ font-size: 14px; letter-spacing:.2px; }
     .navkey.bkspkey{ font-size: 31px; }
+    /* Dokunmatik cihazlarda çift dokunma bekleme gecikmesini kaldırır, tuşlar anında tepki verir */
+    html, body, button, .lsk, .ffkkey, .navkey, .key{ touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .navkey.dir{
     position: relative;
     border-radius: 0;
@@ -1960,7 +1962,7 @@ button[data-k="BRT"]::before {
           <div class="pad leftpad">
             <div class="numgrid" id="numgrid"></div>
             <div class="navrow4"><button class="navkey" type="button" data-k="/">/</button><button class="navkey dir left" type="button" data-k="LT">◄</button><button class="navkey" type="button" data-k="ENT"><span class="ent-symbol"></span></button><button class="navkey dir right" type="button" data-k="RT">►</button></div>
-            <div class="navrow4"><div class="navspacer"></div><button class="navkey bkspkey" type="button" data-k="BKSP" data-tip="Bir önceki sayfaya geri dönmeyi sağlar.">⮌</button><button class="navkey dir down" type="button" data-k="DN">▼</button><button class="navkey smalltxt" type="button" data-k="PM">+/−</button></div>
+            <div class="navrow4"><div class="navspacer"></div><button class="navkey bkspkey" type="button" data-k="BKSP" data-tip="Bir önceki sayfaya geri dönmeyi sağlar." aria-label="Geri"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" focusable="false" style="display:block;pointer-events:none"><path d="M8 5 L3 10 L8 15 M3 10 H14.5 A5 5 0 0 1 14.5 20 H9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="navkey dir down" type="button" data-k="DN">▼</button><button class="navkey smalltxt" type="button" data-k="PM">+/−</button></div>
           </div>
           <div class="pad rightpad">
             <div class="alphabox"><div class="alphagrid" id="alphagrid"></div></div>
@@ -3546,7 +3548,7 @@ button[data-k="BRT"]::before {
     const endIdx = Math.min(startIdx + pageSize, list.length);
     return { list, pageSize, totalPages, safeIdx, pageIdx, startIdx, endIdx };
   }
-  function applyBrightness(){ displayBox.style.filter = `brightness(${state.brightness/100})`; }
+  function applyBrightness(){ displayBox.style.filter = (state.brightness >= 100) ? "" : `brightness(${state.brightness/100})`; }
   function setRckActive(on){
     state.rckActive = !!on;
     if(rckBtnEl) rckBtnEl.classList.toggle("rck-active", state.rckActive);
