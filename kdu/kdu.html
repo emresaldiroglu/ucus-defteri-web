@@ -2,7 +2,10 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#030303" />
   <title>Keyboard Display Unit</title>
 
   <style>
@@ -23,13 +26,16 @@
     }
 
     *{ box-sizing:border-box; }
+    html{ height:100%; overflow:hidden; overscroll-behavior:none; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
     body{
       margin:0;
-      width:100vw;
-      height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      overscroll-behavior:none;
+      -webkit-user-select:none;
+      -webkit-touch-callout:none;
       background: radial-gradient(circle at 50% 18%, #1d1f22 0%, #0a0b0c 48%, #030303 100%);
       font-family: 'Consolas', 'Courier New', monospace;
         font-weight: 700;           /* Yazıyı kalınlaştırır */
@@ -41,7 +47,6 @@
     }
 
     .kdu{
-      position: relative;
       width: 910px;
       background: linear-gradient(155deg, #3a3f46 0%, var(--casing) 32%, #1e2227 100%);
       border: 1px solid #111318;
@@ -55,7 +60,15 @@
         inset 14px 0 18px rgba(255,255,255,.03),
         inset -14px 0 18px rgba(0,0,0,.32);
       transform-origin: center center;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      margin: 0;
+      transform: translate(-50%, -50%);
     }
+    /* Telefonda uzun basınca metin seçimi, büyüteç ve menü çıkmasın; giriş alanları hariç */
+    *{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color: transparent; }
+    input, textarea{ -webkit-user-select:text; user-select:text; }
     .kdu::before{
       content:"";
       position:absolute;
@@ -9642,8 +9655,11 @@ function findNavDataByFreq(type, freqVal) {
   function makeLSK(el,s){ el.innerHTML=""; LSK_LINES.forEach((l,i)=>{ const b=document.createElement('button'); b.className="lsk"; b.onclick=()=>handleLSK(s,i+1); el.appendChild(b); }); }
 
   function fit(){
-    const s = Math.min(window.innerWidth/860, window.innerHeight/kdu.offsetHeight)*0.98;
-    kdu.style.transform=`scale(${Math.min(s,1)})`; applyBrightness(); render();
+    const vw = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    // Ekranı olabildiğince doldur: cihaz genişliğine/yüksekliğine göre ölçekle (büyük ekranda 1'i aşmaz)
+    const s = Math.min(vw/(kdu.offsetWidth + 6), vh/(kdu.offsetHeight + 6));
+    kdu.style.transform=`translate(-50%, -50%) scale(${Math.min(s,1)})`; applyBrightness(); render();
     const t=linesEl.offsetTop, h=linesEl.offsetHeight/TOTAL_LINES;
     [lskLeft,lskRight].forEach(c=>{ c.style.height=displayBox.offsetHeight+"px"; c.querySelectorAll('.lsk').forEach((b,i)=>b.style.top=(t+(LSK_LINES[i]-0.2)*h)+"px"); });
   }
@@ -10496,7 +10512,15 @@ function findNavDataByFreq(type, freqVal) {
   }
 
   initLoginOverlay();
-  makeLSK(lskLeft,"L"); makeLSK(lskRight,"R"); window.onresize=fit; new ResizeObserver(fit).observe(kdu); requestAnimationFrame(fit);
+  makeLSK(lskLeft,"L"); makeLSK(lskRight,"R");
+  // Telefonda sıkıştırma/çift dokunma yakınlaştırması ve uzun basma menüsü engellenir
+  ["gesturestart","gesturechange","gestureend"].forEach(ev => document.addEventListener(ev, e => e.preventDefault(), { passive:false }));
+  document.addEventListener("contextmenu", e => { if(!(e.target && e.target.closest && e.target.closest("input, textarea"))) e.preventDefault(); });
+  document.addEventListener("selectstart", e => { if(!(e.target && e.target.closest && e.target.closest("input, textarea"))) e.preventDefault(); });
+  document.addEventListener("touchmove", e => { if(e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
+  if(window.visualViewport) window.visualViewport.addEventListener("resize", () => fit());
+  window.addEventListener("orientationchange", () => setTimeout(fit, 250));
+  window.onresize=fit; new ResizeObserver(fit).observe(kdu); requestAnimationFrame(fit);
 })();
 </script>
 </body>
