@@ -1010,3 +1010,12 @@ html[data-tema="nvg"] .heli-seridi { --fener: rgba(70,255,122,.34); --duman: #46
 .mh-duman-git { margin-left: 1px; animation: mh-git 28s linear calc(2s + var(--g)) infinite; }
 .mh-duman-don { margin-left: 17px; animation: mh-don 28s linear calc(2s + var(--g)) infinite; }
 @media (prefers-reduced-motion: reduce) { .mh-duman, .mh-fener { display: none; } }
+
+/* Ajanda penceresi: ay satırı düzeni (ay adı solda, Cmt/Paz sağda, sayılar altta; taşmaz) */
+.ao-ay { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; }
+.ao-ay .ist-aj-ad { grid-column: 1; grid-row: 1; flex: none; min-width: 0; }
+.ao-ay .ist-aj-hs { grid-column: 2; grid-row: 1; text-align: right; white-space: nowrap; }
+.ao-ay .ist-aj-sayi { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+.ao-ay.bos .ist-aj-sayi { grid-column: 2; grid-row: 1; }
+.aj-ikon { flex: 0 0 36px; }
+.aj-butonlar { flex: none; }
