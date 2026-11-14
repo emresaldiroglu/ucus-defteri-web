@@ -203,24 +203,33 @@ function say(text) {
   m.textContent = text; m.hidden = false;
 }
 
-function play(c) {
+var tryToken = 0;
+function play(c, n) {
+  n = n || 0;
+  var urls = [c.url].concat(c.alts || []);
+  var token = ++tryToken;
   current = c; save("tv.last", c.id);
-  $("title").textContent = c.name; $("sub").textContent = c.cat;
+  $("title").textContent = c.name;
+  $("sub").textContent = c.cat + (urls.length > 1 ? " · kaynak " + (n + 1) + "/" + urls.length : "");
   say("Yükleniyor...");
+  function fail() {
+    if (token !== tryToken) return;
+    if (n + 1 < urls.length) { say("Kaynak " + (n + 1) + " açılamadı, sıradaki deneniyor..."); play(c, n + 1); }
+    else say("Bu kanalın hiçbir kaynağı açılmadı. Adres değişmiş ya da yurt dışı erişimi kapalı olabilir.");
+  }
   if (hls) { hls.destroy(); hls = null; }
-  video.removeAttribute("src");
+  video.removeAttribute("src"); video.onerror = null;
   if (window.Hls && Hls.isSupported()) {
-    hls = new Hls({ lowLatencyMode: false });
-    hls.on(Hls.Events.MANIFEST_PARSED, function () { say(""); tryPlay(); });
+    hls = new Hls({ lowLatencyMode: false, manifestLoadingMaxRetry: 1, levelLoadingMaxRetry: 1 });
+    hls.on(Hls.Events.MANIFEST_PARSED, function () { if (token === tryToken) { say(""); tryPlay(); } });
     hls.on(Hls.Events.ERROR, function (e, d) {
       if (!d.fatal) return;
-      say("Bu yayın açılamadı. Adres değişmiş ya da yurt dışı erişimi kapalı olabilir.");
-      hls.destroy(); hls = null;
+      hls.destroy(); hls = null; fail();
     });
-    hls.loadSource(c.url); hls.attachMedia(video);
+    hls.loadSource(urls[n]); hls.attachMedia(video);
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = c.url; video.onloadedmetadata = function () { say(""); tryPlay(); };
-    video.onerror = function () { say("Bu yayın açılamadı."); };
+    video.src = urls[n]; video.onloadedmetadata = function () { say(""); tryPlay(); };
+    video.onerror = fail;
   } else {
     say("Bu tarayıcı canlı yayın (HLS) oynatamıyor.");
   }
@@ -301,41 +310,68 @@ function mapCat(g) {
 }
 
 // M3U metnini kanal listesine ekler. prefix "m" kullanıcı, "o" hazır liste.
-function addM3U(text, prefix) {
-  var lines = text.split(/\r?\n/), added = 0, pending = null, seen = {};
-  all().forEach(function (c) { seen[c.url] = true; });
+function normName(s) {
+  return s.toLocaleLowerCase("tr").replace(/[\(\[].*?[\)\]]/g, "").replace(/\b(hd|fhd|sd|uhd|4k|tv)\b/g, "")
+    .replace(/[^a-z0-9çğıöşü]+/g, "");
+}
+// onlyTurkey: gruplu listelerde (çok ülkeli) sadece Türkiye grubunu alır.
+function addM3U(text, prefix, onlyTurkey, noSave) {
+  var lines = text.split(/\r?\n/), added = 0, pending = null, seen = {}, byName = {};
+  all().forEach(function (c) {
+    seen[c.url] = true;
+    (c.alts || []).forEach(function (u) { seen[u] = true; });
+    byName[normName(c.name)] = c;
+  });
   lines.forEach(function (ln, idx) {
     ln = ln.trim();
     if (ln.indexOf("#EXTINF") === 0) {
       var g = /group-title="([^"]*)"/.exec(ln);
+      var gt = g ? g[1] : "";
+      var tvc = /tvg-country="([^"]*)"/.exec(ln);
       var name = ln.indexOf(",") >= 0 ? ln.slice(ln.lastIndexOf(",") + 1).trim() : "Kanal";
-      pending = { name: name || "Kanal", cat: mapCat(g && g[1].split(";")[0]) };
+      var isTr = /turk|türk|\bTR\b/i.test(gt) || (tvc && /^TR$/i.test(tvc[1])) || /\.tr\b/i.test(ln);
+      pending = (onlyTurkey && !isTr) ? null : { name: name || "Kanal", cat: mapCat(gt.split(";")[0]) };
     } else if (pending && /^https?:\/\//.test(ln)) {
       if (!seen[ln]) {
         seen[ln] = true;
-        custom.push({ id: prefix + Date.now() + "_" + idx, name: pending.name, cat: pending.cat, url: ln, src: prefix });
-        added++;
+        var key = normName(pending.name), ex = byName[key];
+        if (ex) { (ex.alts = ex.alts || []).push(ln); }
+        else {
+          var c = { id: prefix + Date.now() + "_" + idx, name: pending.name, cat: pending.cat, url: ln, src: prefix };
+          custom.push(c); byName[key] = c; added++;
+        }
       }
       pending = null;
     }
   });
   custom.sort(function (a, b) { return a.name.localeCompare(b.name, "tr"); });
-  save("tv.custom", custom); renderList();
+  if (!noSave) { save("tv.custom", custom); renderList(); }
   return added;
 }
 
-// Hazır Türkiye listesi (iptv-org, herkese açık yayınlar). Tarayıcınız doğrudan indirir.
+// Hazır listeler (herkese açık). Tarayıcınız doğrudan indirir, aynı kanalın kaynakları birleştirilir.
+var SOURCES = [
+  { name: "iptv-org Türkiye", url: "https://iptv-org.github.io/iptv/countries/tr.m3u", onlyTurkey: false },
+  { name: "iptv-org Türkçe", url: "https://iptv-org.github.io/iptv/languages/tur.m3u", onlyTurkey: false },
+  { name: "Free-TV", url: "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8", onlyTurkey: true }
+];
 $("tr").onclick = function () {
-  var btn = $("tr"); btn.disabled = true; say("Türkiye listesi indiriliyor...");
-  fetch("https://iptv-org.github.io/iptv/countries/tr.m3u")
-    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
-    .then(function (t) {
-      custom = custom.filter(function (c) { return c.src !== "o"; });
-      var n = addM3U(t, "o");
-      flash(n + " kanal eklendi. Çalışmayan olabilir, bu normaldir.");
-    })
-    .catch(function () { say("Liste indirilemedi. İnternet bağlantınızı kontrol edin."); })
-    .then(function () { btn.disabled = false; });
+  var btn = $("tr"); btn.disabled = true; say("Listeler indiriliyor...");
+  custom = custom.filter(function (c) { return c.src !== "o"; });
+  Promise.all(SOURCES.map(function (s) {
+    return fetch(s.url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (t) { return { s: s, t: t }; }, function () { return { s: s, t: null }; });
+  })).then(function (res) {
+    var added = 0, ok = 0, bad = [];
+    res.forEach(function (x) {
+      if (x.t === null) { bad.push(x.s.name); return; }
+      ok++; added += addM3U(x.t, "o", x.s.onlyTurkey, true);
+    });
+    save("tv.custom", custom); renderList();
+    var total = custom.reduce(function (a, c) { return a + 1 + (c.alts ? c.alts.length : 0); }, 0);
+    if (!ok) say("Hiçbir liste indirilemedi. İnternet bağlantınızı kontrol edin.");
+    else flash(added + " yeni kanal eklendi (" + total + " kaynak)." + (bad.length ? " İndirilemeyen: " + bad.join(", ") + "." : ""));
+  }).then(function () { btn.disabled = false; });
 };
 
 renderTabs(); renderList();
