@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canlı TV</title>
+<style>
+/* Düzen: solda kanal listesi, sağda oynatıcı. TV kumandası ile gezilir. */
+:root {
+  --bg: #f3f4f6; --panel: #ffffff; --line: #d9dce3; --fg: #15171c; --muted: #5d6472;
+  --accent: #d6361f; --accent-fg: #ffffff; --focus: #1d5fd1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1013; --panel: #171a20; --line: #272c35; --fg: #eceef2; --muted: #98a0ae;
+    --accent: #ff5a3d; --accent-fg: #14100f; --focus: #6aa2ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1013; --panel: #171a20; --line: #272c35; --fg: #eceef2; --muted: #98a0ae;
+  --accent: #ff5a3d; --accent-fg: #14100f; --focus: #6aa2ff; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; height: 100%; }
+.side { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--line); }
+.head { padding: 14px 16px 10px; display: flex; gap: 10px; align-items: center; }
+.logo { font-weight: 800; letter-spacing: .02em; font-size: 1.15rem; }
+.logo b { color: var(--accent); }
+.search { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+.tabs { display: flex; gap: 6px; padding: 0 16px 10px; overflow-x: auto; }
+.tab { flex: none; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; cursor: pointer; font-size: .9rem; }
+.tab[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; }
+.ch { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
+.ch:hover { background: var(--bg); }
+.ch[aria-current="true"] { background: var(--bg); box-shadow: inset 4px 0 0 var(--accent); }
+.num { width: 2.2em; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat { font-size: .78rem; color: var(--muted); }
+.star { border: 0; background: transparent; cursor: pointer; font-size: 1.2rem; color: var(--muted); padding: 4px 6px; border-radius: 6px; }
+.star[aria-pressed="true"] { color: var(--accent); }
+.foot { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: .9rem; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+.stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 16px; gap: 12px; }
+.screen { position: relative; flex: 1; min-height: 0; background: #000; border-radius: 12px; overflow: hidden; display: grid; place-items: center; }
+video { width: 100%; height: 100%; background: #000; }
+.msg { position: absolute; inset: auto 16px 16px 16px; padding: 10px 14px; border-radius: 8px; background: rgba(0,0,0,.75); color: #fff; font-size: .95rem; }
+.now { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.now h1 { margin: 0; font-size: 1.4rem; }
+.now span { color: var(--muted); font-size: .9rem; }
+.hint { color: var(--muted); font-size: .85rem; }
+
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--fg); width: min(520px, calc(100vw - 32px)); padding: 18px; }
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.field { display: grid; gap: 4px; margin-bottom: 10px; }
+.field label { font-size: .85rem; color: var(--muted); }
+.field input, .field select { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); width: 100%; }
+.row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; min-height: 100%; }
+  .stage { order: -1; }
+  .screen { aspect-ratio: 16 / 9; flex: none; }
+  .side { border-right: 0; max-height: 60vh; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="head">
+      <div class="logo">Canlı<b>TV</b></div>
+      <input id="q" class="search" type="search" placeholder="Kanal ara" aria-label="Kanal ara">
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="list" id="list" role="list"></div>
+    <div class="foot">
+      <button class="btn primary" id="add">Kanal ekle</button>
+      <button class="btn" id="imp">M3U içe aktar</button>
+      <button class="btn" id="tr">Türkiye kanallarını yükle</button>
+      <input id="file" type="file" accept=".m3u,.m3u8,text/plain" hidden>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="screen" id="screen">
+      <video id="v" controls playsinline autoplay></video>
+      <div class="msg" id="msg" hidden></div>
+    </div>
+    <div class="now">
+      <h1 id="title">Bir kanal seçin</h1>
+      <span id="sub"></span>
+    </div>
+    <div class="hint">Kumanda: ↑ ↓ kanal seç, OK izle, F tam ekran, S favori. Tam ekranda ↑ ↓ kanal değiştirir.</div>
+  </main>
+</div>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h2>Kanal ekle</h2>
+    <div class="field"><label for="fn">Kanal adı</label><input id="fn" required maxlength="40"></div>
+    <div class="field"><label for="fu">Yayın adresi (.m3u8)</label><input id="fu" type="url" required placeholder="https://..."></div>
+    <div class="field"><label for="fc">Kategori</label>
+      <select id="fc"><option>Ulusal</option><option>Haber</option><option>Spor</option><option>Çocuk</option><option>Belgesel</option><option>Diğer</option></select>
+    </div>
+    <div class="row">
+      <button class="btn" type="button" id="cancel">Vazgeç</button>
+      <button class="btn primary" type="submit">Kaydet</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.17/hls.min.js"></script>
+<script>
+// Resmi TRT yayın adresleri. Adresler zamanla değişebilir; çalışmayanı "Kanal ekle" ile güncelleyin.
+var DEFAULTS = [
+  { id: "trt1", name: "TRT 1", cat: "Ulusal", url: "https://tv-trt1.medya.trt.com.tr/master.m3u8" },
+  { id: "trthaber", name: "TRT Haber", cat: "Haber", url: "https://tv-trthaber.medya.trt.com.tr/master.m3u8" },
+  { id: "trtspor", name: "TRT Spor", cat: "Spor", url: "https://tv-trtspor1.medya.trt.com.tr/master.m3u8" },
+  { id: "trtcocuk", name: "TRT Çocuk", cat: "Çocuk", url: "https://tv-trtcocuk.medya.trt.com.tr/master.m3u8" },
+  { id: "trtbelgesel", name: "TRT Belgesel", cat: "Belgesel", url: "https://tv-trtbelgesel.medya.trt.com.tr/master.m3u8" }
+];
+var TABS = ["Tümü", "Favoriler", "Ulusal", "Haber", "Spor", "Çocuk", "Belgesel", "Diğer"];
+
+function load(key, fallback) {
+  try { var s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch (e) { return fallback; }
+}
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+
+var custom = load("tv.custom", []);
+var favs = load("tv.favs", []);
+var lastId = load("tv.last", null);
+var tab = "Tümü", query = "", current = null, hls = null;
+
+var $ = function (id) { return document.getElementById(id); };
+var video = $("v");
+
+function all() { return DEFAULTS.concat(custom); }
+function visible() {
+  var q = query.trim().toLocaleLowerCase("tr");
+  return all().filter(function (c) {
+    if (tab === "Favoriler" && favs.indexOf(c.id) < 0) return false;
+    if (tab !== "Tümü" && tab !== "Favoriler" && c.cat !== tab) return false;
+    return !q || c.name.toLocaleLowerCase("tr").indexOf(q) >= 0;
+  });
+}
+
+function renderTabs() {
+  var box = $("tabs"); box.innerHTML = "";
+  TABS.forEach(function (t) {
+    var b = document.createElement("button");
+    b.className = "tab"; b.textContent = t; b.setAttribute("aria-pressed", String(t === tab));
+    b.onclick = function () { tab = t; renderTabs(); renderList(); };
+    box.appendChild(b);
+  });
+}
+
+function renderList() {
+  var box = $("list"); box.innerHTML = "";
+  var items = visible();
+  if (!items.length) {
+    var p = document.createElement("p");
+    p.className = "hint"; p.style.padding = "12px";
+    p.textContent = tab === "Favoriler" ? "Henüz favori yok. Kanalın yanındaki yıldıza basın." : "Kanal bulunamadı.";
+    box.appendChild(p); return;
+  }
+  items.forEach(function (c, i) {
+    var row = document.createElement("div");
+    row.style.display = "flex"; row.style.alignItems = "center"; row.setAttribute("role", "listitem");
+    var b = document.createElement("button");
+    b.className = "ch"; b.dataset.id = c.id;
+    b.setAttribute("aria-current", String(current && current.id === c.id));
+    b.innerHTML = '<span class="num"></span><span class="name"></span><span class="cat"></span>';
+    b.children[0].textContent = i + 1; b.children[1].textContent = c.name; b.children[2].textContent = c.cat;
+    b.onclick = function () { play(c); };
+    var s = document.createElement("button");
+    s.className = "star"; s.textContent = "★"; s.title = "Favori";
+    s.setAttribute("aria-label", c.name + " favori"); s.setAttribute("aria-pressed", String(favs.indexOf(c.id) >= 0));
+    s.onclick = function () { toggleFav(c.id); };
+    row.appendChild(b); row.appendChild(s); box.appendChild(row);
+  });
+}
+
+function toggleFav(id) {
+  var i = favs.indexOf(id);
+  if (i >= 0) favs.splice(i, 1); else favs.push(id);
+  save("tv.favs", favs); renderList();
+}
+
+function say(text) {
+  var m = $("msg");
+  if (!text) { m.hidden = true; return; }
+  m.textContent = text; m.hidden = false;
+}
+
+function play(c) {
+  current = c; save("tv.last", c.id);
+  $("title").textContent = c.name; $("sub").textContent = c.cat;
+  say("Yükleniyor...");
+  if (hls) { hls.destroy(); hls = null; }
+  video.removeAttribute("src");
+  if (window.Hls && Hls.isSupported()) {
+    hls = new Hls({ lowLatencyMode: false });
+    hls.on(Hls.Events.MANIFEST_PARSED, function () { say(""); tryPlay(); });
+    hls.on(Hls.Events.ERROR, function (e, d) {
+      if (!d.fatal) return;
+      say("Bu yayın açılamadı. Adres değişmiş ya da yurt dışı erişimi kapalı olabilir.");
+      hls.destroy(); hls = null;
+    });
+    hls.loadSource(c.url); hls.attachMedia(video);
+  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = c.url; video.onloadedmetadata = function () { say(""); tryPlay(); };
+    video.onerror = function () { say("Bu yayın açılamadı."); };
+  } else {
+    say("Bu tarayıcı canlı yayın (HLS) oynatamıyor.");
+  }
+  document.querySelectorAll(".ch").forEach(function (b) {
+    b.setAttribute("aria-current", String(b.dataset.id === c.id));
+  });
+}
+function tryPlay() {
+  var p = video.play();
+  if (p && p.catch) p.catch(function () { video.muted = true; video.play().catch(function () {}); });
+}
+
+function zap(step) {
+  var items = visible(); if (!items.length) return;
+  var i = items.findIndex(function (c) { return current && c.id === current.id; });
+  i = (i + step + items.length) % items.length;
+  play(items[i]);
+  var el = document.querySelector('.ch[data-id="' + items[i].id + '"]');
+  if (el) el.scrollIntoView({ block: "nearest" });
+}
+
+document.addEventListener("keydown", function (e) {
+  var t = e.target, typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT");
+  if (typing || $("dlg").open) return;
+  var k = e.key;
+  if (k === "f" || k === "F") { e.preventDefault(); toggleFull(); return; }
+  if (k === "s" || k === "S") { if (current) toggleFav(current.id); return; }
+  if (k === "ArrowUp" || k === "ArrowDown") {
+    e.preventDefault();
+    var step = k === "ArrowDown" ? 1 : -1;
+    if (document.fullscreenElement) { zap(step); return; }
+    var btns = Array.prototype.slice.call(document.querySelectorAll(".ch"));
+    var i = btns.indexOf(document.activeElement);
+    var n = i < 0 ? 0 : Math.max(0, Math.min(btns.length - 1, i + step));
+    if (btns[n]) btns[n].focus();
+  }
+});
+function toggleFull() {
+  if (document.fullscreenElement) { document.exitFullscreen(); return; }
+  var s = $("screen"); if (s.requestFullscreen) s.requestFullscreen().catch(function () {});
+}
+
+$("q").addEventListener("input", function (e) { query = e.target.value; renderList(); });
+
+// Kanal ekleme
+$("add").onclick = function () { $("dlg").showModal(); $("fn").focus(); };
+$("cancel").onclick = function () { $("dlg").close(); };
+$("form").addEventListener("submit", function (e) {
+  e.preventDefault();
+  var c = { id: "c" + Date.now(), name: $("fn").value.trim(), cat: $("fc").value, url: $("fu").value.trim() };
+  custom.push(c); save("tv.custom", custom);
+  $("form").reset(); $("dlg").close(); renderList(); play(c);
+});
+
+// M3U içe aktarma
+$("imp").onclick = function () { $("file").click(); };
+$("file").addEventListener("change", function (e) {
+  var f = e.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function () {
+    var n = addM3U(String(r.result), "m");
+    flash(n + " kanal eklendi.");
+  };
+  r.readAsText(f); e.target.value = "";
+});
+
+function flash(t) { say(t); setTimeout(function () { say(""); }, 4000); }
+
+// Kategori adlarını sekmelere çevirir (hem Türkçe hem İngilizce grup adları)
+function mapCat(g) {
+  var s = (g || "").toLocaleLowerCase("tr");
+  if (/news|haber/.test(s)) return "Haber";
+  if (/sport|spor/.test(s)) return "Spor";
+  if (/kids|child|çocuk|cocuk|animation/.test(s)) return "Çocuk";
+  if (/document|belgesel|science|education/.test(s)) return "Belgesel";
+  if (/general|entertainment|ulusal|movies|series/.test(s)) return "Ulusal";
+  return "Diğer";
+}
+
+// M3U metnini kanal listesine ekler. prefix "m" kullanıcı, "o" hazır liste.
+function addM3U(text, prefix) {
+  var lines = text.split(/\r?\n/), added = 0, pending = null, seen = {};
+  all().forEach(function (c) { seen[c.url] = true; });
+  lines.forEach(function (ln, idx) {
+    ln = ln.trim();
+    if (ln.indexOf("#EXTINF") === 0) {
+      var g = /group-title="([^"]*)"/.exec(ln);
+      var name = ln.indexOf(",") >= 0 ? ln.slice(ln.lastIndexOf(",") + 1).trim() : "Kanal";
+      pending = { name: name || "Kanal", cat: mapCat(g && g[1].split(";")[0]) };
+    } else if (pending && /^https?:\/\//.test(ln)) {
+      if (!seen[ln]) {
+        seen[ln] = true;
+        custom.push({ id: prefix + Date.now() + "_" + idx, name: pending.name, cat: pending.cat, url: ln, src: prefix });
+        added++;
+      }
+      pending = null;
+    }
+  });
+  custom.sort(function (a, b) { return a.name.localeCompare(b.name, "tr"); });
+  save("tv.custom", custom); renderList();
+  return added;
+}
+
+// Hazır Türkiye listesi (iptv-org, herkese açık yayınlar). Tarayıcınız doğrudan indirir.
+$("tr").onclick = function () {
+  var btn = $("tr"); btn.disabled = true; say("Türkiye listesi indiriliyor...");
+  fetch("https://iptv-org.github.io/iptv/countries/tr.m3u")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function (t) {
+      custom = custom.filter(function (c) { return c.src !== "o"; });
+      var n = addM3U(t, "o");
+      flash(n + " kanal eklendi. Çalışmayan olabilir, bu normaldir.");
+    })
+    .catch(function () { say("Liste indirilemedi. İnternet bağlantınızı kontrol edin."); })
+    .then(function () { btn.disabled = false; });
+};
+
+renderTabs(); renderList();
+var start = all().find(function (c) { return c.id === lastId; }) || DEFAULTS[0];
+play(start);
+</script>
+</body>
+</html>
