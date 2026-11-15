@@ -15,6 +15,7 @@
         <h1>🛠️ Yönetim Paneli</h1>
         <nav class="menu">
             <a href="#" id="menuKullanicilar" class="aktif">Kullanıcılar</a>
+            <a href="#duyuru" id="menuDuyuru">Duyuru</a>
             <a href="#gunluk" id="menuGunluk">İşlem Geçmişi</a>
             <a href="/login">Panelim</a>
             <a href="/logout">Çıkış</a>
@@ -68,6 +69,22 @@
         <!-- KULLANICI DETAYI -->
         <section id="gorunumDetay" hidden>
             <div id="detayIcerik"></div>
+        </section>
+
+        <!-- DUYURU -->
+        <section id="gorunumDuyuru" hidden>
+            <h2 class="bolum-baslik">Duyuru <small>(kullanıcılar panele girince üstte görür)</small></h2>
+            <div class="duyuru-kart">
+                <label for="duyuruMetin">Duyuru metni</label>
+                <textarea id="duyuruMetin" rows="4" maxlength="300" placeholder="Örn: Yeni özellik eklendi, panelde Kılavuz'a bakın."></textarea>
+                <div class="duyuru-alt"><span id="duyuruSayac">0 / 300</span></div>
+                <div class="duyuru-butonlar">
+                    <button type="button" class="btn btn-tamam" data-eylem="duyuru-yayinla">Yayınla</button>
+                    <button type="button" class="btn btn-iptal" data-eylem="duyuru-kaldir">Duyuruyu kaldır</button>
+                </div>
+                <p id="duyuruDurum" class="duyuru-durum"></p>
+                <p class="duyuru-not">Kullanıcı ✕ ile kapatırsa o cihazda aynı duyuru tekrar görünmez. Metni değiştirip yeniden yayınlarsan herkese yeniden görünür.</p>
+            </div>
         </section>
 
         <!-- İŞLEM GEÇMİŞİ -->

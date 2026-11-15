@@ -157,3 +157,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
     .c-aciklama { max-width: none; white-space: normal; }
     .c-islem { text-align: left; }
 }
+
+/* Duyuru */
+.duyuru-kart { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; padding: 14px; max-width: 640px; }
+.duyuru-kart label { display: block; font-weight: 700; margin-bottom: 6px; }
+.duyuru-alt { text-align: right; font-size: 12px; color: #667; margin: 4px 0 10px; }
+.duyuru-butonlar { display: flex; flex-wrap: wrap; gap: 8px; }
+.duyuru-durum { margin: 12px 0 0; font-size: 14px; }
+.duyuru-durum b { color: var(--mavi); }
+.duyuru-not { margin: 10px 0 0; font-size: 12px; color: #667; }

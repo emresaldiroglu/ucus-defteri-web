@@ -1011,6 +1011,33 @@
     }
 
 
+    /* ---------- DUYURU: yönetici mesajı, kapatılınca bu cihazda tekrar gösterilmez ---------- */
+
+    var DUYURU_ANAHTAR = 'duyuruGorulen';
+    function duyuruBandiKur() {
+        var kap = $('duyuruBandi');
+        var d = panelVeri && panelVeri.duyuru;
+        if (!kap || !d || !d.metin) return;
+        var gorulen = '';
+        try { gorulen = localStorage.getItem(DUYURU_ANAHTAR) || ''; } catch (e) { gorulen = ''; }
+        if (gorulen === String(d.id)) return;
+        kap.textContent = '';
+        kap.appendChild(eleman('span', 'duyuru-simge', '📢'));
+        kap.appendChild(eleman('span', 'duyuru-metin', d.metin));
+        var x = eleman('button', 'duyuru-kapat', '✕');
+        x.type = 'button';
+        x.setAttribute('data-eylem', 'duyuru-kapat');
+        x.setAttribute('aria-label', 'Duyuruyu kapat');
+        kap.appendChild(x);
+        kap.hidden = false;
+    }
+    function duyuruKapat() {
+        var kap = $('duyuruBandi');
+        var d = panelVeri && panelVeri.duyuru;
+        if (d) { try { localStorage.setItem(DUYURU_ANAHTAR, String(d.id)); } catch (e) { /* kayıt yoksa oturum boyunca kapalı */ } }
+        if (kap) kap.hidden = true;
+    }
+
     /* ---------- UYARI BANDI: turuncu uyarıları kaldırma (cihazda hatırlanır) ---------- */
 
     var UYARI_ANAHTAR = 'uyariGizli';
@@ -1904,6 +1931,7 @@
             case 'profil-modal': profilModalAc('bilgi'); break;
             case 'ekle-goster': modalKapat('profilModal'); eklemeKartiAc(); break;
             case 'uyari-ac': uyariAcKapat(hedef); break;
+            case 'duyuru-kapat': duyuruKapat(); break;
             case 'uyari-kaldir': uyariKaldir(hedef); break;
             case 'uyari-geri-getir': uyariGeriGetir(); break;
             case 'cop-ac': copAc(); break;
@@ -1993,6 +2021,7 @@
     filtreleUcuslari();
     sonKopyaGuncelle();
     sablonlariCiz();
+    duyuruBandiKur();
     uyariBandiKur();
     if (panelVeri.yenilik) setTimeout(function () { yenilikAc(true); }, 500);
     eklemeKartiniBelirle();

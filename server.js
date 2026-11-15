@@ -325,6 +325,25 @@ const DeletedFlightSchema = new mongoose.Schema({
 });
 const DeletedFlight = mongoose.model('DeletedFlight', DeletedFlightSchema, 'silinen_ucuslar');
 
+// Yönetici duyurusu: kullanıcıların panelinde üstte bir bant olarak görünür (tek aktif duyuru)
+const DUYURU_MAX_KARAKTER = 300;
+const DuyuruSchema = new mongoose.Schema({
+    metin: String,
+    yazar: String,
+    tarih: { type: Date, default: Date.now }
+});
+const Duyuru = mongoose.model('Duyuru', DuyuruSchema, 'duyuru');
+async function aktifDuyuruGetir() {
+    try {
+        const d = await Duyuru.findOne().sort({ tarih: -1 }).lean();
+        if (!d || !d.metin) return null;
+        return { id: String(new Date(d.tarih).getTime()), metin: String(d.metin) };
+    } catch (e) {
+        console.error('Duyuru okunamadı:', e);
+        return null;
+    }
+}
+
 // Yönetici işlemlerinin kaydı (kim, ne zaman, neyi değiştirdi)
 const AdminLogSchema = new mongoose.Schema({
     admin: String,
@@ -707,7 +726,7 @@ function ucusSatiriHtml(f) {
         </tr>`;
 }
 
-function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar, yenilikGoster, ajanda) {
+function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sablonlar, yenilikGoster, ajanda, duyuru) {
     profil = profil || {};
     const hedefSaat = profil.donemHedefSaat || DONEM_HEDEF_SAAT;
     const sablonListesi = sablonListesiHazirla(sablonlar);
@@ -731,6 +750,7 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
         aracBazli: aracBazliDurum,
         sablonlar: sablonListesi,
         ajanda: ajandaListesiHazirla(ajanda),
+        duyuru: (duyuru && duyuru.metin) ? { id: String(duyuru.id), metin: String(duyuru.metin) } : null,
         donemUcuslari: aktifDonem.donemUcuslari.map(f => ({
             tarih: f.tarih,
             havaAraciTipi: f.havaAraciTipi,
@@ -751,6 +771,8 @@ function panelHtmlOlustur(email, flights, kayitliTarihler, yonetici, profil, sab
                     <span class="tb-koyu" aria-hidden="true">🌙</span><span class="tb-acik" aria-hidden="true">☀️</span><span class="tb-nvg" aria-hidden="true">NVG</span>
                 </button>
             </div>
+
+            <div id="duyuruBandi" class="duyuru-bandi" role="status" hidden></div>
 
             ${uyariBandiHtml(uyarilar)}
 
@@ -1299,9 +1321,10 @@ const loginHandler = async (req, res) => {
         const flights = await Flight.find({ userEmail: email }).sort({ tarih: -1 });
         const kayitliTarihler = await ReportDate.find({ userEmail: email });
         const ajanda = await Ajanda.find({ userEmail: email });
+        const duyuru = await aktifDuyuruGetir();
 
         res.set('Cache-Control', 'no-store');
-        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar, (user.gorulenSurum || 0) < YENILIK_SURUMU, ajanda));
+        res.send(panelHtmlOlustur(email, flights, kayitliTarihler, adminMi(email), user.profil, user.sablonlar, (user.gorulenSurum || 0) < YENILIK_SURUMU, ajanda, duyuru));
     } catch (error) {
         console.error(error);
         if (cerezle) return res.status(500).send("Sunucu hatası.");
@@ -2009,6 +2032,30 @@ app.post('/api/admin/tarih', adminApiGerekli, async (req, res) => {
     } catch (e) {
         console.error(e);
         res.json({ success: false, message: 'Tarih kaydedilemedi.' });
+    }
+});
+
+// Duyuru: yönetici bir metin yayınlar, kullanıcılar panele girince üstte görür. Boş metin duyuruyu kaldırır.
+app.get('/api/admin/duyuru', adminApiGerekli, async (req, res) => {
+    res.json({ success: true, duyuru: await aktifDuyuruGetir(), sinir: DUYURU_MAX_KARAKTER });
+});
+app.post('/api/admin/duyuru', adminApiGerekli, async (req, res) => {
+    const ham = req.body && req.body.metin;
+    if (ham !== undefined && ham !== null && typeof ham !== 'string') return res.json({ success: false, message: 'Geçersiz metin.' });
+    const metin = String(ham || '').replace(/\s+/g, ' ').trim();
+    if (metin.length > DUYURU_MAX_KARAKTER) return res.json({ success: false, message: `Duyuru en fazla ${DUYURU_MAX_KARAKTER} karakter olabilir.` });
+    try {
+        await Duyuru.deleteMany({});
+        if (!metin) {
+            await logYaz(req.adminEmail, 'Duyuru kaldırıldı', '-', '');
+            return res.json({ success: true, duyuru: null });
+        }
+        await new Duyuru({ metin, yazar: req.adminEmail, tarih: new Date() }).save();
+        await logYaz(req.adminEmail, 'Duyuru yayınlandı', '-', metin);
+        res.json({ success: true, duyuru: await aktifDuyuruGetir() });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Duyuru kaydedilemedi.' });
     }
 });
 

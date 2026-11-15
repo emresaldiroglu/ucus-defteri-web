@@ -1019,3 +1019,14 @@ html[data-tema="nvg"] .heli-seridi { --fener: rgba(70,255,122,.34); --duman: #46
 .ao-ay.bos .ist-aj-sayi { grid-column: 2; grid-row: 1; }
 .aj-ikon { flex: 0 0 36px; }
 .aj-butonlar { flex: none; }
+
+/* Yönetici duyurusu */
+.duyuru-bandi { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 11px 12px; border-radius: 14px; font-size: 14px; line-height: 1.4; background: linear-gradient(135deg, rgba(79,172,254,.2), rgba(79,172,254,.08)); border: 1px solid rgba(79,172,254,.5); color: #d6ecff; }
+.duyuru-bandi[hidden] { display: none; }
+.duyuru-bandi .duyuru-simge { flex: none; }
+.duyuru-bandi .duyuru-metin { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.duyuru-bandi .duyuru-kapat { flex: none; width: 30px; height: 30px; padding: 0; border-radius: 8px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: inherit; font-size: 15px; line-height: 1; cursor: pointer; }
+html[data-tema="acik"] .duyuru-bandi { color: #124a7a; background: rgba(33,125,214,.12); border-color: rgba(33,125,214,.45); }
+html[data-tema="acik"] .duyuru-bandi .duyuru-kapat { background: rgba(0,0,0,.06); border-color: rgba(0,0,0,.2); }
+html[data-tema="nvg"] .duyuru-bandi { color: #eaffef; background: rgba(70,255,122,.1); border-color: rgba(70,255,122,.45); }
+html[data-tema="nvg"] .duyuru-bandi .duyuru-kapat { background: rgba(70,255,122,.12); border-color: rgba(70,255,122,.4); }

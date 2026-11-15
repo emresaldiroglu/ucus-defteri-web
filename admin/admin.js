@@ -131,8 +131,10 @@
         $('gorunumListe').hidden = ad !== 'liste';
         $('gorunumDetay').hidden = ad !== 'detay';
         $('gorunumGunluk').hidden = ad !== 'gunluk';
-        $('menuKullanicilar').classList.toggle('aktif', ad !== 'gunluk');
+        $('gorunumDuyuru').hidden = ad !== 'duyuru';
+        $('menuKullanicilar').classList.toggle('aktif', ad !== 'gunluk' && ad !== 'duyuru');
         $('menuGunluk').classList.toggle('aktif', ad === 'gunluk');
+        $('menuDuyuru').classList.toggle('aktif', ad === 'duyuru');
         window.scrollTo(0, 0);
     }
 
@@ -144,6 +146,7 @@
             if (email) return detayAc(email);
         }
         if (h === 'gunluk') return gunlukAc();
+        if (h === 'duyuru') return duyuruAc();
         return listeAc();
     }
 
@@ -568,6 +571,51 @@
 
     /* ---------- İŞLEM GEÇMİŞİ ---------- */
 
+    /* ---------- DUYURU ---------- */
+
+    function duyuruSayaciniGuncelle() {
+        var n = $('duyuruMetin').value.length;
+        $('duyuruSayac').textContent = n + ' / ' + (durum.duyuruSinir || 300);
+    }
+
+    function duyuruDurumuYaz(d) {
+        var el = $('duyuruDurum');
+        el.textContent = '';
+        if (d && d.metin) {
+            el.appendChild(document.createTextNode('Şu an yayında: '));
+            el.appendChild(eleman('b', '', d.metin));
+        } else {
+            el.textContent = 'Şu an yayında duyuru yok.';
+        }
+    }
+
+    async function duyuruAc() {
+        gorunumGoster('duyuru');
+        var r = await api('/api/admin/duyuru');
+        if (!r.success) {
+            if (!r.oturumYok) bildir(r.message || 'Duyuru alınamadı.', 'hata');
+            return;
+        }
+        durum.duyuruSinir = r.sinir || 300;
+        $('duyuruMetin').value = r.duyuru ? r.duyuru.metin : '';
+        duyuruSayaciniGuncelle();
+        duyuruDurumuYaz(r.duyuru);
+    }
+
+    async function duyuruKaydet(dugme, metin) {
+        dugme.disabled = true;
+        var r = await api('/api/admin/duyuru', 'POST', { metin: metin });
+        dugme.disabled = false;
+        if (!r.success) {
+            if (!r.oturumYok) bildir(r.message || 'Duyuru kaydedilemedi.', 'hata');
+            return;
+        }
+        $('duyuruMetin').value = r.duyuru ? r.duyuru.metin : '';
+        duyuruSayaciniGuncelle();
+        duyuruDurumuYaz(r.duyuru);
+        bildir(r.duyuru ? 'Duyuru yayınlandı.' : 'Duyuru kaldırıldı.', 'basari');
+    }
+
     async function gunlukAc() {
         gorunumGoster('gunluk');
         var r = await api('/api/admin/gunluk');
@@ -619,10 +667,16 @@
             case 'kullanici-sil': kullaniciSilAc(); break;
             case 'kullanici-sil-onayla': kullaniciSilOnayla(h); break;
             case 'daha-fazla': durum.tumUcuslar = true; detayCiz(); break;
+            case 'duyuru-yayinla':
+                if (!$('duyuruMetin').value.trim()) { bildir('Önce duyuru metnini yazın.', 'hata'); break; }
+                duyuruKaydet(h, $('duyuruMetin').value);
+                break;
+            case 'duyuru-kaldir': duyuruKaydet(h, ''); break;
             case 'modal-kapat': modalKapat(d.modal); break;
         }
     });
 
+    $('duyuruMetin').addEventListener('input', duyuruSayaciniGuncelle);
     $('ara').addEventListener('input', listeCiz);
     $('filtre').addEventListener('change', listeCiz);
     $('sirala').addEventListener('change', listeCiz);
