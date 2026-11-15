@@ -35,6 +35,8 @@
                     <option value="dolan">Dönem saatini dolduranlar</option>
                     <option value="pasif">30+ gündür uçmayanlar</option>
                     <option value="hic">Hiç uçuşu olmayanlar</option>
+                    <option value="askida">Askıdaki hesaplar</option>
+                    <option value="girmeyen">30+ gündür giriş yapmayanlar</option>
                 </select>
                 <select id="sirala" aria-label="Sıralama">
                     <option value="kayit-yeni">Yeni kayıt önce</option>
@@ -43,6 +45,7 @@
                     <option value="donem-cok">Dönem saati (çoktan aza)</option>
                     <option value="ucus-cok">Uçuş sayısı (çoktan aza)</option>
                     <option value="son-ucus">Son uçuş (yeniden eskiye)</option>
+                    <option value="son-giris">Son giriş (yeniden eskiye)</option>
                     <option value="eposta">E-posta (A-Z)</option>
                 </select>
             </div>
@@ -58,7 +61,7 @@
             <div class="tablo-sarmal">
                 <table class="tablo kullanici-tablo">
                     <thead>
-                        <tr><th>E-posta</th><th>Kayıt</th><th>Uçuş</th><th>Toplam Saat</th><th>Dönem (kalan)</th><th>Son Uçuş</th></tr>
+                        <tr><th>E-posta</th><th>Kayıt</th><th>Uçuş</th><th>Toplam Saat</th><th>Dönem (kalan)</th><th>Son Uçuş</th><th>Son Giriş</th></tr>
                     </thead>
                     <tbody id="kullaniciGovde"></tbody>
                 </table>

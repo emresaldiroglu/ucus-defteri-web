@@ -79,9 +79,14 @@ async function oturumGerekli(req, res, next) {
     }
     // Hesap silinmişse eski çerez artık işlem yapamaz
     try {
-        if (!(await User.exists({ email: oturum.email }))) {
+        const kayit = await User.findOne({ email: oturum.email }, 'askida').lean();
+        if (!kayit) {
             oturumCerezSil(req, res);
             return res.status(401).json({ success: false, message: "Hesap bulunamadı, lütfen tekrar giriş yapın." });
+        }
+        if (kayit.askida) {
+            oturumCerezSil(req, res);
+            return res.status(401).json({ success: false, message: "Hesabınız askıya alınmış. Yöneticiyle iletişime geçin." });
         }
     } catch (e) {
         console.error(e);
@@ -167,6 +172,10 @@ const UserSchema = new mongoose.Schema({
     password: String,
     // Kullanıcının en son okuduğu "Yenilikler" sürümü (0 = hiç görmedi)
     gorulenSurum: { type: Number, default: 0 },
+    // Yönetici alanları: hesap askıya alma, son giriş zamanı, yönetici notu (kullanıcıya gösterilmez)
+    askida: { type: Boolean, default: false },
+    sonGiris: Date,
+    yoneticiNotu: String,
     // Kişisel bilgiler (hepsi isteğe bağlı; yalnızca kullanıcının kendisi görür/değiştirir)
     profil: {
         adSoyad: String,
@@ -1314,7 +1323,21 @@ const loginHandler = async (req, res) => {
         }
 
         if (!isMatch) return basarisiz();
+        if (user.askida) {
+            // Şifre doğru girildiği için hesabın var olduğu zaten biliniyor; askı bilgisi verilir
+            oturumCerezSil(req, res);
+            return girisSayfasinaDon(res, 'hata', 'askida', 'login');
+        }
         if (!cerezle) girisSiniriHesap.temizle(hesapAnahtar);
+        // Son giriş zamanı: şifreyle girişte her seferinde, çerezle açılışta en fazla saatte bir yazılır
+        try {
+            const simdi = Date.now();
+            if (!cerezle || !user.sonGiris || simdi - new Date(user.sonGiris).getTime() > 3600 * 1000) {
+                await User.updateOne({ email }, { $set: { sonGiris: new Date(simdi) } });
+            }
+        } catch (e) {
+            console.error('Son giriş yazılamadı:', e);
+        }
 
         oturumCerezYaz(req, res, email, kalici);
 
@@ -1819,7 +1842,7 @@ Object.keys(ADMIN_DOSYALARI).forEach(url => {
 // Tüm kullanıcılar için uçuş sayısı, toplam saat, dönem saati ve son uçuş tarihi
 async function kullaniciOzetleriniHesapla() {
     const [kullanicilar, ucuslar] = await Promise.all([
-        User.find({}, 'email profil.donemHedefSaat').lean(),
+        User.find({}, 'email profil.donemHedefSaat askida sonGiris').lean(),
         Flight.find({}, 'userEmail tarih sure').lean()
     ]);
     const donem = donemSiniri();
@@ -1833,7 +1856,9 @@ async function kullaniciOzetleriniHesapla() {
             toplamDakika: 0,
             donemDakika: 0,
             hedefDakika: ((u.profil && u.profil.donemHedefSaat) || DONEM_HEDEF_SAAT) * 60,
-            sonUcus: null
+            sonUcus: null,
+            askida: u.askida === true,
+            sonGiris: u.sonGiris ? new Date(u.sonGiris).toISOString() : null
         });
     });
     ucuslar.forEach(f => {
@@ -1873,7 +1898,7 @@ app.get('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
     const email = epostaTemizle(req.query && req.query.email);
     if (!email) return res.json({ success: false, message: 'E-posta gerekli.' });
     try {
-        const user = await User.findOne({ email }, 'email profil.donemHedefSaat').lean();
+        const user = await User.findOne({ email }, 'email profil.donemHedefSaat askida sonGiris yoneticiNotu').lean();
         if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
 
         const ucuslar = await Flight.find({ userEmail: emailFiltresi(email) })
@@ -1886,7 +1911,10 @@ app.get('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
             success: true,
             kullanici: {
                 email: user.email,
-                kayit: user._id && user._id.getTimestamp ? user._id.getTimestamp().toISOString() : null
+                kayit: user._id && user._id.getTimestamp ? user._id.getTimestamp().toISOString() : null,
+                askida: user.askida === true,
+                sonGiris: user.sonGiris ? new Date(user.sonGiris).toISOString() : null,
+                not: user.yoneticiNotu || ''
             },
             ucuslar: ucuslar.map(f => ({
                 id: String(f._id),
@@ -1904,6 +1932,45 @@ app.get('/api/admin/kullanici', adminApiGerekli, async (req, res) => {
     } catch (e) {
         console.error(e);
         res.json({ success: false, message: 'Kullanıcı bilgisi alınamadı.' });
+    }
+});
+
+// Hesabı askıya alır / askıyı kaldırır (veriler silinmez, giriş yapılamaz)
+app.post('/api/admin/askiya-al', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.body && req.body.email);
+    const askida = req.body && req.body.askida === true;
+    if (!email) return res.json({ success: false, message: 'E-posta gerekli.' });
+    if (adminMi(email)) return res.json({ success: false, message: 'Yönetici hesapları askıya alınamaz.' });
+    try {
+        const user = await User.findOne({ email }, 'email').lean();
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+        await User.updateOne({ email }, { $set: { askida } });
+        await logYaz(req.adminEmail, askida ? 'Hesap askıya alındı' : 'Askı kaldırıldı', email, '');
+        res.json({ success: true, askida });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'İşlem yapılamadı.' });
+    }
+});
+
+// Yönetici notu: yalnızca yönetim panelinde görünür, kullanıcıya hiçbir yerde gösterilmez
+const YONETICI_NOTU_MAX = 500;
+app.post('/api/admin/not', adminApiGerekli, async (req, res) => {
+    const email = epostaTemizle(req.body && req.body.email);
+    const ham = req.body && req.body.not;
+    if (!email) return res.json({ success: false, message: 'E-posta gerekli.' });
+    if (ham !== undefined && ham !== null && typeof ham !== 'string') return res.json({ success: false, message: 'Geçersiz not.' });
+    const not = String(ham || '').trim();
+    if (not.length > YONETICI_NOTU_MAX) return res.json({ success: false, message: `Not en fazla ${YONETICI_NOTU_MAX} karakter olabilir.` });
+    try {
+        const user = await User.findOne({ email }, 'email').lean();
+        if (!user) return res.json({ success: false, message: 'Kullanıcı bulunamadı.' });
+        await User.updateOne({ email }, { $set: { yoneticiNotu: not } });
+        await logYaz(req.adminEmail, not ? 'Not güncellendi' : 'Not silindi', email, not ? `${not.length} karakter` : '');
+        res.json({ success: true, not });
+    } catch (e) {
+        console.error(e);
+        res.json({ success: false, message: 'Not kaydedilemedi.' });
     }
 });
 

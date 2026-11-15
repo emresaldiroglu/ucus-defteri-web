@@ -166,3 +166,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px
 .duyuru-durum { margin: 12px 0 0; font-size: 14px; }
 .duyuru-durum b { color: var(--mavi); }
 .duyuru-not { margin: 10px 0 0; font-size: 12px; color: #667; }
+
+/* Hesap askısı ve yönetici notu */
+.askida-uyari { margin: 8px 0; padding: 8px 12px; border-radius: 8px; background: #fdecea; border: 1px solid #f5b5ae; color: #8a1f14; font-size: 14px; font-weight: 600; }
+.rozet.kirmizi { background: #fdecea; color: #a32020; border: 1px solid #f5b5ae; }
+.not-alt { margin-top: 8px; }
+#yoneticiNotu { height: auto; min-height: 70px; }

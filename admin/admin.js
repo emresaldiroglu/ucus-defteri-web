@@ -203,6 +203,8 @@
             if (f === 'dolan') return u.donemDakika >= (u.hedefDakika || hedef);
             if (f === 'pasif') return u.ucusSayisi > 0 && u.sonUcus < otuz;
             if (f === 'hic') return u.ucusSayisi === 0;
+            if (f === 'askida') return u.askida === true;
+            if (f === 'girmeyen') return !u.sonGiris || u.sonGiris.slice(0, 10) < otuz;
             return true;
         });
 
@@ -213,6 +215,7 @@
             'donem-cok': function (a, b) { return b.donemDakika - a.donemDakika; },
             'ucus-cok': function (a, b) { return b.ucusSayisi - a.ucusSayisi; },
             'son-ucus': function (a, b) { return (b.sonUcus || '').localeCompare(a.sonUcus || ''); },
+            'son-giris': function (a, b) { return (b.sonGiris || '').localeCompare(a.sonGiris || ''); },
             'eposta': function (a, b) { return a.email.localeCompare(b.email); }
         };
         l.sort(siralayicilar[s] || siralayicilar['kayit-yeni']);
@@ -226,6 +229,7 @@
         tr.dataset.email = u.email;
 
         var eposta = hucre(tr, 'c-eposta', '', u.email, true);
+        if (u.askida) eposta.appendChild(eleman('span', 'rozet kirmizi', 'Askıda'));
         if (u.ucusSayisi === 0) eposta.appendChild(eleman('span', 'rozet gri', 'Uçuş yok'));
         else if (u.sonUcus < tarihOnce(30)) eposta.appendChild(eleman('span', 'rozet turuncu', 'Pasif'));
         if (u.donemDakika >= hedef) eposta.appendChild(eleman('span', 'rozet yesil', 'Dönem doldu'));
@@ -236,6 +240,7 @@
         var donem = hucre(tr, '', 'Dönem (kalan)', dk(u.donemDakika));
         donem.appendChild(eleman('span', 'kalan', u.donemDakika >= hedef ? '✓' : '(' + dk(hedef - u.donemDakika) + ')'));
         hucre(tr, '', 'Son uçuş', u.sonUcus ? trTarih(u.sonUcus) : '-');
+        hucre(tr, '', 'Son giriş', u.sonGiris ? trTarih(u.sonGiris.slice(0, 10)) : '-');
         return tr;
     }
 
@@ -317,13 +322,28 @@
         geri.href = '#';
         ust.appendChild(geri);
         ust.appendChild(eleman('h2', null, u.email));
-        ust.appendChild(eleman('div', 'kayit', 'Kayıt: ' + (u.kayit ? trZaman(u.kayit) : '-')));
+        ust.appendChild(eleman('div', 'kayit', 'Kayıt: ' + (u.kayit ? trZaman(u.kayit) : '-') + '  ·  Son giriş: ' + (u.sonGiris ? trZaman(u.sonGiris) : 'kayıt yok')));
+        if (u.askida) ust.appendChild(eleman('div', 'askida-uyari', 'Bu hesap askıda: kullanıcı giriş yapamaz. Verileri duruyor.'));
         var bg = eleman('div', 'buton-grubu');
         bg.appendChild(dugme('🚁 Uçuş ekle', 'btn btn-tamam', 'ucus-ekle'));
         bg.appendChild(dugme('🔑 Şifre sıfırla', 'btn btn-mavi', 'sifre-sifirla'));
+        bg.appendChild(dugme(u.askida ? 'Askıyı kaldır' : 'Hesabı askıya al', 'btn btn-ikincil', 'hesap-askiya-al'));
         bg.appendChild(dugme('🗑️ Hesabı sil', 'btn btn-tehlike', 'kullanici-sil'));
         ust.appendChild(bg);
         kap.appendChild(ust);
+
+        // Yönetici notu (kullanıcı görmez)
+        var notKart = eleman('div', 'kart');
+        notKart.appendChild(eleman('h3', null, '📝 Yönetici notu (kullanıcı görmez)'));
+        var notAlan = document.createElement('textarea');
+        notAlan.id = 'yoneticiNotu'; notAlan.rows = 3; notAlan.maxLength = 500;
+        notAlan.placeholder = 'Örn: 14. dönem, S70, telefon...';
+        notAlan.value = u.not || '';
+        notKart.appendChild(notAlan);
+        var notAlt = eleman('div', 'not-alt');
+        notAlt.appendChild(dugme('Notu kaydet', 'btn btn-tamam btn-kucuk', 'not-kaydet'));
+        notKart.appendChild(notAlt);
+        kap.appendChild(notKart);
 
         // Özet kartları
         var ozet = eleman('div', 'ozet-grid dort');
@@ -512,6 +532,30 @@
 
     /* ---------- ŞİFRE SIFIRLAMA ve HESAP SİLME ---------- */
 
+    async function hesapAskiyaAl() {
+        var u = durum.detay.kullanici;
+        var yeni = !u.askida;
+        var ok = await onayIste(yeni ? 'Hesabı askıya al' : 'Askıyı kaldır',
+            yeni ? u.email + ' giriş yapamayacak ve açık oturumları kapanacak. Verileri silinmez, istediğin zaman geri açabilirsin.'
+                 : u.email + ' tekrar giriş yapabilecek.',
+            yeni ? 'Askıya al' : 'Kaldır');
+        if (!ok) return;
+        var r = await api('/api/admin/askiya-al', 'POST', { email: u.email, askida: yeni });
+        if (r.oturumYok) return;
+        if (r.success) { bildir(yeni ? 'Hesap askıya alındı.' : 'Askı kaldırıldı.', 'basari'); await detayYenile(); }
+        else bildir(r.message || 'İşlem yapılamadı.', 'hata');
+    }
+
+    async function notKaydet(dugmeEl) {
+        var u = durum.detay.kullanici;
+        dugmeEl.disabled = true;
+        var r = await api('/api/admin/not', 'POST', { email: u.email, not: $('yoneticiNotu').value });
+        dugmeEl.disabled = false;
+        if (r.oturumYok) return;
+        if (r.success) { u.not = r.not; bildir(r.not ? 'Not kaydedildi.' : 'Not silindi.', 'basari'); }
+        else bildir(r.message || 'Not kaydedilemedi.', 'hata');
+    }
+
     async function sifreSifirla() {
         var email = durum.detay.kullanici.email;
         var ok = await onayIste('Şifre sıfırla', email + ' için yeni bir geçici şifre oluşturulacak. Mevcut şifresi geçersiz olacak.', 'Sıfırla');
@@ -663,6 +707,8 @@
             case 'tarih-kaydet': tarihKaydet(h); break;
             case 'tarih-temizle': tarihTemizle(d.alan); break;
             case 'sifre-sifirla': sifreSifirla(); break;
+            case 'hesap-askiya-al': hesapAskiyaAl(); break;
+            case 'not-kaydet': notKaydet(h); break;
             case 'sifre-kopyala': sifreKopyala(); break;
             case 'kullanici-sil': kullaniciSilAc(); break;
             case 'kullanici-sil-onayla': kullaniciSilOnayla(h); break;
